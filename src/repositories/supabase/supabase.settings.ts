@@ -1,0 +1,70 @@
+import type { SqlClient } from './client';
+import type { ISettingsRepository } from '../interfaces/entity-repositories';
+import type { CampSettings } from '../../core/entities/settings';
+import { SETTINGS_ID } from '../../core/entities/settings';
+
+function toSettings(r: Record<string, unknown>): CampSettings {
+  return {
+    id: SETTINGS_ID,
+    campName: r['camp_name'] as string,
+    year: r['year'] as number,
+    startDate: r['start_date'] as string,
+    endDate: r['end_date'] as string,
+    timezone: r['timezone'] as string,
+    checkInLocation: r['check_in_location'] as string,
+    checkInFrom: r['check_in_from'] as string,
+    checkInBanner: (r['check_in_banner'] as string | null) ?? undefined,
+    registerBaseUrl: r['register_base_url'] as string,
+    checkInDays: (r['check_in_days'] as string[] | null) ?? [],
+    accommodationLocked: r['accommodation_locked'] as boolean,
+    campMode: r['camp_mode'] as CampSettings['campMode'],
+    createdAt: (r['created_at'] as Date).toISOString(),
+    updatedAt: (r['updated_at'] as Date).toISOString(),
+  };
+}
+
+function settingsCols(s: CampSettings): Record<string, unknown> {
+  return {
+    id: SETTINGS_ID,
+    camp_name: s.campName,
+    year: s.year,
+    start_date: s.startDate,
+    end_date: s.endDate,
+    timezone: s.timezone,
+    check_in_location: s.checkInLocation,
+    check_in_from: s.checkInFrom,
+    check_in_banner: s.checkInBanner ?? null,
+    register_base_url: s.registerBaseUrl,
+    check_in_days: s.checkInDays,
+    accommodation_locked: s.accommodationLocked,
+    camp_mode: s.campMode,
+    created_at: s.createdAt,
+    updated_at: s.updatedAt,
+  };
+}
+
+const UPDATE_COLS = [
+  'camp_name', 'year', 'start_date', 'end_date', 'timezone',
+  'check_in_location', 'check_in_from', 'check_in_banner', 'register_base_url',
+  'check_in_days', 'accommodation_locked', 'camp_mode', 'updated_at',
+] as const;
+
+export class SupabaseSettingsRepository implements ISettingsRepository {
+  constructor(private sql: SqlClient) {}
+
+  async init(): Promise<void> {}
+
+  async getSingleton(): Promise<CampSettings | null> {
+    const rows = await this.sql`select * from settings where id = 'settings'`;
+    return rows[0] ? toSettings(rows[0]) : null;
+  }
+
+  async saveSingleton(settings: CampSettings): Promise<CampSettings> {
+    const cols = settingsCols(settings);
+    await this.sql`
+      insert into settings ${this.sql(cols)}
+      on conflict (id) do update set ${this.sql(cols, ...UPDATE_COLS)}
+    `;
+    return settings;
+  }
+}
