@@ -1,0 +1,12 @@
+# dependencies
+node_modules/
+
+# build / runtime
+dist/
+data/
+*.log
+
+# tooling / local
+.superpowers/
+.vercel/
+.DS_Store

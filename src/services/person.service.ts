@@ -1,0 +1,230 @@
+import type { IPersonRepository } from '../repositories/interfaces/entity-repositories';
+import type { Person } from '../core/entities/person';
+import { isCamper, isRegistrant } from '../core/entities/person';
+import type { CheckInEntry, SignOutEvent } from '../core/entities/camper';
+import type { Actor } from '../core/entities/user';
+import { assertCan, canAccessChurch } from './access-control';
+import { NotFoundError, BadRequestError } from '../core/errors/app-error';
+import { ageFromDob, nowISO } from '../utils/date';
+import { newId } from '../utils/id';
+import { withCheckIn, withSignEvent } from './person-lifecycle';
+
+/**
+ * PersonService — the unified registrant + camper service (design D2), operating
+ * over the single `people` store. It exposes a pre-camp ("registrant") view and an
+ * at-camp ("camper") view, both filtered by lifecycle, so the existing /registrants
+ * and /campers routes can be repointed here in Step 4 without changing their shapes.
+ *
+ * Step 3 introduces this additively alongside the legacy RegistrantService /
+ * CamperService. The route switchover + legacy removal happen in Step 4 (compiler in
+ * the loop). RBAC reuses the canonical helpers in access-control.ts; person scoping
+ * reads churchId/zone (the only fields the camper/registrant access rules use).
+ */
+
+export interface PersonProfile extends Person {
+  fullName: string;
+  age: number | null;
+  lastSignOut: string | null;
+}
+
+export interface PersonService {
+  /** All people the actor may see (any lifecycle), role-scoped. */
+  list(actor: Actor, opts?: { zone?: string; churchId?: string; q?: string }): Promise<Person[]>;
+  /** Pre-camp view: lifecycle === 'registered'. */
+  listRegistrants(actor: Actor, churchId?: string): Promise<Person[]>;
+  /** At-camp view: lifecycle ∈ {arrived, checked_out, departed}. */
+  listCampers(actor: Actor, opts?: { zone?: string; churchId?: string; q?: string }): Promise<Person[]>;
+  get(actor: Actor, id: string): Promise<Person>;
+  getProfile(actor: Actor, id: string): Promise<PersonProfile>;
+  buildProfile(person: Person): PersonProfile;
+
+  // ----- Step 4 write surface (dormant until the live switchover wires routes) -----
+  /** Create a pre-camp registrant (lifecycle 'registered'). */
+  create(actor: Actor, input: { firstName: string; lastName: string; gender: Person['gender']; kind?: Person['kind']; grade?: Person['grade'] | null; churchId: string; churchName: string; zone: string; paymentStatus?: Person['paymentStatus']; accommodationKind?: Person['accommodationKind']; accommodationLabel?: string | null; parentGuardianName?: string | null; parentPhone?: string | null; mobile?: string | null }): Promise<Person>;
+  update(actor: Actor, id: string, patch: Partial<Person>): Promise<Person>;
+  remove(actor: Actor, id: string): Promise<void>;
+  /** Apply a check-in entry — first 'in' promotes registered → arrived (Day-1 sign-in). */
+  checkIn(actor: Actor, personId: string, entry: Omit<CheckInEntry, 'id'>): Promise<Person>;
+  /** Apply a sign-out/sign-in attendance event. */
+  signEvent(actor: Actor, personId: string, event: Omit<SignOutEvent, 'id'>): Promise<Person>;
+}
+
+/** True if the actor may access a person, by role + church/zone (mirrors canAccessCamper). */
+export function canAccessPerson(actor: Actor, person: Pick<Person, 'churchId' | 'zone'>): boolean {
+  switch (actor.role) {
+    case 'admin':
+    case 'director':
+      return true;
+    case 'zoneLeader':
+      return actor.zone != null && person.zone === actor.zone;
+    case 'church':
+      return actor.churchId === person.churchId;
+    default:
+      return false;
+  }
+}
+
+export function makePersonService(repo: IPersonRepository): PersonService {
+  function buildProfile(person: Person): PersonProfile {
+    const lastSignOut =
+      person.signOutHistory
+        .filter((e) => e.type === 'out')
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0]?.timestamp ?? null;
+    return {
+      ...person,
+      fullName: `${person.firstName} ${person.lastName}`,
+      age: person.dateOfBirth ? ageFromDob(person.dateOfBirth) : null,
+      lastSignOut,
+    };
+  }
+
+  async function scopedAll(
+    actor: Actor,
+    opts: { zone?: string; churchId?: string; q?: string },
+  ): Promise<Person[]> {
+    let results: Person[];
+    if (opts.q) {
+      results = await repo.search(opts.q);
+    } else if (opts.zone) {
+      results = await repo.findByZone(opts.zone);
+    } else if (opts.churchId) {
+      results = await repo.findByChurch(opts.churchId);
+    } else {
+      results = await repo.findAll();
+    }
+    return results.filter((p) => canAccessPerson(actor, p));
+  }
+
+  async function getOwned(actor: Actor, id: string): Promise<Person> {
+    const p = await repo.findById(id);
+    if (!p) throw new NotFoundError('Person not found');
+    if (!canAccessPerson(actor, p)) throw new NotFoundError('Person not found');
+    return p;
+  }
+
+  return {
+    buildProfile,
+
+    async list(actor, opts = {}) {
+      assertCan(actor, 'camper:read');
+      return scopedAll(actor, opts);
+    },
+
+    async listRegistrants(actor, churchId) {
+      assertCan(actor, 'registrant:read');
+      // Preserve the legacy churchId fast-path access check (registrant.service.list).
+      if (churchId) {
+        const items = await repo.findByChurch(churchId);
+        const zone = items[0]?.zone;
+        // canAccessChurch matches the old registrant behaviour incl. the empty-church
+        // edge (zone undefined -> zoneLeader denied).
+        if (!canAccessChurch(actor, churchId, zone)) {
+          return [];
+        }
+        return items.filter(isRegistrant);
+      }
+      const all = await scopedAll(actor, {});
+      return all.filter(isRegistrant);
+    },
+
+    async listCampers(actor, opts = {}) {
+      assertCan(actor, 'camper:read');
+      const all = await scopedAll(actor, opts);
+      return all.filter(isCamper);
+    },
+
+    async get(actor, id) {
+      assertCan(actor, 'camper:read');
+      return getOwned(actor, id);
+    },
+
+    async getProfile(actor, id) {
+      assertCan(actor, 'camper:read');
+      const p = await getOwned(actor, id);
+      return buildProfile(p);
+    },
+
+    // ----- Step 4 write surface (dormant; wired to routes during the switchover) ---
+
+    async create(actor, input) {
+      assertCan(actor, 'registrant:write');
+      if (!canAccessPerson(actor, { churchId: input.churchId, zone: input.zone })) {
+        throw new BadRequestError('Cannot create a person outside your scope');
+      }
+      const now = nowISO();
+      const person: Person = {
+        id: newId('person'),
+        firstName: input.firstName,
+        lastName: input.lastName,
+        gender: input.gender,
+        dateOfBirth: null,
+        grade: input.grade ?? null,
+        school: null,
+        kind: input.kind ?? 'youth',
+        churchId: input.churchId,
+        churchName: input.churchName,
+        zone: input.zone,
+        groupId: null,
+        mobile: input.mobile ?? null,
+        email: null,
+        suburb: null,
+        postcode: null,
+        state: null,
+        medicalConditions: [],
+        dietaryRequirements: [],
+        otherMedications: null,
+        parentGuardianName: input.parentGuardianName ?? null,
+        parentPhone: input.parentPhone ?? null,
+        parentRelation: null,
+        blueCardNumber: null,
+        blueCardExpiry: null,
+        consents: {
+          medical: { granted: false, timestamp: null },
+          media: { granted: false, timestamp: null },
+          supervision: { granted: false, timestamp: null },
+        },
+        paymentStatus: input.paymentStatus ?? 'unpaid',
+        accommodationKind: input.accommodationKind ?? null,
+        accommodationLabel: input.accommodationLabel ?? null,
+        lifecycle: 'registered',
+        atCamp: false,
+        checkInHistory: [],
+        signOutHistory: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      return repo.save(person);
+    },
+
+    async update(actor, id, patch) {
+      assertCan(actor, 'registrant:write');
+      const existing = await getOwned(actor, id);
+      // Identity + lifecycle/history are not patchable here (lifecycle changes only
+      // via checkIn/signEvent); guard church/zone moves through the scope check.
+      const { id: _i, lifecycle: _l, atCamp: _a, checkInHistory: _ch, signOutHistory: _sh, createdAt: _c, ...safe } = patch;
+      const updated: Person = { ...existing, ...safe, id: existing.id, updatedAt: nowISO() };
+      return repo.save(updated);
+    },
+
+    async remove(actor, id) {
+      assertCan(actor, 'registrant:write');
+      await getOwned(actor, id);
+      await repo.delete(id);
+    },
+
+    async checkIn(actor, personId, entry) {
+      assertCan(actor, 'checkin:write');
+      const person = await getOwned(actor, personId);
+      const full: CheckInEntry = { ...entry, id: newId('ci') };
+      // withCheckIn applies the D2 promotion (registered → arrived on first 'in').
+      return repo.save(withCheckIn(person, full, nowISO()));
+    },
+
+    async signEvent(actor, personId, event) {
+      assertCan(actor, 'checkin:write');
+      const person = await getOwned(actor, personId);
+      const full: SignOutEvent = { ...event, id: newId('so') };
+      return repo.save(withSignEvent(person, full, nowISO()));
+    },
+  };
+}

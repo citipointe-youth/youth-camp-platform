@@ -1,0 +1,211 @@
+YOUTH CAMP PLATFORM — IMPLEMENTATION PLAN
+==========================================
+Version: 1.0  |  Date: June 2026
+Status: Phase 1 complete (in-memory backend + full frontend)
+
+--------------------------------------------------------------------------------
+OVERVIEW
+--------------------------------------------------------------------------------
+
+The platform is built in a deliberately staged approach. Phase 1 is fully
+functional but uses in-memory storage. Each subsequent phase replaces exactly
+one swap point without touching the rest of the codebase.
+
+Swap points (all in src/container.ts):
+  1. Repositories  — InMemory* → real DB implementations
+  2. Auth provider — MockAuthProvider → OAuth/JWT/Supabase Auth
+  3. Persistence   — NullPersistence → already implemented (JsonFilePersistence)
+
+
+--------------------------------------------------------------------------------
+PHASE 1 — COMPLETE (current state)
+--------------------------------------------------------------------------------
+
+What is built:
+  - Full TypeScript Express backend (93 source files)
+  - All business logic, RBAC, validation
+  - In-memory repositories with optional JSON-file snapshots
+  - Mock auth (salted password hashes, in-memory session tokens)
+  - Full frontend SPA: public/index.html (connects to backend)
+  - Full standalone demo: camp-platform-demo.html (offline, MockAPI)
+
+Limitations:
+  - Data lost on server restart (unless PERSISTENCE=json env var set)
+  - Session tokens invalidated on restart
+  - No real email/SMS for reminders and notifications
+  - Single-server only (no horizontal scaling)
+  - No file storage for imports (CSV parsed in memory)
+
+
+--------------------------------------------------------------------------------
+PHASE 2 — DATABASE INTEGRATION
+--------------------------------------------------------------------------------
+
+Effort estimate: 2–4 days (depending on DB choice)
+
+Steps:
+  a. Choose a database (see options below)
+  b. Create repository implementations in src/repositories/<provider>/
+     - Implement each interface from src/repositories/interfaces/entity-repositories.ts
+     - IUserRepository, IChurchRepository, IRegistrantRepository, ICamperRepository,
+       IAccommodationRepository, IZoneRepository, IGroupRepository,
+       INoteRepository, INotificationRepository, IScheduleRepository,
+       IDevotionalRepository, IFaqRepository, ISettingsRepository, ISnapshotRepository
+  c. Update src/container.ts — replace InMemory* constructors with new implementations
+  d. Run npm run test to verify all 79 tests pass
+  e. Run npm run typecheck
+
+Database options:
+
+  OPTION A — Supabase (recommended for church/non-profit context)
+    - Free tier sufficient for camp-scale usage
+    - Postgres under the hood; use Supabase client or Prisma
+    - Built-in auth (replaces Phase 3)
+    - Real-time subscriptions available for notifications
+    - Hosting: supabase.com
+
+  OPTION B — PlanetScale / TiDB (serverless MySQL)
+    - Generous free tier
+    - Use Prisma as the ORM
+    - Schema file: prisma/schema.prisma (needs to be created)
+
+  OPTION C — SQLite + Turso (edge-deployable)
+    - Closest to the current in-memory model
+    - Turso provides distributed SQLite with branching
+    - Good for low-traffic, single-region deployments
+
+  OPTION D — Firebase Firestore (NoSQL)
+    - No SQL migrations required
+    - Document model maps naturally to entities
+    - Built-in auth and real-time (replaces Phase 3)
+    - Note: queries are more limited than SQL
+
+Schema notes (if using SQL):
+  - Camper.checkInHistory → separate check_in_entries table (camperId FK)
+  - Camper.signOutHistory → separate sign_out_events table (camperId FK)
+  - Church.reservations → separate accommodation_reservations table
+  - Church.contacts → separate church_contacts table or JSONB column
+  - CampSettings → single-row table (enforce with CHECK constraint)
+
+
+--------------------------------------------------------------------------------
+PHASE 3 — REAL AUTHENTICATION
+--------------------------------------------------------------------------------
+
+Effort estimate: 1–2 days
+
+The IAuthProvider interface in src/services/auth.service.ts is the swap point.
+Replace MockAuthProvider with a real implementation:
+
+  OPTION A — Supabase Auth (if using Supabase for DB)
+    - Use supabase.auth.signInWithPassword()
+    - Map Supabase user to the app's User entity via userId
+    - JWTs issued by Supabase, verified server-side
+
+  OPTION B — Auth0 / Clerk
+    - Works with any database
+    - Clerk has a generous free tier and good React/Next.js SDKs
+    - Validate JWT in auth.middleware.ts
+
+  OPTION C — Custom JWT (if self-hosting)
+    - Use jsonwebtoken package
+    - Store hashed passwords in DB (already doing this in seed)
+    - Issue JWT on login, verify on each request
+    - Add refresh token support for mobile use
+
+Password reset flow:
+  - Currently: admin sets password manually via POST /accounts/users/password
+  - With real auth: add forgot-password email flow via auth provider
+
+Multi-factor authentication:
+  - Recommended for admin account only
+  - Available via Supabase Auth and Auth0 out of the box
+
+
+--------------------------------------------------------------------------------
+PHASE 4 — HOSTING & DEPLOYMENT
+--------------------------------------------------------------------------------
+
+Effort estimate: 4–8 hours
+
+See DEPLOYMENT_PROMPT.txt for the full AI-assisted deployment prompt.
+
+Recommended hosting stack (budget-conscious, church/non-profit):
+
+  Backend:
+    - Railway.app (free tier, auto-deploys from GitHub)
+    - Render.com (free tier, sleeps after 15min inactivity — upgrade for camp week)
+    - Fly.io (generous free tier, stays awake, good for camp-week uptime)
+
+  Frontend:
+    - The Express backend already serves public/index.html as a static file
+    - No separate frontend hosting needed
+    - Optionally: Cloudflare Pages for the demo HTML (pure static)
+
+  Database:
+    - Supabase free tier (500MB, plenty for a camp)
+    - PlanetScale free tier (5GB)
+
+  Domain:
+    - Cloudflare Registrar (cost price, ~$8–12/yr for .com)
+    - Point DNS to hosting provider
+
+Environment variables required at deployment:
+  PORT=4200                        # or let host assign
+  NODE_ENV=production
+  PERSISTENCE=json                 # or 'memory' for ephemeral
+  DATA_DIR=/data                   # persistent volume path (if json)
+  CORS_ORIGINS=https://yourdomain.com
+  LOG_LEVEL=info
+  # After Phase 3:
+  JWT_SECRET=<random 64-char hex>
+  AUTH_PROVIDER=supabase           # or 'auth0', 'clerk', 'jwt'
+  DATABASE_URL=postgres://...      # or SUPABASE_URL + SUPABASE_ANON_KEY
+
+
+--------------------------------------------------------------------------------
+PHASE 5 — NOTIFICATIONS (REAL)
+--------------------------------------------------------------------------------
+
+Currently: notifications are stored in-DB and shown in the app feed only.
+
+Real push/SMS options:
+  - In-app only (current) — sufficient for leaders who keep the tab open
+  - Web Push (PWA) — service worker + push API, free, works on iOS 16.4+
+  - SMS via Twilio — ~$0.0079/SMS; useful for urgent camp-wide notices
+  - Email via Resend/SendGrid — free tiers sufficient for reminders
+
+The notification entity already has scope/priority/body fields ready for any channel.
+
+
+--------------------------------------------------------------------------------
+PHASE 6 — OPTIONAL ENHANCEMENTS
+--------------------------------------------------------------------------------
+
+These are out of scope for the current build but the architecture supports them:
+
+  - Parent-facing self-registration portal (separate SPA, same backend)
+  - Medical/consent form digital collection with signature capture
+  - Photo upload for camper profiles
+  - Offline-first PWA (service worker + IndexedDB sync)
+  - Multi-camp support (tenant isolation at the church/organisation level)
+  - Automated blue card (WWC) expiry reminders
+  - Bulk SMS to parents for urgent camp notices
+
+
+--------------------------------------------------------------------------------
+TESTING CHECKLIST BEFORE GOING LIVE
+--------------------------------------------------------------------------------
+
+  [ ] npm run typecheck passes with 0 errors
+  [ ] npm run test passes (all tests green)
+  [ ] Log in as each role and verify correct screens/tabs
+  [ ] Switch mode pre-camp → at-camp and verify all tabs rebuild correctly
+  [ ] Register a new church + account via admin console
+  [ ] Import a CSV of students (at-camp mode, admin)
+  [ ] Daily check-in: check in a student AM, confirm they still need PM check-in
+  [ ] Send a zone notification as zone leader, confirm camp account sees it
+  [ ] Sign a student out of camp and back in
+  [ ] Add a devotional and schedule item via admin
+  [ ] New year rollover: save defaults, purge and restore
+  [ ] Open on a mobile browser and verify layout

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#12233b"/>
+  <!-- tent silhouette in camp blue -->
+  <path d="M256 120 L408 392 H104 Z" fill="none" stroke="#2563eb" stroke-width="28" stroke-linejoin="round"/>
+  <path d="M256 120 L256 392" stroke="#3b82f6" stroke-width="24"/>
+  <circle cx="256" cy="300" r="20" fill="#f59e0b"/>
+</svg>

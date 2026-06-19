@@ -1,0 +1,25 @@
+{
+  "name": "camp-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Youth Camp Platform — combined pre-camp Hub + on-ground Leaders Portal. Admin can switch the app between modes. Platform-agnostic (in-memory + JSON persistence).",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.0.5"
+  }
+}

@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12233b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Camp Platform">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<title>Youth Camp Platform</title>
+<style>
+:root{--navy:#12233b;--blue:#2563eb;--blue2:#3b82f6;--teal:#0ea5a4;--amber:#f59e0b;--rose:#e11d48;--green:#16a34a;--paper:#f4f7fc;--card:#fff;--ink:#1f2937;--muted:#647488;--line:#e8edf4;--chip:#eef4ff;
+/* design tokens (3.2) */
+--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--r-sm:10px;--r:13px;--r-lg:18px;
+--shadow-sm:0 4px 12px rgba(12,26,48,.06);--shadow:0 10px 24px rgba(12,26,48,.08);
+--ok:#16a34a;--warn:#b45309;--danger:#b91c1c;--info:#2563eb;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b1220;display:flex;justify-content:center;}
+.app{width:100%;max-width:460px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5);}
+.bar{background:var(--navy);color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 12px;display:flex;align-items:center;gap:7px;flex:none;z-index:20;}
+.bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;}
+.bar.canback .bk{display:grid;}
+.bar .ttl{flex:1;min-width:0;}.bar .ttl .t{font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar .ttl .s{font-size:.7rem;color:#9fb6d6;}
+.mode-badge{font-size:.58rem;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;flex:none;}
+.role-badge{font-size:.58rem;font-weight:800;background:#f59e0b;color:#3a2a00;border-radius:999px;padding:3px 8px;white-space:nowrap;flex:none;}
+.sign-out{padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.15);font-size:.72rem;font-weight:700;flex:none;cursor:pointer;white-space:nowrap;}
+.stage{flex:1;position:relative;overflow:hidden;}
+.screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;display:none;}
+.screen.active{display:block;animation:rise .25s ease;}
+@keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.tabs{display:flex;background:#fff;border-top:1px solid var(--line);flex:none;padding-bottom:env(safe-area-inset-bottom);z-index:20;}
+.tab{flex:1;text-align:center;padding:7px 4px;font-size:.7rem;color:var(--muted);cursor:pointer;border:none;background:none;position:relative;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:1px;}
+.tab .ic{display:block;}
+.tab.on{color:var(--blue);font-weight:700;}.tab.on .ic{opacity:1;}
+.tab .tb{position:absolute;top:4px;right:50%;transform:translateX(16px);background:var(--rose);color:#fff;font-size:.55rem;font-weight:800;border-radius:999px;min-width:15px;height:15px;padding:0 4px;display:none;place-items:center;}
+.hero{background:radial-gradient(130% 130% at 0% 0%,#2f6bf6,#12233b 75%);color:#fff;border-radius:18px;padding:16px;margin-bottom:13px;position:relative;overflow:hidden;}
+.hero:after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;background:rgba(255,255,255,.07);border-radius:50%;}
+.hero .k{font-size:.64rem;letter-spacing:.16em;text-transform:uppercase;color:#9cc0ff;font-weight:700;}
+.hero h2{font-size:1.35rem;margin:4px 0 2px;}
+.hero .cd{display:flex;gap:12px;align-items:flex-end;margin-top:12px;}
+.hero .big{font-size:2.6rem;font-weight:800;line-height:.9;}.hero .cd .meta{font-size:.78rem;color:#cfe0ff;padding-bottom:4px;}
+.nownext{background:linear-gradient(135deg,#1d3a6e,#12233b);color:#fff;border-radius:14px;padding:13px 15px;margin-bottom:12px;}
+.nownext .now{font-weight:800;}.nownext .nx{font-size:.8rem;color:#9fb6d6;margin-top:2px;}
+.notice{display:flex;gap:10px;align-items:flex-start;background:#eef4ff;border:1px solid #dbe6ff;border-radius:13px;padding:11px 13px;margin-bottom:12px;cursor:pointer;}
+.notice.urg{background:#fef2f2;border-color:#fecaca;}
+.notice .nico{font-size:1rem;line-height:1.35;flex:none;}
+.notice .nt{font-weight:700;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.notice .ns{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.notice .ndis{flex:none;margin-left:6px;border:none;background:transparent;color:var(--muted);font-size:1.25rem;line-height:1;cursor:pointer;padding:0 2px;}
+.notice .ndis:active{color:#111;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;box-shadow:0 3px 10px rgba(18,35,59,.05);}
+.card.tap{cursor:pointer;transition:transform .12s;}.card.tap:active{transform:scale(.985);}
+.rowsb{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.lbl{font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 0 9px;}
+.h3{font-size:.72rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:14px 2px 8px;}
+h3.sec{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 2px 8px;}
+.bar7{height:9px;border-radius:999px;background:#eaeef5;overflow:hidden;margin:9px 0 8px;}.bar7>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#3b82f6);}
+.pill{font-size:.62rem;font-weight:700;padding:3px 8px;border-radius:999px;display:inline-block;}
+.pill.ok{background:#e7f7ec;color:#15803d;}.pill.warn{background:#fdecec;color:#b91c1c;}.pill.amb{background:#fef3c7;color:#92660b;}.pill.info{background:#e7efff;color:#2851a3;}
+.pills{display:flex;gap:7px;flex-wrap:wrap;}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:4px;grid-auto-rows:1fr;}
+.tile{background:#fff;border:1px solid var(--line);border-radius:15px;padding:12px 8px;min-height:86px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:pointer;transition:transform .12s;box-shadow:0 3px 10px rgba(18,35,59,.05);position:relative;}
+.tile:active{transform:scale(.96);}.tile .ic{font-size:1.55rem;display:block;color:var(--blue);}.tile .l{font-size:.74rem;font-weight:600;margin-top:6px;color:#334155;}
+.tile .sub{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* SVG icon system (3.1) */
+.ic-svg{width:20px;height:20px;display:inline-block;vertical-align:middle;flex:none;stroke:currentColor;}
+.tile .ic-svg{width:26px;height:26px;}
+.tab .ic-svg{width:21px;height:21px;}
+.notice .nico .ic-svg{width:18px;height:18px;}
+.search .ic-svg{width:18px;height:18px;color:var(--blue);}
+.btn .ic-svg{width:15px;height:15px;margin-right:3px;}
+.tile .b{position:absolute;top:7px;right:8px;background:var(--rose);color:#fff;font-size:.58rem;font-weight:800;border-radius:999px;padding:2px 6px;}
+.row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:13px;margin-bottom:8px;cursor:pointer;}
+.row.checked{background:#f3fbf5;border-color:#cdeccf;}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:.78rem;font-weight:700;color:#2851a3;background:#dbe6ff;flex:none;}
+.av.male{background:#dbe6ff;color:#2851a3;}.av.female{background:#fce4f1;color:#c0257e;}
+.nm{font-weight:600;font-size:.88rem;}.sub{font-size:.7rem;color:var(--muted);}
+.chev{color:#c2cdda;font-size:1.1rem;}
+.search{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--blue);border-radius:13px;padding:11px 13px;margin-bottom:12px;}
+.search input{border:none;outline:none;font-size:1rem;flex:1;background:none;}
+.faq-item{background:#fff;border:1px solid var(--line);border-radius:13px;margin-bottom:8px;overflow:hidden;}
+.faq-item .q{padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;font-size:.9rem;gap:10px;}
+.faq-item .q .pm{color:var(--blue);font-size:1.2rem;transition:transform .2s;flex:none;}
+.faq-item .a{max-height:0;overflow:hidden;transition:max-height .25s ease;font-size:.86rem;color:#475569;padding:0 14px;}
+.faq-item.open .a{max-height:360px;padding:0 14px 13px;}.faq-item.open .q .pm{transform:rotate(45deg);}
+.findcard{background:#f8fbff;border:1.5px solid #dbe6ff;border-radius:14px;padding:13px;margin-bottom:10px;}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #dbe6ff;font-size:.86rem;gap:10px;}
+.kv:last-of-type{border:none;}.kv .k{color:var(--muted);}.kv .v{font-weight:600;text-align:right;}
+.kv2{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:.9rem;gap:10px;}
+.kv2:last-child{border:none;}.kv2 .k{color:var(--muted);}.kv2 .v{font-weight:600;text-align:right;}
+.med{background:#fde2e1;color:#b91c1c;border-radius:8px;padding:4px 9px;font-size:.76rem;font-weight:600;display:inline-block;margin:5px 0;}
+.seg{display:flex;background:#eef2f8;border-radius:12px;padding:4px;gap:4px;margin-bottom:10px;}
+.seg button{flex:1;border:none;background:none;padding:9px 4px;border-radius:9px;font-size:.78rem;font-weight:700;color:var(--muted);cursor:pointer;}
+.seg button.on{background:#fff;color:var(--blue);box-shadow:0 2px 6px rgba(18,35,59,.12);}
+.filters{display:flex;gap:8px;margin-bottom:11px;}
+.filters select{flex:1;font-size:.82rem;padding:8px 10px;}
+.ncard{background:#fff;border:1px solid var(--line);border-left:4px solid #cbd5e1;border-radius:12px;padding:11px 13px;margin-bottom:9px;}
+.ncard.urgent{border-left-color:var(--rose);}.ncard.zone{border-left-color:var(--teal);}
+.ntag{font-size:.58rem;font-weight:800;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:#e7efff;color:#2851a3;}
+.ntime{margin-left:auto;font-size:.7rem;color:#94a3b8;}.ntop{display:flex;gap:7px;align-items:center;margin-bottom:4px;}
+.ntitle{font-weight:700;font-size:.92rem;}.nbody{font-size:.84rem;color:#475569;margin-top:2px;}.nfrom{font-size:.72rem;color:#94a3b8;margin-top:5px;}
+.noteitem{background:#fffdf5;border:1px solid #f2e6c7;border-radius:10px;padding:9px 11px;margin-bottom:7px;font-size:.84rem;}
+.noteitem .meta{font-size:.7rem;color:#94a3b8;margin-top:3px;}
+.note-hint{font-size:.74rem;color:var(--muted);text-align:center;margin-top:10px;}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 0;color:var(--muted);gap:12px;}
+.spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading .lt{font-size:.78rem;font-weight:600;}
+.callbox{background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:12px;font-size:.84rem;color:#166534;margin-bottom:10px;}
+.warnbox{background:#fffbeb;border:1px solid #fcd980;border-radius:12px;padding:12px;font-size:.82rem;color:#92660b;margin-bottom:10px;}
+.infobox{background:#eef4ff;border:1px solid #cdddff;border-radius:12px;padding:12px;font-size:.82rem;color:#2851a3;margin-bottom:10px;}
+.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 18px;border-radius:999px;font-size:.84rem;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:40;max-width:90%;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.modal{position:absolute;inset:0;background:rgba(8,14,25,.55);display:none;align-items:flex-end;z-index:50;}
+.modal.show{display:flex;}
+.sheet{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:18px 16px max(18px,env(safe-area-inset-bottom));animation:rise .2s;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.sheet h3{font-size:1.05rem;color:var(--navy);margin-bottom:6px;}
+label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin:10px 2px 4px;letter-spacing:.03em;text-transform:uppercase;}
+.fld,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:10px 12px;font-size:.92rem;font-family:inherit;background:#fff;outline:none;}
+textarea{min-height:78px;resize:vertical;}
+.btn{display:block;width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:13px;font-size:.92rem;font-weight:700;text-align:center;cursor:pointer;margin-top:8px;}
+.btn:active{transform:scale(.99);}.btn.alt{background:#fff;color:var(--blue);border:1.5px solid var(--blue);}
+.btn.sm{width:auto;padding:7px 11px;margin:0;font-size:.74rem;}
+.btn.red{background:linear-gradient(135deg,#e11d48,#9f1239);}.btn.ghost{background:#eef2f8;color:#334155;}
+.detail-hd{background:linear-gradient(135deg,#2f6bf6,#12233b);color:#fff;border-radius:18px;padding:18px;margin-bottom:14px;text-align:center;}
+.detail-hd .av-lg{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:1.3rem;font-weight:800;margin:0 auto 9px;}
+.detail-hd h2{font-size:1.3rem;}
+.snap .bignum{font-size:2.2rem;font-weight:800;line-height:1;color:var(--navy);}
+.accbadge{font-size:.7rem;font-weight:800;padding:7px 12px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.accbadge.tent{background:#e7f7ec;color:#15803d;}.accbadge.classroom{background:#e7efff;color:#2851a3;}.accbadge.mixed{background:#fef3c7;color:#92660b;}
+.gbar{display:flex;height:16px;border-radius:999px;overflow:hidden;background:#eef2f8;margin:4px 0 6px;}
+.gbar i{display:block;height:100%;}.gbar .m{background:linear-gradient(90deg,#60a5fa,#2563eb);}.gbar .f{background:linear-gradient(90deg,#f472b6,#db2777);}
+.glabels{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;}
+.gradebars{display:flex;gap:6px;align-items:flex-end;height:92px;padding-top:8px;}
+.gcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;}
+.gcol .gbar-col{width:100%;max-width:30px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#93c5fd,#2563eb);min-height:4px;}
+.gcol.empty .gbar-col{background:#e6ecf5;}.gcol .n{font-size:.72rem;font-weight:800;color:var(--navy);}.gcol .g{font-size:.62rem;color:var(--muted);font-weight:700;}
+.statband{display:flex;gap:8px;margin-bottom:12px;}
+.statband .s{flex:1;background:#fff;border:1px solid var(--line);border-radius:13px;padding:10px;text-align:center;}
+.statband .s b{display:block;font-size:1.35rem;color:var(--navy);line-height:1.1;}.statband .s span{font-size:.62rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.selrow{display:flex;gap:8px;margin-bottom:12px;}.selrow>div{flex:1;}.selrow label{margin-top:0;}
+.lead-tag{font-size:.58rem;font-weight:800;background:#ede9fe;color:#6d28d9;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.gradepill{font-size:.6rem;font-weight:800;background:#eef2f8;color:#475569;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.err{background:#fde2e1;color:#7f1d1d;border-radius:10px;padding:9px 12px;font-size:.82rem;margin-top:8px;display:none;}
+#login{position:absolute;inset:0;background:radial-gradient(130% 90% at 50% 0%,#2f6bf6,#0b1220);display:flex;flex-direction:column;justify-content:center;padding:26px;z-index:60;}
+#login h1{color:#fff;font-size:1.7rem;text-align:center;margin-bottom:4px;letter-spacing:-.02em;}
+#login p{color:#cfe0ff;text-align:center;font-size:.85rem;margin-bottom:18px;}
+#login .card{background:rgba(255,255,255,.97);}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.quick button{flex:1;min-width:44%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:8px;font-size:.74rem;cursor:pointer;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar" id="bar" style="display:none">
+    <div class="bk" onclick="back()">&#8249;</div>
+    <div class="ttl"><div class="t" id="barT">Camp Platform</div><div class="s" id="barS"></div></div>
+    <div class="mode-badge" id="modeBadge"></div>
+    <div class="mode-badge" id="dayBadge" onclick="switchDay()" style="cursor:pointer;display:none" title="Tap to switch camp day"></div>
+    <div class="role-badge" id="roleBadge"></div>
+    <div class="sign-out" onclick="logout()">Sign out</div>
+  </header>
+  <div class="stage" id="stage" style="display:none">
+    <section class="screen" id="home"></section>
+    <section class="screen" id="people"></section>
+    <section class="screen" id="help"></section>
+    <section class="screen" id="student"></section>
+    <section class="screen" id="codes"></section>
+    <section class="screen" id="checkin"></section>
+    <section class="screen" id="search"></section>
+    <section class="screen" id="notifs"></section>
+    <section class="screen" id="compose"></section>
+    <section class="screen" id="camper"></section>
+    <section class="screen" id="firstday"></section>
+    <section class="screen" id="myyouth"></section>
+    <section class="screen" id="schedule"></section>
+    <section class="screen" id="devotional"></section>
+    <section class="screen" id="faq"></section>
+    <section class="screen" id="notes"></section>
+    <section class="screen" id="testimonies"></section>
+    <section class="screen" id="budget"></section>
+    <section class="screen" id="accom"></section>
+    <section class="screen" id="admin"></section>
+    <section class="screen" id="adminAccounts"></section>
+    <section class="screen" id="adminAccom"></section>
+    <section class="screen" id="adminFaq"></section>
+    <section class="screen" id="adminSettings"></section>
+    <section class="screen" id="adminData"></section>
+    <section class="screen" id="import"></section>
+    <section class="screen" id="adminDevos"></section>
+    <section class="screen" id="adminFaqEdit"></section>
+    <section class="screen" id="adminSchedEdit"></section>
+    <section class="screen" id="adminContacts"></section>
+  </div>
+  <nav class="tabs" id="tabs" style="display:none"></nav>
+  <div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
+  <div class="toast" id="toast"></div>
+  <div id="login">
+    <h1>Youth Camp Platform</h1>
+    <p>Registration &amp; on-ground management</p>
+    <div class="card">
+      <label>Username</label><input class="fld" id="username" placeholder="username" autocapitalize="none" autocomplete="username" autocorrect="off" spellcheck="false">
+      <label>Password</label><input class="fld" id="password" type="password" autocomplete="current-password">
+      <button class="btn" onclick="doLogin()">Sign in</button>
+      <div class="err" id="loginErr"></div>
+    </div>
+    <!-- Demo quick-login: only rendered for the in-memory demo build, injected by
+         _initDemoLogin() when /settings reports a demo/seed backend. Never shipped
+         with prefilled credentials in production. -->
+    <div id="demoLogin"></div>
+  </div>
+</div>
+
+<script>
+/* ===== API (real backend) ===== */
+/* The Express backend returns results bare (no {ok,data} envelope); errors come as
+   an HTTP error status with a JSON body {code,message}. 204 = no content. */
+/* Resilience (ported from connection-made-simple Phase 3): every request has an
+   AbortController TIMEOUT so a hung fetch (cold start / flaky signal / slow DB)
+   fails FAST with a recoverable error instead of leaving the UI on an infinite
+   loading screen. Imports get a longer window. Concurrent in-flight GETs for the
+   same path are COALESCED so the post-login prefetch and a navigation don't
+   double-fire. */
+const API_TIMEOUT_MS=20000, API_IMPORT_TIMEOUT_MS=90000;
+const _inflight=new Map(); // path -> Promise (GET coalescing)
+async function _doFetch(path,opt){
+  const isImport=path.indexOf('/import')===0||path.indexOf('/import')===path.length-7;
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),isImport?API_IMPORT_TIMEOUT_MS:API_TIMEOUT_MS);
+  let res;
+  try{
+    res=await fetch(path,{method:opt.method||'GET',signal:ctrl.signal,
+      headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})},
+      ...(opt.body!==undefined?{body:JSON.stringify(opt.body)}:{})});
+  }catch(e){
+    if(e&&e.name==='AbortError')throw new Error('Request timed out — check your connection and try again.');
+    throw new Error('Network error — is the server running?');
+  }finally{clearTimeout(timer);}
+  if(res.status===401&&TOKEN){sessionExpired();throw new Error('Session expired — please sign in again.');}
+  if(res.status===204)return null;
+  let j=null;try{j=await res.json();}catch(e){j=null;}
+  if(!res.ok)throw new Error((j&&(j.message||j.error))||('Request failed ('+res.status+')'));
+  return j;
+}
+async function api(path,opt={}){
+  const method=(opt.method||'GET').toUpperCase();
+  if(method!=='GET')return _doFetch(path,opt); // only GETs are safe to coalesce
+  if(_inflight.has(path))return _inflight.get(path);
+  const p=_doFetch(path,opt).finally(()=>_inflight.delete(path));
+  _inflight.set(path,p);
+  return p;
+}
+/* ===== STATE ===== */
+let TOKEN=null,ACTOR=null,SETTINGS=null,CAMP_MODE='pre-camp',STACK=['home'];
+let SESSIONS=[],SEL_SESSION=null,FILTER={gender:'all',grade:'all',church:'all',zone:'all'};
+let LAST_LEADER='';
+const GRADES=[7,8,9,10,11,12];
+const ZONES=['Yellow','Blue','Green','Red'];
+const ACC_LABEL={tent:'△\uFE0F All tents',classroom:'⌂ All classrooms',mixed:'△\uFE0F⌂ Mixed'};
+
+/* ===== UTILS ===== */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const initials=n=>String(n||'').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'\u2013';
+const val=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+const sel=id=>{const e=document.getElementById(id);return e?e.value:'';};
+/* ===== SVG ICONS (3.1) ===== */
+const ICONS={
+home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+star:'<path d="M12 3l2.6 5.6 6 .8-4.4 4.1 1.1 6L12 16.8 6.7 19.5l1.1-6L3.4 9.4l6-.8Z"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+users:'<circle cx="9" cy="8" r="3"/><path d="M2 20a7 7 0 0 1 14 0"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M22 20a7 7 0 0 0-5-6.7"/>',
+note:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M19 17H6"/>',
+help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4 1.4c0 1.6-2 2-2 3.6M12 17h.01"/>',
+gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4L4.6 11a7.9 7.9 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4Z"/>'
+};
+function ic(n,cls){return `<svg class="ic-svg${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
+const canReadNotes=()=>ACTOR&&['zoneLeader','director','admin'].includes(ACTOR.role);
+/* Notes ON AN INDIVIDUAL PROFILE: church may see notes for its OWN campers (no
+   consolidated list — the Notes tab stays zone/director/admin via canReadNotes()).
+   Backend GET /notes/camper/:id allows note:write, which church holds + scopes to
+   the camper's church. */
+const canReadCamperNotes=()=>ACTOR&&['church','zoneLeader','director','admin'].includes(ACTOR.role);
+let tT;
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2400);}
+function modal(html){document.getElementById('sheet').innerHTML=html;document.getElementById('modal').classList.add('show');}
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+function dayLong(d){try{return new Date(d+'T12:00:00Z').toLocaleDateString(undefined,{weekday:'long',timeZone:'UTC'});}catch{return d;}}
+function timeFmt(iso){try{return new Date(iso).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}catch{return iso;}}
+function dtFmt(iso){try{return new Date(iso).toLocaleString();}catch{return iso;}}
+
+function sessionExpired(){
+  TOKEN=null;ACTOR=null;SESSIONS=[];SEL_SESSION=null;SETTINGS=null;STACK=['home'];
+  document.getElementById('bar').style.display='none';
+  document.getElementById('stage').style.display='none';
+  document.getElementById('tabs').style.display='none';
+  closeModal();
+  const lg=document.getElementById('login');lg.style.display='flex';
+  const err=document.getElementById('loginErr');if(err){err.textContent='Session expired — please sign in again.';err.style.display='block';}
+}
+
+/* ===== AUTH ===== */
+// Demo quick-login is shown ONLY on local/dev hosts — never in production, where
+// advertising valid usernames + the shared demo password would be a security leak.
+function _isDemoHost(){const h=location.hostname;return h==='localhost'||h==='127.0.0.1'||h===''||h.endsWith('.local');}
+function _initDemoLogin(){
+  if(!_isDemoHost())return;
+  const box=document.getElementById('demoLogin');if(!box)return;
+  const accts=[['victory','Church (Victory)'],['gracepoint','Church (Grace Point)'],['yellowzone','Zone Leader'],['director','Director'],['admin','Admin']];
+  box.innerHTML=`<p style="color:#9cc0ff;font-size:.68rem;margin:12px 0 4px;text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Quick login · demo</p>
+    <div class="quick">${accts.map(([u,l])=>`<button onclick="quick('${u}')">${l}</button>`).join('')}</div>`;
+}
+function quick(u){document.getElementById('username').value=u;document.getElementById('password').value='demo1234';doLogin();}
+async function doLogin(){
+  const err=document.getElementById('loginErr');if(err)err.style.display='none';
+  try{
+    const d=await api('/auth/login',{method:'POST',body:{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value}});
+    TOKEN=d.token;ACTOR={...d.user,displayName:((d.user.firstName||'')+' '+(d.user.lastName||'')).trim()};
+    SETTINGS=await api('/settings');
+    CAMP_MODE=SETTINGS.campMode||'pre-camp';
+    document.getElementById('login').style.display='none';
+    document.getElementById('bar').style.display='flex';
+    document.getElementById('stage').style.display='block';
+    document.getElementById('tabs').style.display='flex';
+    updateModeUI();buildTabs();STACK=['home'];await gotoTab('home');
+  }catch(e){if(err){err.textContent=e.message;err.style.display='block';}else toast(e.message);}
+}
+function logout(){api('/auth/logout',{method:'POST'}).catch(()=>{});TOKEN=null;ACTOR=null;location.reload();}
+function updateModeUI(){
+  const b=document.getElementById('modeBadge'),r=document.getElementById('roleBadge');
+  if(CAMP_MODE==='at-camp'){b.textContent='AT CAMP';b.style.background='#16a34a';b.style.color='#fff';}
+  else{b.textContent='PRE-CAMP';b.style.background='#f59e0b';b.style.color='#3a2a00';}
+  if(r&&ACTOR)r.textContent=ACTOR.role==='admin'?'Admin':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?'Zone·'+ACTOR.zone:'Church';
+  const db=document.getElementById('dayBadge');
+  if(db){if(CAMP_MODE==='at-camp'){db.style.display='';const day=(SETTINGS&&SETTINGS.campDay)||1;db.innerHTML='DAY '+day+' <span style="opacity:.75">⇄</span>';db.style.background='#2563eb';db.style.color='#fff';}else db.style.display='none';}
+}
+/* campDay is client-side only — the backend has no campDay field. Per-device view state. */
+function switchDay(){const cur=(SETTINGS&&SETTINGS.campDay)||1;const next=cur===1?2:1;
+  if(SETTINGS)SETTINGS.campDay=next;updateModeUI();
+  toast(next===1?'Day 1 — First Day Sign In':'Day '+next+' — testimonies open');STACK=['home'];RENDER.home();}
+
+/* ===== ROUTER ===== */
+const TAB_OF={home:'home',codes:'home',people:'people',student:'people',help:'help',
+  admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
+  adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
+  checkin:'checkin',search:'search',notifs:'notifs',compose:'notifs',
+  camper:'home',myyouth:'home',firstday:'home',schedule:'home',devotional:'home',faq:'home',notes:'home',testimonies:'home',budget:'home',accom:'home',import:'home'};
+
+function _showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(id);if(el)el.classList.add('active');
+  document.getElementById('bar').classList.toggle('canback',STACK.length>1);
+  const tab=TAB_OF[id];
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',!!(tab&&t.dataset.tab===tab)));
+}
+function _paint(id,html,t,s){
+  document.getElementById('barT').textContent=t;
+  document.getElementById('barS').textContent=s||'';}
+  
+/* Navigation core (ported resilience from CMS Phase 5/8):
+   - shows the target screen with a SPINNER immediately, so a slow RENDER never
+     leaves the UI on a blank/stale screen ("pre-loading screen");
+   - issues a nav token so a RENDER that finishes after the user has navigated
+     away can bail via _stale() instead of overwriting the new screen
+     ("stuck spinner / wrong page" guard). */
+let _navToken=0, _navId=null;
+function _stale(tok){return tok!==_navToken;}
+function _spinner(id,label){
+  const el=document.getElementById(id);
+  if(el){el.innerHTML='<div class="loading"><div class="spin"></div><div class="lt">'+(label||'Loading…')+'</div></div>';el.scrollTop=0;}
+  _showScreen(id);
+}
+async function _navTo(id,arg){
+  const tok=++_navToken; _navId=id;
+  _spinner(id);
+  try{ if(RENDER[id]) await RENDER[id](arg,tok); }
+  catch(e){ if(!_stale(tok)) { const el=document.getElementById(id); if(el)el.innerHTML='<p class="note-hint">'+esc(e.message||'Something went wrong')+'</p>'; } }
+}
+async function go(id,arg){STACK.push(id);await _navTo(id,arg);}
+async function gotoTab(id){
+  const keepHome=['checkin','search','notifs'];
+  STACK=keepHome.includes(id)?['home',id]:[id];
+  await _navTo(id);
+}
+async function back(){if(STACK.length>1){STACK.pop();const id=STACK[STACK.length-1];await _navTo(id);}}
+
+function paint(id,html,t,s){
+  // Stale-render guard: if the user has navigated to a DIFFERENT screen while this
+  // render was awaiting, don't overwrite it. (id===_navId means this is still the
+  // active target — including same-screen re-renders.)
+  if(_navId&&_navId!==id&&!STACK.includes(id))return;
+  _paint(id,html,t,s);
+  const el=document.getElementById(id);
+  if(el){el.innerHTML=html;el.scrollTop=0;}
+  _showScreen(id);
+}
+
+function buildTabs(){
+  let tabs;
+  if(CAMP_MODE==='pre-camp'){
+    tabs=[['home','home','Home'],['people','users','My Youth']];
+    if(ACTOR&&ACTOR.role==='admin'){tabs.push(['notifs','bell','Notices']);tabs.push(['admin','gear','Admin']);}
+    else{tabs.push(['help','help','Help']);tabs.push(['notifs','bell','Notices']);}
+  }else{
+    if(ACTOR&&ACTOR.role==='admin'){
+      tabs=[['home','home','Home'],['checkin','check','Check-in'],['search','search','Search'],['admin','gear','Admin']];
+    }else{
+      tabs=[['home','home','Home'],['checkin','check','Check-in'],['search','search','Search'],['notifs','bell','Notices']];
+    }
+  }
+  document.getElementById('tabs').innerHTML=tabs.map(([id,name,l])=>
+    `<button class="tab" data-tab="${id}" onclick="gotoTab('${id}')"><span class="ic">${ic(name)}</span>${l}</button>`
+  ).join('');
+}
+
+const RENDER={};
+
+/* ===== PRE-CAMP HOME ===== */
+RENDER.home=async function renderHome(){
+  if(CAMP_MODE==='at-camp'){await renderHomeAtCamp();return;}
+  const h=await api('/home');
+  const s=SETTINGS,isWide=['director','admin'].includes(ACTOR.role);
+  let body=`<div class="hero"><div class="k">${esc((s&&s.campName)||h.campName)}</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
+    <div class="cd"><div class="big">${h.daysToGo??'—'}</div><div class="meta">days to go<br>${esc(h.startDate||'')}${s&&s.endDate?' – '+esc(s.endDate):''}</div></div></div>`;
+  body+=`<div class="statband">
+    <div class="s"><b>${h.totalCampers||0}</b><span>Campers</span></div>
+    <div class="s"><b>${h.totalLeaders||0}</b><span>Leaders</span></div>
+    <div class="s"><b style="color:${h.noBlueCardCount?'#b91c1c':'#15803d'}">${h.noBlueCardCount||0}</b><span>Ldr blue card</span></div>
+  </div>`;
+  if(isWide)body+=`<div class="card tap" onclick="go('budget')"><div class="rowsb"><div><div style="font-weight:600">Budget &amp; costings</div><div class="sub">Camper fees by accommodation</div></div><span class="pill info">View ›</span></div></div>`;
+  if(isWide)body+=`<div class="card tap" onclick="go('accom')"><div class="rowsb"><div><div style="font-weight:600">Accommodation allocations</div><div class="sub">Spaces &amp; per-church spot allocation</div></div><span class="pill info">View ›</span></div></div>`;
+  body+=`<div class="card"><div class="rowsb"><div class="lbl" style="margin:0">${isWide?'Camp registrations':'Your registrations'}</div><b>${h.totalRegistrants||0}</b></div>
+    <div class="rowsb" style="margin-top:6px"><span class="sub" style="font-size:.74rem">${h.totalCampers||0} campers · ${h.totalLeaders||0} leaders</span>${h.unpaidCount?`<span class="pill amb">${h.unpaidCount} unpaid</span>`:'<span class="pill ok">All paid</span>'}</div></div>`;
+  if(isWide){
+    // By-ministry M/F split — aggregate from /registrants (the /home + /breakdown DTOs carry no gender split)
+    const regs=await api('/registrants').catch(()=>[]);
+    const by={};(regs||[]).forEach(r=>{const c=by[r.churchId]||(by[r.churchId]={name:r.churchName,maleStudents:0,femaleStudents:0,maleLeaders:0,femaleLeaders:0,total:0});c.total++;
+      const ld=r.kind==='leader';if(r.gender==='male'){ld?c.maleLeaders++:c.maleStudents++;}else{ld?c.femaleLeaders++:c.femaleStudents++;}});
+    const churches=Object.values(by);
+    if(churches.length){
+      body+=`<h3 class="sec">By ministry</h3>`;
+      const gcols='grid-template-columns:1fr 58px 20px 58px 20px 34px';
+      const hdr=`<div style="display:grid;${gcols};align-items:end;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--line)"><span></span><span style="text-align:center">Student</span><span></span><span style="text-align:center">Leader</span><span></span><span style="text-align:center">Total</span></div>`;
+      const rows=churches.map(c=>`<div style="display:grid;${gcols};align-items:center;padding:7px 0;border-top:1px solid var(--line)">
+        <span style="font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span>
+        <span style="text-align:center;white-space:nowrap"><b style="color:#2563eb">${c.maleStudents}</b><b style="color:#db2777;margin-left:9px">${c.femaleStudents}</b></span><span></span>
+        <span style="text-align:center;white-space:nowrap"><b style="color:#2563eb">${c.maleLeaders}</b><b style="color:#db2777;margin-left:9px">${c.femaleLeaders}</b></span><span></span>
+        <span style="text-align:center;font-weight:800;color:var(--ink)">${c.total}</span>
+      </div>`).join('');
+      body+=`<div class="card" style="padding:8px 12px">${hdr}${rows}</div>`;
+    }
+  }else{
+    const regs=await api('/registrants').catch(()=>[]);
+    const mine=(regs||[]).filter(r=>r.kind==='camper');
+    const tent=mine.filter(r=>r.accommodationKind==='tent').length,cls=mine.filter(r=>r.accommodationKind==='classroom').length;
+    body+=`<h3 class="sec">Accommodation registrations</h3>`;
+    body+=`<div class="card"><div class="rowsb"><b>△ Tent</b><span class="pill info">${tent} registered</span></div>
+      <div class="rowsb" style="margin-top:8px"><b>⌂ Classroom</b><span class="pill info">${cls} registered</span></div>
+      <div class="sub" style="font-size:.74rem;margin-top:8px">Your group's tent vs classroom split. Specific locations are assigned by the camp office.</div></div>`;
+    if(ACTOR.role==='church'){let code='—';try{const chs=await api('/accounts/churches');const mc=(chs||[]).find(c=>c.id===ACTOR.churchId);if(mc)code=mc.code||'—';}catch(e){}
+      body+=`<div class="card tap" onclick="go('codes')"><div class="rowsb"><div><div style="font-weight:600"># Registration code</div><div class="sub">Share with your families</div></div><span class="pill info">${esc(code)} ›</span></div></div>`;}
+  }
+  // Notices — latest 3 (backend has no scheduled-for-later; expiry handled server-side)
+  try{const feed=await api('/notifications');
+    const notices=(feed||[]).slice(0,3);
+    body+=`<div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3><span class="sub" style="font-size:.72rem">Latest 3 · tap to open</span></div>
+    <div id="homeNotices" style="margin-top:10px">${notices.length?notices.map(noticeCard).join(''):'<p class="note-hint">All caught up — no notices right now.</p>'}</div>`;
+  }catch(e){}
+  paint('home',body,'My Church Hub',isWide?'All churches':(ACTOR.churchName?esc(ACTOR.churchName):esc(ACTOR.displayName)));
+};
+
+function accLabelOf(tent,cls){const p=tent&&cls?'mixed':tent?'tent':cls?'classroom':'none';
+  return{primary:p,text:p==='tent'?`△ All tents · ${tent}`:p==='classroom'?`⌂ All classrooms · ${cls}`:p==='mixed'?`△ Tent ${tent} · ⌂ Classroom ${cls}`:''};}
+
+/* ===== AT-CAMP HOME ===== */
+async function renderHomeAtCamp(){
+  const [d,feed]=await Promise.all([api('/home'),api('/notifications')]);
+  const DUE=d.checkInsDue||0;
+  const tb=document.getElementById('tabDue');if(tb){if(DUE>0){tb.style.display='grid';tb.textContent=DUE;}else tb.style.display='none';}
+  let myAccom='';
+  if(ACTOR.role==='church'&&ACTOR.churchId){try{const held=await api('/accommodation/held/'+ACTOR.churchId);
+    const parts=[...new Set((held||[]).map(x=>x.label||x.blockName||x.name||x.kind).filter(Boolean))];
+    myAccom=parts.length?parts.join(' · '):'To be confirmed';
+  }catch(e){myAccom='To be confirmed';}}
+  // Tiles: only screens NOT already on the quick bar (Daily Check-in, Search, Notices, Admin live there).
+  const tiles=[];
+  const day1=((SETTINGS&&SETTINGS.campDay)||1)===1;
+  tiles.push(day1?`<div class="tile" onclick="go('firstday')"><div class="ic">${ic('check')}</div><div class="l">First Day Sign In</div></div>`:`<div class="tile" onclick="go('testimonies')"><div class="ic">${ic('star')}</div><div class="l">Submit Testimonies</div></div>`);
+  tiles.push(`<div class="tile" onclick="go('myyouth')"><div class="ic">${ic('users')}</div><div class="l">My Youth Details</div></div>`);
+  if(canReadNotes())tiles.push(`<div class="tile" onclick="go('notes')"><div class="ic">${ic('note')}</div><div class="l">Testimonies &amp; Notes</div></div>`);
+  tiles.push(`<div class="tile" onclick="go('schedule')"><div class="ic">${ic('calendar')}</div><div class="l">Schedule</div></div>`);
+  tiles.push(`<div class="tile" onclick="go('devotional')"><div class="ic">${ic('book')}</div><div class="l">Devotional</div></div>`);
+  if(ACTOR.role==='church')tiles.push(`<div class="tile" style="cursor:default"><div class="ic">⌂</div><div class="l">Your Accommodation</div><div class="sub" style="font-size:.62rem;margin-top:2px">${esc(myAccom)}</div></div>`);
+  // Director has import:run but the Admin tab (where the importer lives) is admin-only;
+  // surface a direct import entry point so the capability is reachable. (Admin already
+  // has it under Admin → Data.)
+  if(ACTOR.role==='director')tiles.push(`<div class="tile" onclick="go('import')"><div class="ic">${ic('users')}</div><div class="l">Import Students</div></div>`);
+  tiles.push(`<div class="tile" onclick="go('faq')"><div class="ic">${ic('help')}</div><div class="l">FAQ</div></div>`);
+  const notices=(feed||[]).slice(0,3);
+  const noticesHtml=notices.length?notices.map(noticeCard).join(''):'<p class="note-hint">All caught up — no notices right now.</p>';
+  const html=`<div class="hero"><div class="k">${esc(SETTINGS?.campName||'Youth Camp')} · Live</div>
+    <h2>Hi ${esc(d.greetingName||ACTOR.displayName)}</h2>
+    <div style="color:#cfe0ff;font-size:.82rem">${ACTOR.role==='admin'?'Back office':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?(esc(ACTOR.zone)+' Zone Leader'):'Church · '+esc(ACTOR.zone)+' Zone'}</div></div>
+  <div class="tiles">${tiles.join('')}</div>
+  <div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3><span class="sub" style="font-size:.72rem">Latest 3 · tap to open</span></div>
+  <div id="homeNotices" style="margin-top:10px">${noticesHtml}</div>`;
+  paint('home','','Home',d.greetingName||ACTOR.displayName);
+  document.getElementById('home').innerHTML=html;
+}
+function noticeCard(n){
+  const urg=n.priority==='urgent';
+  const scope=n.scope==='camp'?'Camp-wide':n.scope==='church'?'Your church':esc(n.zone||'')+' Zone';
+  return `<div class="notice ${urg?'urg':''}" data-nid="${esc(n.id)}" onclick="gotoTab('notifs')">
+    <span class="nico" style="color:${urg?'var(--danger)':'var(--info)'}">${ic(urg?'alert':'bell')}</span>
+    <div style="flex:1;min-width:0">
+      <div class="nt">${esc(n.title)}</div>
+      ${urg?`<div class="ns" style="white-space:normal;color:#7f1d1d;margin:2px 0 1px">${esc(n.body)}</div>`:''}
+      <div class="ns">${scope}${urg?' · Urgent':''}</div>
+    </div>
+  </div>`;
+}
+const _DISMISS_KEY='cp_dismissed_notices';
+function _dismissedSet(){try{return new Set(JSON.parse(localStorage.getItem(_DISMISS_KEY)||'[]'));}catch(e){return new Set();}}
+function isNoticeDismissed(id){return _dismissedSet().has(id);}
+function dismissNotice(btn){
+  const card=btn.closest('.notice');if(!card)return;
+  const s=_dismissedSet();if(card.dataset.nid)s.add(card.dataset.nid);
+  try{localStorage.setItem(_DISMISS_KEY,JSON.stringify([...s]));}catch(e){}
+  const box=document.getElementById('homeNotices');
+  card.remove();
+  if(box&&!box.querySelector('.notice'))box.innerHTML='<p class="note-hint">All caught up — no notices right now.</p>';
+}
+
+/* ===== PRE-CAMP MY YOUTH ===== */
+let ALLREG=[],CHURCHES=[];
+function _isWideRole(){return ACTOR!=null&&['director','admin','zoneLeader'].includes(ACTOR.role);}
+RENDER.people=async function renderPeople(){
+  ALLREG=await api('/registrants');
+  const map={};ALLREG.forEach(r=>{if(r.churchId)map[r.churchId]=r.churchName;});
+  CHURCHES=Object.entries(map).map(([id,name])=>({id,name}));
+  const isDir=_isWideRole();
+  const genderSel=`<div><label>Gender</label><select id="myGender" onchange="drawPeople()"><option value="all">All</option><option value="male">Guys</option><option value="female">Girls</option></select></div>`;
+  const gradeSel=`<div><label>Grade</label><select id="myGrade" onchange="drawPeople()"><option value="all">All grades</option>${GRADES.map(g=>`<option value="${g}">Gr ${g}</option>`).join('')}</select></div>`;
+  const churchSel=isDir?`<div><label>Church</label><select id="myChurch" onchange="drawPeople()"><option value="all">All churches</option>${CHURCHES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>`:'';
+  const snapHtml=buildPeopleSnap(ALLREG);
+  paint('people',`<div id="psnap">${snapHtml}</div>
+    ${isDir?`<div class="selrow">${churchSel}</div>`:''}<div class="selrow">${genderSel}${gradeSel}</div>
+    <div class="search"><span>${ic('search')}</span><input id="pq" placeholder="Search students &amp; leaders…" oninput="drawPeople()"></div>
+    <div id="plist"></div>`,'My Youth',(ACTOR.role==='zoneLeader'?(ACTOR.zone+' Zone'):isDir?'All churches':'Your church')+' · '+ALLREG.length+' people');
+  drawPeople();
+};
+function buildPeopleSnap(regs){
+  const campers=regs.filter(r=>r.kind==='camper'),leaders=regs.filter(r=>r.kind==='leader');
+  const g={male:campers.filter(c=>c.gender==='male').length,female:campers.filter(c=>c.gender==='female').length};
+  const gtot=(g.male+g.female)||1;
+  const lg={male:leaders.filter(l=>l.gender==='male').length,female:leaders.filter(l=>l.gender==='female').length};const lgtot=(lg.male+lg.female)||1;
+  const grades=GRADES.map(gr=>({gr,n:campers.filter(c=>c.grade===gr).length})),maxG=Math.max(1,...grades.map(x=>x.n));
+  const tent=regs.filter(r=>r.accommodationKind==='tent').length,cls=regs.filter(r=>r.accommodationKind==='classroom').length;
+  const al=accLabelOf(tent,cls);const wwc=leaders.filter(l=>!l.blueCardCollected).length;
+  const cols=grades.map(x=>`<div class="gcol${x.n?'':' empty'}"><div class="gbar-col" style="height:${x.n?Math.round(x.n/maxG*64)+4:4}px"></div><span class="n">${x.n||''}</span><span class="g">${x.gr}</span></div>`).join('');
+  return `<div class="card snap">
+    <div class="rowsb"><div><div class="lbl" style="margin:0">Campers</div><div class="bignum">${campers.length}</div></div>
+    ${al.primary!=='none'?`<span class="accbadge ${al.primary}">${ACC_LABEL[al.primary]||al.primary}</span>`:''}
+    </div>
+    <div class="lbl" style="margin-top:12px">Student split</div>
+    <div class="gbar"><i class="m" style="width:${g.male/gtot*100}%"></i><i class="f" style="width:${g.female/gtot*100}%"></i></div>
+    <div class="glabels"><span>♂ Guys <b style="color:#2563eb">${g.male}</b></span><span>Girls <b style="color:#db2777">${g.female}</b> ♀</span></div>
+    <div class="lbl" style="margin-top:12px">Leader split</div>
+    <div class="gbar"><i class="m" style="width:${lg.male/lgtot*100}%"></i><i class="f" style="width:${lg.female/lgtot*100}%"></i></div>
+    <div class="glabels"><span>♂ Guys <b style="color:#2563eb">${lg.male}</b></span><span>Girls <b style="color:#db2777">${lg.female}</b> ♀</span></div>
+    <div class="lbl" style="margin-top:14px">By grade</div><div class="gradebars">${cols}</div>
+    <div class="rowsb" style="margin-top:12px;font-size:.8rem"><span style="font-weight:700">${leaders.length} leaders</span>${wwc?`<span class="pill warn">${wwc} need blue card</span>`:'<span class="pill ok">blue cards ✓</span>'}</div></div>`;
+}
+function scopeRegs(){const c=sel('myChurch')||'all';let base=ALLREG;if(ACTOR&&ACTOR.role==='zoneLeader')base=ALLREG.filter(r=>r.zone===ACTOR.zone);return c==='all'?base:base.filter(r=>r.churchId===c);}
+function drawPeople(){
+  const snap=document.getElementById('psnap');if(snap)snap.innerHTML=buildPeopleSnap(scopeRegs());
+  const gen=sel('myGender')||'all',gr=sel('myGrade')||'all',q=(val('pq')||'').toLowerCase();
+  const list=scopeRegs().filter(s=>(gen==='all'||s.gender===gen)&&(gr==='all'||String(s.grade)===gr)&&
+    (s.firstName+' '+s.lastName).toLowerCase().includes(q))
+    .sort((a,b)=>a.lastName.localeCompare(b.lastName)||a.firstName.localeCompare(b.firstName));
+  const el=document.getElementById('plist');
+  if(el)el.innerHTML=list.length?list.map(personRow).join(''):`<p class="note-hint">No one matches these filters.</p>`;
+}
+function accDisplay(s){
+  if(['director','admin'].includes(ACTOR.role))return s.accommodationLabel||(s.accommodationKind==='tent'?'Tent':s.accommodationKind==='classroom'?'Classroom':'—');
+  return s.accommodationKind==='tent'?'Tent':s.accommodationKind==='classroom'?'Classroom':'—';
+}
+function personRow(s){
+  const isL=s.kind==='leader';
+  const flag=(isL&&!s.blueCardCollected);
+  const dot=flag?`<span style="width:8px;height:8px;border-radius:50%;background:#e11d48;display:inline-block;margin-left:6px"></span>`:'';
+  const tags=[];
+  if(isL)tags.push(s.blueCardCollected?'<span class="pill ok">✓ Blue card</span>':'<span class="pill warn">No blue card</span>');
+  if(s.medical)tags.push(`<span class="pill info">⚕ ${esc(s.medical)}</span>`);
+  if(!tags.length)tags.push('<span class="pill ok">All good</span>');
+  const tag=isL?'<span class="lead-tag">LEADER</span>':`<span class="gradepill">Gr ${s.grade}</span>`;
+  return `<div class="row" onclick="openPerson('${s.id}')"><div class="av ${esc(s.gender)}">${initials(s.firstName+' '+s.lastName)}</div>
+    <div style="flex:1;min-width:0"><div class="nm">${esc(s.firstName+' '+s.lastName)}${tag}${dot}</div>
+    <div class="sub">${esc(accDisplay(s))}${_isWideRole()?' · '+esc(s.churchName):''}</div>
+    <div class="pills" style="margin-top:5px">${tags.join('')}</div></div><span class="chev">›</span></div>`;
+}
+async function openPerson(id){
+  const s=await api('/registrants/'+id);const isL=s.kind==='leader';
+  const out=isL&&!s.blueCardCollected;
+  const body=`<div class="detail-hd"><div class="av-lg">${initials(s.firstName+' '+s.lastName)}</div>
+    <h2>${esc(s.firstName+' '+s.lastName)}</h2>
+    <div style="color:#cfe0ff;font-size:.82rem">${esc(s.churchName)} · ${esc(s.zone)} Zone · ${isL?'Leader (18+)':'Grade '+s.grade}</div></div>
+    <div class="card">
+      <div class="kv2"><span class="k">Accommodation</span><span class="v">${esc(accDisplay(s))}</span></div>
+      ${isL?'':`<div class="kv2"><span class="k">Dietary</span><span class="v">${esc(s.dietary||'—')}</span></div>
+      <div class="kv2"><span class="k">Medical</span><span class="v">${esc(s.medical||'—')}</span></div>
+      <div class="kv2"><span class="k">Parent</span><span class="v">${esc(s.parentName||'—')}</span></div>`}
+      ${isL?`<div class="kv2"><span class="k">Blue card (WWC)</span><span class="v">${s.blueCardCollected?'<span class="pill ok">✓ Collected</span>':'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
+    </div>
+    ${isL?`<div class="card"><div class="lbl" style="margin-top:0">Blue card (WWC)</div>
+      ${s.blueCardCollected?'<p class="note-hint">Blue card collected ✓</p>':(['director','admin'].includes(ACTOR.role)?`<button class="btn alt" onclick="markReg('${s.id}',{blueCardCollected:true})">Mark blue card collected</button>`:'<p class="note-hint">Not yet collected — a director or admin can mark this.</p>')}
+    </div>`:''}`;
+  paint('student',body,isL?'Leader':'Camper',esc(s.churchName));
+  if(STACK[STACK.length-1]!=='student')STACK.push('student');
+}
+async function markReg(id,patch){try{await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated ✓');await openPerson(id);}catch(e){toast(e.message);}}
+
+/* CODES */
+RENDER.codes=async function(){
+  const s=SETTINGS;let code='—';
+  try{const chs=await api('/accounts/churches');const mc=(chs||[]).find(c=>c.id===ACTOR.churchId);if(mc)code=mc.code||'—';}catch(e){}
+  paint('codes',`<div class="card" style="text-align:center"><div class="lbl">Your church code</div>
+    <div style="font-size:2rem;font-weight:800;letter-spacing:.1em;color:var(--navy)">${esc(code)}</div>
+    <p class="note-hint" style="margin-top:6px">Families enter this at ${esc(s?.registerBaseUrl||'')}.</p></div>
+    <div class="card"><div class="lbl">Family self-register link</div>
+    <div style="background:#f1f5fb;border-radius:10px;padding:10px;font-size:.82rem;color:#2851a3;word-break:break-all">${esc(s?.registerBaseUrl||'')+'/r/'+esc((ACTOR.displayName||'church').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}</div>
+    <button class="btn" onclick="toast('Link copied ✓')">Copy link</button></div>`,'Registration code','Share with your families');
+};
+
+/* HELP / FAQ pre-camp */
+RENDER.help=async function(){
+  const faqs=await api('/faq');
+  paint('help',`<h3 class="sec" style="margin-top:2px">Frequently asked</h3>`+
+    faqs.map(f=>`<div class="faq-item"><div class="q" onclick="this.parentElement.classList.toggle('open')">${esc(f.question)}<span class="pm">+</span></div><div class="a">${esc(f.answer)}</div></div>`).join('')
+  ,'Help & FAQ','Answers for the lead-up');
+};
+
+function _ciLabel(session){
+  try{
+    const d=new Date(session.day+'T12:00:00Z');
+    const wk=d.toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'});
+    const h=parseInt((session.startTime||'09:00').split(':')[0]);
+    return wk+' '+(h<12?'AM':h<17?'PM':'Eve');
+  }catch(e){return session.label||session.id;}
+}
+/* ===== DAILY CHECK-IN ===== */
+RENDER.checkin=async function renderCheckin(){
+  if(SESSIONS.length===0)SESSIONS=await api('/checkin/sessions');
+  if(!SEL_SESSION){const cur=await api('/checkin/sessions/current').catch(()=>null);SEL_SESSION=(cur&&cur.id)||(SESSIONS[0]&&SESSIONS[0].id);}
+  if(!SEL_SESSION){paint('checkin','<p class="note-hint">No check-in sessions configured. Set camp dates in admin settings.</p>','Daily Check-in','');return;}
+  // Real status: {session, roster:[{camperId,firstName,lastName,church,zone,checkedIn}], checkedInCount, totalCount}.
+  // Roster carries no gender/grade — enrich from /campers so those filters work.
+  const [st,campers]=await Promise.all([api('/checkin/sessions/'+SEL_SESSION+'/status'),api('/campers').catch(()=>[])]);
+  const cmap={};(campers||[]).forEach(c=>{cmap[c.id]={gender:c.gender,grade:c.grade};});
+  const roster=(st.roster||[]).map(r=>({id:r.camperId,name:(r.firstName+' '+r.lastName).trim(),church:r.church,zone:r.zone,present:!!r.checkedIn,gender:(cmap[r.camperId]||{}).gender,grade:(cmap[r.camperId]||{}).grade}));
+  const DUE=(st.totalCount!=null?st.totalCount:roster.length)-(st.checkedInCount!=null?st.checkedInCount:roster.filter(c=>c.present).length);
+  const tb=document.getElementById('tabDue');if(tb){if(DUE>0){tb.style.display='grid';tb.textContent=DUE;}else tb.style.display='none';}
+  const showZone=['director','admin'].includes(ACTOR.role);
+  const showChurch=['zoneLeader','director','admin'].includes(ACTOR.role);
+  const zonesOpt=['all',...new Set(roster.map(c=>c.zone))].filter((v,i,a)=>a.indexOf(v)===i);
+  let churchPool=FILTER.zone!=='all'?roster.filter(c=>c.zone===FILTER.zone):roster;
+  const churchesOpt=['all',...new Set(churchPool.map(c=>c.church))].filter((v,i,a)=>a.indexOf(v)===i);
+  let list=roster.filter(c=>(FILTER.gender==='all'||c.gender===FILTER.gender)&&
+    (FILTER.grade==='all'||String(c.grade)===FILTER.grade)&&
+    (FILTER.zone==='all'||c.zone===FILTER.zone)&&
+    (FILTER.church==='all'||c.church===FILTER.church));
+  list.sort((a,b)=>a.present-b.present);
+  const dueShown=list.filter(c=>!c.present).length,presentShown=list.length-dueShown;
+  const label=_ciLabel(st.session||SESSIONS.find(x=>x.id===SEL_SESSION)||{});
+  const dayBtns=SESSIONS.map(s=>`<button class="${s.id===SEL_SESSION?'on':''}" onclick="selDay('${s.id}')">${esc(_ciLabel(s))}</button>`).join('');
+  const gradeOpts=['all',...GRADES].map(g=>`<option value="${g}" ${String(g)===FILTER.grade?'selected':''}>${g==='all'?'All grades':'Grade '+g}</option>`).join('');
+  const zoneSelOpts=zonesOpt.map(z=>`<option value="${z}" ${z===FILTER.zone?'selected':''}>${z==='all'?'All zones':z+' Zone'}</option>`).join('');
+  const churchSelOpts=churchesOpt.map(ch=>`<option value="${esc(ch)}" ${ch===FILTER.church?'selected':''}>${ch==='all'?'All churches':esc(ch)}</option>`).join('');
+  const html=`<div class="seg" id="dayseg">${dayBtns}</div>
+    ${(showZone||showChurch)?`<div class="filters">${showZone?`<select onchange="setFilter('zone',this.value)">${zoneSelOpts}</select>`:''}${showChurch?`<select onchange="setFilter('church',this.value)">${churchSelOpts}</select>`:''}</div>`:''}
+    <div class="filters">
+      <select onchange="setFilter('gender',this.value)"><option value="all" ${FILTER.gender==='all'?'selected':''}>All genders</option><option value="female" ${FILTER.gender==='female'?'selected':''}>Girls</option><option value="male" ${FILTER.gender==='male'?'selected':''}>Guys</option></select>
+      <select onchange="setFilter('grade',this.value)">${gradeOpts}</select>
+    </div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+      <div><div class="nm">${esc(label)} check-in</div><div class="sub">${presentShown}/${list.length} present${list.length!==roster.length?' · filtered':''}</div></div>
+      ${dueShown>0?`<div style="text-align:right"><div style="font-weight:800;font-size:1.4rem;line-height:1;color:#b45309">${dueShown}</div><div class="sub" style="font-size:.68rem">not yet checked in${list.length!==roster.length?' (filtered)':''}</div></div>`:`<span class="pill ok">All checked in ✓</span>`}
+    </div>
+    ${list.map(c=>`<div class="row ${c.present?'checked':''}"><div class="av ${esc(c.gender||'')}">${initials(c.name)}</div>
+      <div style="flex:1;min-width:0"><div class="nm">${esc(c.name)}</div><div class="sub">${esc(c.church||c.zone)}${c.grade?' · Yr '+c.grade:''}</div></div>
+      <button class="btn ghost sm" onclick="notePrompt('${c.id}','${esc(c.name)}')">＋ note</button>
+      ${c.present?`<button class="btn alt sm" onclick="doCheck('${c.id}','out')">✓ in</button>`:`<button class="btn sm" onclick="doCheck('${c.id}','in')">Check in</button>`}
+    </div>`).join('')}
+    <p class="note-hint">Notes are visible to zone leaders &amp; directors only.</p>`;
+  paint('checkin',html,'Daily Check-in',label);
+};
+function selDay(id){SEL_SESSION=id;RENDER.checkin();}
+function setFilter(k,v){FILTER[k]=v;if(k==='zone')FILTER.church='all';RENDER.checkin();}
+async function doCheck(camperId,type){try{await api('/checkin',{method:'POST',body:{camperId,sessionId:SEL_SESSION,type}});toast(type==='in'?'Checked in ✓':'Checked out');await RENDER.checkin();}catch(e){toast(e.message);}}
+function notePrompt(camperId,name){
+  const d=(window._draft&&window._draft.camperId===camperId)?window._draft:{leader:LAST_LEADER,body:''};
+  modal(`<h3>Note · ${esc(name)}</h3><p class="sub" style="margin:4px 0 8px">Visible to zone leaders &amp; directors only.</p>
+    <label>Your name (leader)</label><input class="fld" id="noteLeader" value="${esc(d.leader)}" placeholder="e.g. Sarah Doyle">
+    <label>Note</label><textarea id="noteBody" placeholder="e.g. left dinner early, looked unwell">${esc(d.body)}</textarea>
+    <button class="btn" onclick="reviewNote('${camperId}','${esc(name)}')">Review →</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+}
+function reviewNote(camperId,name){
+  const leader=document.getElementById('noteLeader').value.trim(),body=document.getElementById('noteBody').value.trim();
+  if(!leader){toast('Add your name first');return;}if(!body){toast('Type a note first');return;}
+  LAST_LEADER=leader;window._draft={camperId,leader,body};
+  modal(`<h3>Review note</h3><div class="card" style="margin:6px 0 10px">
+    <div class="sub">Student</div><div class="nm">${esc(name)}</div>
+    <div class="sub" style="margin-top:7px">Logged by</div><div class="nm">${esc(leader)}</div>
+    <div class="sub" style="margin-top:7px">Note</div><div style="font-size:.9rem">${esc(body)}</div></div>
+    <button class="btn" onclick="confirmNote('${camperId}')">Confirm &amp; submit</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="notePrompt('${camperId}','${esc(name)}')">‹ Edit</button>`);
+}
+async function confirmNote(camperId){const d=window._draft;if(!d)return;
+  // Backend attributes the note to the logged-in actor; the typed leader name is folded into the body.
+  const body=d.leader&&d.leader!==ACTOR.displayName?`${d.body}\n— logged by ${d.leader}`:d.body;
+  try{await api('/notes',{method:'POST',body:{camperId,body,sessionId:SEL_SESSION,category:'note'}});window._draft=null;closeModal();toast('Note submitted ✓');}catch(e){toast(e.message);}}
+
+/* ===== SEARCH ===== */
+RENDER.search=function(){
+  paint('search',`<div class="search"><span>${ic('search')}</span><input id="q" placeholder="Type a student's name…" oninput="doSearch(this.value)"></div><div id="results"><p class="note-hint">Type a name to find any camper or leader across the camp.</p></div>`,'Search Student Details','Find any camper');
+};
+let sT;function doSearch(v){clearTimeout(sT);sT=setTimeout(()=>runSearch(v),200);}
+async function runSearch(v){const box=document.getElementById('results');if(!box)return;
+  if(!v.trim()){box.innerHTML='<p class="note-hint">Type a name to find any camper or leader across the camp.</p>';return;}
+  try{const res=await api('/search?q='+encodeURIComponent(v));
+    box.innerHTML=res.length?res.map(r=>{const c=r.camper||{};const name=(c.firstName+' '+c.lastName).trim();
+      const contacts=r.contacts||[];const prim=contacts.find(x=>x.type==='primary');const back=contacts.find(x=>x.type==='backup');
+      const med=c.medicalConditions||[];
+      return `<div class="findcard"><div style="display:flex;justify-content:space-between"><b>${esc(name)}</b><span class="pill info">${esc(c.churchName||'')}</span></div>
+      <div class="sub" style="margin:3px 0">${esc(c.zone||'')} Zone · ${c.kind==='leader'?'Leader':'Grade '+(c.grade||'—')}</div>
+      ${med.map(m=>`<span class="med">${esc(m)}</span> `).join('')}
+      ${prim?`<div class="kv"><span class="k">Primary leader</span><span class="v">${esc(prim.name)} · <span style="color:#2563eb">${esc(prim.phone)}</span></span></div>`:''}
+      ${back?`<div class="kv"><span class="k">Secondary leader</span><span class="v">${esc(back.name)} · <span style="color:#2563eb">${esc(back.phone)}</span></span></div>`:''}
+      ${!prim&&!back?'<div class="sub" style="color:#b45309">No leader contact set — ask admin to add one.</div>':''}
+      <div style="display:flex;gap:8px;margin-top:9px">
+        ${prim?`<button class="btn sm" style="flex:1" onclick="reveal('${c.id}','${esc(prim.role)}')">☎︎ Call primary</button>`:''}
+        ${back?`<button class="btn alt sm" style="flex:1" onclick="reveal('${c.id}','${esc(back.role)}')">Secondary</button>`:''}
+      </div></div>`;}).join(''):'<p class="note-hint">No camper matches.</p>';
+  }catch(e){toast(e.message);}}
+async function reveal(id,role){try{const c=await api('/search/contact/'+id+'/'+encodeURIComponent(role));toast('☎︎ '+c.name+': '+c.phone);}catch(e){toast(e.message);}}
+
+/* ===== NOTICES ===== */
+RENDER.notifs=async function(){
+  const feed=await api('/notifications');
+  const canSend=['zoneLeader','director','admin'].includes(ACTOR.role);
+  const canDelete=['zoneLeader','director','admin'].includes(ACTOR.role);
+  paint('notifs',`${canSend?`<button class="btn" onclick="go('compose')">✎ Send a notice</button>`:`<p class="note-hint">Church accounts receive notices; zone leaders &amp; directors send.</p>`}
+    ${feed.length?'':`<p class="note-hint">No ${CAMP_MODE==='pre-camp'?'pre-camp':'camp'} notices yet. Leaders &amp; directors can post camp, zone or church updates here.</p>`}${feed.map(n=>`<div class="ncard ${n.priority==='urgent'?'urgent':n.scope==='zone'?'zone':''}">
+      <div class="ntop"><span class="ntag">${n.scope==='camp'?'◆ Camp-wide':n.scope==='church'?'Church':esc(n.zone||'')+' Zone'}</span>
+      ${n.priority==='urgent'?'<span class="ntag" style="background:#fdecec;color:#b91c1c">Urgent</span>':''}
+      <span class="ntime">${timeFmt(n.createdAt)}</span></div>
+      <div class="ntitle">${esc(n.title)}</div><div class="nbody">${esc(n.body)}</div>
+      <div class="rowsb" style="align-items:center;margin-top:6px"><div class="nfrom" style="margin:0">— ${esc(n.senderName)}</div>${canDelete?`<button class="btn ghost sm" onclick="deleteNotice('${n.id}')">Delete</button>`:''}</div></div>`).join('')}`,'Notices',CAMP_MODE==='pre-camp'?'Pre-camp updates':'Camp &amp; zone updates');
+};
+async function deleteNotice(id){if(!confirm('Delete this notice for everyone?'))return;try{await api('/notifications/'+id,{method:'DELETE'});toast('Notice deleted');RENDER.notifs();}catch(e){toast(e.message);}}
+
+/* ===== BUDGET (director/admin) =====
+   Prices come from accommodation blocks (settings has no price fields); the backend has
+   no fee-tier, so every camper is charged the full price for their accommodation kind. */
+RENDER.budget=async function(){
+  if(!['director','admin'].includes(ACTOR.role)){paint('budget','<p class="note-hint" style="margin-top:24px;text-align:center">Budget is available to directors only.</p>','Budget & costings','');return;}
+  const [regs,blocks]=await Promise.all([api('/registrants'),api('/accommodation/blocks')]);
+  const priceOf=k=>{const b=(blocks||[]).find(x=>x.kind===k);return b?Number(b.price)||0:0;};
+  window._budgetPrice={tent:priceOf('tent')||140,classroom:priceOf('classroom')||120};
+  window._budgetRegs=regs||[];
+  const churches=[...new Map((regs||[]).map(r=>[r.churchId,r.churchName])).entries()].map(([id,name])=>({id,name}));
+  const selHtml=`<div class="filters"><select id="budChurch" onchange="drawBudget()"><option value="all">All ministries</option>${churches.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>`;
+  paint('budget',`${selHtml}<div id="budgetBody"></div>`,'Budget & costings','Camper fees by accommodation');
+  drawBudget();
+};
+function budgetAmount(r,price){return price[r.accommodationKind]||0;}
+function drawBudget(){
+  const regs=window._budgetRegs||[],price=window._budgetPrice||{tent:140,classroom:120};
+  const scope=sel('budChurch')||'all';
+  const campers=(scope==='all'?regs:regs.filter(r=>r.churchId===scope)).filter(r=>r.kind==='camper');
+  const cats=[{key:'tent',label:'△ Tent'},{key:'classroom',label:'⌂ Classroom'}];
+  let total=0;
+  const rows=cats.map(t=>{const grp=campers.filter(r=>r.accommodationKind===t.key);const amt=grp.reduce((s,r)=>s+budgetAmount(r,price),0);total+=amt;
+    return `<div class="card"><div class="rowsb"><div><div style="font-weight:600">${t.label}</div><div class="sub">${grp.length} ${grp.length===1?'camper':'campers'} · $${price[t.key]||0} ea</div></div><b style="font-size:1.05rem">$${amt.toLocaleString()}</b></div></div>`;
+  }).join('');
+  const unset=campers.filter(r=>r.accommodationKind!=='tent'&&r.accommodationKind!=='classroom').length;
+  const head=`<div class="card" style="background:linear-gradient(135deg,#2f6bf6,#12233b);color:#fff;border:none">
+    <div class="lbl" style="color:#9cc0ff;margin:0">Fees${scope==='all'?' · all ministries':''}</div>
+    <div style="font-size:2rem;font-weight:800">$${total.toLocaleString()}</div>
+    <div style="font-size:.8rem;color:#cfe0ff">${campers.length} campers${unset?' · '+unset+' without accommodation set':''}</div></div>`;
+  const box=document.getElementById('budgetBody');if(box)box.innerHTML=head+`<h3 class="sec">By accommodation</h3>`+rows;
+}
+
+/* ===== ACCOMMODATION ALLOCATIONS (director/admin) =====
+   Backend model = accommodation blocks (spaces) + per-church reservations (spot counts).
+   There is no room-by-room placement entity, so allocation is per-church tent/classroom
+   spot counts; Tent City below is a client-side planning view from registrant data. */
+RENDER.accom=async function(){
+  if(!['director','admin'].includes(ACTOR.role)){paint('accom','<p class="note-hint" style="margin-top:24px;text-align:center">Accommodation allocations are available to directors only.</p>','Accommodation allocations','');return;}
+  const [blocks,churches,regs]=await Promise.all([api('/accommodation/blocks'),api('/accounts/churches'),api('/registrants')]);
+  window._accomBlocks=blocks||[];window._accomChurches=churches||[];window._accomRegs=regs||[];
+  paint('accom','<div id="accomBody"></div>','Accommodation allocations','Spaces · church spots · tent city');
+  drawAccom();
+};
+function tentDist(regs){const by={};(regs||[]).filter(r=>r.accommodationKind==='tent').forEach(r=>{const c=by[r.churchId]||(by[r.churchId]={name:r.churchName,m:{stu:0,ld:0},f:{stu:0,ld:0}});const g=r.gender==='male'?c.m:c.f;if(r.kind==='leader')g.ld++;else g.stu++;});return by;}
+function drawAccom(){
+  const blocks=window._accomBlocks||[],churches=window._accomChurches||[],regs=window._accomRegs||[];
+  const spaceCards=blocks.length?blocks.map(b=>{const cap=b.capacity||0,taken=b.liveTaken!=null?b.liveTaken:(b.baseTaken||0),avail=b.available!=null?b.available:(cap-taken);const pct=cap?Math.round(taken/cap*100):0;
+    return `<div class="card"><div class="rowsb"><b>${b.kind==='tent'?'△':'⌂'} ${esc(b.name)}</b><span class="pill ${avail>0?'ok':'warn'}">${avail} left</span></div>
+      <div class="bar7"><i style="width:${pct}%"></i></div><div class="sub" style="font-size:.74rem">${taken}/${cap} taken · $${b.price||0}</div></div>`;}).join(''):'<p class="note-hint">No accommodation spaces yet — add them in Admin → Accommodation.</p>';
+  const churchCards=churches.map(c=>{const res=c.reservations||[];const t=(res.find(r=>r.kind==='tent')||{}).spots||0;const cl=(res.find(r=>r.kind==='classroom')||{}).spots||0;
+    return `<div class="card" style="background:#fafbff"><div style="font-weight:700;margin-bottom:6px">${esc(c.name)} <span style="color:var(--muted)">· ${esc(c.zone||'—')}</span></div>
+    <div style="display:flex;gap:8px"><div style="flex:1"><label>△ Tent spots</label><input class="fld" id="acT_${c.id}" value="${t}"></div>
+    <div style="flex:1"><label>⌂ Classroom spots</label><input class="fld" id="acC_${c.id}" value="${cl}"></div></div>
+    <button class="btn sm" style="width:100%;margin-top:8px" onclick="saveChurchAlloc('${c.id}')">Save allocation</button></div>`;}).join('')||'<p class="note-hint">No churches yet.</p>';
+  const td=tentDist(regs);
+  const tentTable=(gk,label)=>{const rows=Object.values(td).filter(c=>c[gk].stu+c[gk].ld>0).map(c=>{const g=c[gk];const st=Math.ceil(g.stu/7),lt=Math.ceil(g.ld/7);return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:center">${g.stu}</td><td style="text-align:center">${g.ld}</td><td style="text-align:center">${st}</td><td style="text-align:center">${lt}</td></tr>`;}).join('');
+    if(!rows)return '';
+    return `<h3 class="sec">Tent City — ${label}</h3><table style="width:100%;border-collapse:collapse;font-size:.8rem"><tr style="text-align:left;color:var(--muted)"><th style="padding:6px 4px">Ministry</th><th style="text-align:center">Students</th><th style="text-align:center">Leaders</th><th style="text-align:center">Student tents</th><th style="text-align:center">Leader tents</th></tr>${rows}</table>`;};
+  const tentHtml=tentTable('m','Male')+tentTable('f','Female');
+  const box=document.getElementById('accomBody');if(!box)return;
+  box.innerHTML=`<h3 class="sec" style="margin-top:2px">Camp spaces</h3>${spaceCards}
+    <h3 class="sec">Allocation to ministries</h3>${churchCards}
+    ${tentHtml||'<p class="note-hint" style="margin-top:14px">Tent City auto-distribution appears once registrants have a tent accommodation kind set.</p>'}`;
+}
+async function saveChurchAlloc(churchId){
+  const t=Number(val('acT_'+churchId))||0,c=Number(val('acC_'+churchId))||0;
+  const reservations=[];
+  if(t>0)reservations.push({kind:'tent',spots:t,label:'Tent City',confirmed:true});
+  if(c>0)reservations.push({kind:'classroom',spots:c,label:'Classroom',confirmed:true});
+  try{await api('/accommodation/reservations',{method:'POST',body:{churchId,reservations}});toast('Allocation saved ✓');}catch(e){toast(e.message);}}
+RENDER.compose=function(){
+  const isDir=['director','admin'].includes(ACTOR.role);
+  paint('compose',`<label>Send to</label><div class="seg" id="audSeg">
+    ${isDir?`<button class="on" data-aud="camp" onclick="setAud(this)">◆ Camp-wide</button><button data-aud="zone" onclick="setAud(this)">A zone</button>`
+      :`<button class="on" data-aud="myzone" onclick="setAud(this)">${esc(ACTOR.zone)} Zone</button>`}
+    </div>
+    ${isDir?`<div id="zoneWrap" style="display:none"><label>Zone</label><select id="zoneSel">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>`:''}
+    <label>Priority</label><div class="seg" id="priSeg"><button class="on" data-pri="normal" onclick="setPri(this)">◈ Normal</button><button data-pri="urgent" onclick="setPri(this)">⚠︎ Urgent</button></div>
+    <label>Title</label><input class="fld" id="ntitle">
+    <label>Message</label><textarea id="nbody"></textarea>
+    <button class="btn" id="sendBtn" onclick="sendNotif()">Send notice</button>`,'Send a notice','Goes to leaders');
+  window._aud=isDir?'camp':'myzone';window._pri='normal';
+};
+function setAud(b){document.querySelectorAll('#audSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');window._aud=b.dataset.aud;const z=document.getElementById('zoneWrap');if(z)z.style.display=window._aud==='zone'?'block':'none';}
+function setPri(b){document.querySelectorAll('#priSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');window._pri=b.dataset.pri;}
+async function sendNotif(){const title=document.getElementById('ntitle').value.trim(),body=document.getElementById('nbody').value.trim();
+  if(!title||!body){toast('Enter title + message');return;}
+  let p={priority:window._pri,title,body};
+  if(window._aud==='camp')p.scope='camp';else if(window._aud==='myzone'){p.scope='zone';p.zone=ACTOR.zone;}
+  else{p.scope='zone';p.zone=document.getElementById('zoneSel').value;}
+  if(p.scope==='camp'||window._pri==='urgent'){if(!confirm('Send '+(window._pri==='urgent'?'URGENT ':'')+(p.scope==='camp'?'camp-wide':p.zone+' zone')+' notice?'))return;}
+  try{await api('/notifications',{method:'POST',body:p});toast('Delivered ✓');back();}catch(e){toast(e.message);}}
+
+/* ===== MY YOUTH at-camp ===== */
+
+/* ===== FIRST DAY SIGN IN ===== */
+RENDER.firstday=async function(){
+  paint('firstday','<p class="note-hint" style="margin-top:40px;text-align:center">Loading…</p>','First Day Sign In','Select students to confirm');
+  const page=await api('/campers?pageSize=300');
+  window._fdAll=(Array.isArray(page)?page:page.items||[]).filter(c=>c.kind==='student');
+  window._fdPending=new Set();
+  window._fdGender='all';window._fdGrade='all';
+  fdDraw();
+};
+function fdDraw(){
+  const students=window._fdAll||[];
+  const notIn=students.filter(c=>!c.atCamp);
+  const alreadyIn=students.filter(c=>c.atCamp);
+  const gen=window._fdGender||'all';
+  const gr=window._fdGrade||'all';
+  const visible=notIn.filter(c=>(gen==='all'||c.gender===gen)&&(gr==='all'||String(c.grade)===gr));
+  const pending=window._fdPending||(window._fdPending=new Set());
+  const gradeOpts=['all',...GRADES].map(g=>`<option value="${g}" ${String(g)===gr?'selected':''}>${g==='all'?'All grades':'Yr '+g}</option>`).join('');
+  function fdRow(c,done){
+    const av=`<div class="av ${esc(c.gender)}">${initials(c.firstName+' '+c.lastName)}</div>`;
+    const info=`<div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}<span class="gradepill">Yr ${c.grade||'—'}</span></div><div class="sub">${esc(c.churchName)}</div></div>`;
+    if(done){
+      return `<div class="row" style="opacity:.45;cursor:default">${av}${info}<span class="pill ok">✓ In</span></div>`;
+    }
+    const sel=pending.has(c.id);
+    return `<div class="row ${sel?'checked':''}" style="cursor:pointer" onclick="fdToggle('${c.id}',this)" data-id="${c.id}">
+      ${av}${info}
+      <div style="width:26px;height:26px;border-radius:50%;border:2px solid ${sel?'#16a34a':'#c2cdda'};background:${sel?'#16a34a':'transparent'};display:grid;place-items:center;flex:none;transition:.15s">
+        ${sel?'<span style="color:#fff;font-size:.9rem;line-height:1">✓</span>':''}
+      </div></div>`;
+  }
+  const pendingCount=pending.size;
+  let html=`
+    <div class="filters" style="margin-bottom:10px">
+      <select onchange="window._fdGender=this.value;fdDraw()">
+        <option value="all" ${gen==='all'?'selected':''}>All genders</option>
+        <option value="male" ${gen==='male'?'selected':''}>Guys</option>
+        <option value="female" ${gen==='female'?'selected':''}>Girls</option>
+      </select>
+      <select onchange="window._fdGrade=this.value;fdDraw()">${gradeOpts}</select>
+    </div>
+    ${visible.length?visible.map(c=>fdRow(c,false)).join(''):'<p class="note-hint">No students match these filters.</p>'}
+    ${notIn.length===0?'<div class="callbox">All students in your group are signed in ✓</div>':''}
+    ${alreadyIn.length?`<h3 class="sec" style="margin-top:16px">Already signed in (${alreadyIn.length})</h3>`+alreadyIn.map(c=>fdRow(c,true)).join(''):''}
+    <div id="fdConfirmBar" style="display:${pendingCount>0?'block':'none'};position:sticky;bottom:10px;margin-top:16px">
+      <button class="btn" style="background:#16a34a" onclick="fdConfirmAll()">Confirm ${pendingCount} sign-in${pendingCount===1?'':'s'}</button>
+    </div>`;
+  const el=document.getElementById('firstday');
+  if(el)el.innerHTML=html;
+  document.getElementById('barT').textContent='First Day Sign In';
+  document.getElementById('barS').textContent=(notIn.length-pendingCount)+' remaining';
+}
+function fdToggle(id,rowEl){
+  const pending=window._fdPending||(window._fdPending=new Set());
+  if(pending.has(id))pending.delete(id);else pending.add(id);
+  fdDraw();
+}
+async function fdConfirmAll(){
+  const pending=[...(window._fdPending||new Set())];
+  if(!pending.length)return;
+  const btn=document.querySelector('#fdConfirmBar button');
+  if(btn){btn.textContent='Signing in…';btn.disabled=true;}
+  let ok=0,fail=0;
+  await Promise.all(pending.map(id=>
+    api('/attendance/sign-in',{method:'POST',body:{camperId:id,leaderName:ACTOR.displayName}})
+      .then(()=>{
+        const c=window._fdAll.find(s=>s.id===id);
+        if(c)c.atCamp=true;
+        window._fdPending.delete(id);
+        ok++;
+      })
+      .catch(()=>fail++)
+  ));
+  if(fail)toast(fail+' failed — please retry');
+  else toast(ok+' student'+(ok===1?'':'s')+' signed in ✓');
+  fdDraw();
+}
+
+RENDER.myyouth=async function(){
+  paint('myyouth','<p class="note-hint" style="margin-top:40px;text-align:center">Loading…</p>','My Youth Details','At camp · signed out · late');
+  const page=await api('/campers?pageSize=300');
+  const items=Array.isArray(page)?page:page.items||[];
+  const isWide=['zoneLeader','director','admin'].includes(ACTOR.role);
+  const zones=[...new Set(items.map(c=>c.zone))].sort();
+  const zoneFilterHtml=isWide?`<select id="myZoneF" onchange="filterMyYouth()"><option value="all">All zones</option>${zones.map(z=>`<option value="${z}">${z} Zone</option>`).join('')}</select>`:'';
+  window._myYouthAll=items;
+  const base=`<div class="filters">${zoneFilterHtml}<select id="myGenderF" onchange="filterMyYouth()"><option value="all">All genders</option><option value="female">Girls</option><option value="male">Guys</option></select><select id="myGradeF" onchange="filterMyYouth()"><option value="all">All grades</option>${GRADES.map(g=>`<option value="${g}">Yr ${g}</option>`).join('')}</select></div><div id="myYouthList"></div>`;
+  paint('myyouth',base,'My Youth Details','At camp · signed out · late');
+  filterMyYouth();
+};
+function filterMyYouth(){
+  const zone=sel('myZoneF')||'all',gen=sel('myGenderF')||'all',gr=sel('myGradeF')||'all';
+  const all=(window._myYouthAll||[]).filter(c=>(zone==='all'||c.zone===zone)&&(gen==='all'||c.gender===gen)&&(gr==='all'||String(c.grade)===gr));
+  const notArrived=all.filter(c=>c.kind==='student'&&!c.atCamp&&(!c.signOutHistory||c.signOutHistory.length===0));
+  const signedOut=all.filter(c=>!c.atCamp&&c.signOutHistory&&c.signOutHistory.length>0);
+  const atCamp=all.filter(c=>c.atCamp);
+  const el=document.getElementById('myYouthList');if(!el)return;
+  function myRow(c){
+    const lead=c.kind==='leader';
+    const badge=lead?` <span class="lead-tag">LEADER</span>`:'';
+    const sub=`${esc(c.zone)} Zone · ${esc(c.churchName)} · ${lead?'Leader':'Yr '+c.grade}`;
+    return `<div class="row" onclick="openCamper('${c.id}')"><div class="av ${esc(c.gender)}">${initials(c.firstName+' '+c.lastName)}</div>
+      <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}${badge}</div>
+      <div class="sub">${sub}</div></div><span class="chev">›</span></div>`;
+  }
+  let html='';
+  if(atCamp.length){
+    html+=`<h3 class="sec" style="margin-top:4px">At camp (${atCamp.length})</h3>`;
+    html+=atCamp.map(myRow).join('');
+  }
+  if(signedOut.length){
+    html+=`<h3 class="sec">Signed out of camp (${signedOut.length})</h3>`;
+    html+=signedOut.map(myRow).join('');
+  }
+  if(notArrived.length){
+    html+=`<h3 class="sec">Late arrivals (${notArrived.length})</h3>`;
+    html+=`<div class="infobox" style="font-size:.8rem;margin-bottom:8px">First Day Sign In is closed. Sign in late arrivals here — tap a name, then “Sign in to camp”. A note is logged automatically.</div>`;
+    html+=notArrived.map(myRow).join('');
+  }
+  if(!html)html='<p class="note-hint" style="margin-top:24px;text-align:center">No students match these filters.</p>';
+  el.innerHTML=html;
+}
+async function openCamper(id,push=true){
+  const p=await api('/campers/'+id);let notesHtml='';const lead=p.kind==='leader';
+  const lastSignOut=(p.signOutHistory||[]).filter(e=>e.type==='out').slice(-1)[0]||null;
+  if(canReadCamperNotes()){try{const notes=await api('/notes/camper/'+id);
+    notesHtml=`<div class="h3">Notes</div>${notes.length?notes.map(n=>`<div class="noteitem">${esc(n.body)}<div class="meta">${n.category&&n.category!=='note'?esc(n.category)+' · ':''}${esc(n.authorName)} · ${dtFmt(n.createdAt)}</div></div>`).join(''):'<p class="sub">No notes.</p>'}`;
+  }catch(e){}}
+  const camp=`<div class="card"><div class="h3" style="margin-top:0">Camp attendance</div>
+    <div class="kv"><span class="k">Status</span><span class="v">${p.atCamp?'<span class="pill ok">Signed in</span>':'<span class="pill warn">Signed out</span>'}</span></div>
+    ${!p.atCamp&&lastSignOut?`<div class="kv"><span class="k">Signed out by</span><span class="v">${esc(lastSignOut.leaderName)}</span></div>
+    <div class="kv"><span class="k">Reason</span><span class="v">${esc(lastSignOut.reason||'—')}</span></div>
+    <div class="kv"><span class="k">Parents met</span><span class="v">${lastSignOut.parentsMet?'Yes':'No'}</span></div>`:''}
+    ${p.atCamp?`<button class="btn red" onclick="signOutPrompt('${id}','${esc(p.fullName||p.firstName+' '+p.lastName)}')">Sign out of camp</button>`:`<button class="btn" onclick="signInPrompt('${id}','${esc(p.fullName||p.firstName+' '+p.lastName)}')">${(p.signOutHistory||[]).some(e=>e.type==='out')?'Sign back in to camp':'Sign in to camp (late arrival)'}</button>`}</div>`;
+  const fullName=p.fullName||p.firstName+' '+p.lastName;
+  document.getElementById('camper').innerHTML=`<div class="detail-hd"><div class="av-lg">${initials(fullName)}</div>
+    <h2>${esc(fullName)}</h2><div style="color:#cfe0ff;font-size:.82rem">${esc(p.zone)} Zone · ${lead?'Leader (18+)':'Grade '+p.grade}</div></div>
+    <div class="card">
+      <div class="kv"><span class="k">Church</span><span class="v">${esc(p.churchName)}</span></div>
+      <div class="kv"><span class="k">${lead?'Mobile':'Student mobile'}</span><span class="v"><a href="tel:${esc(p.mobile||'')}" style="color:#2563eb;text-decoration:none">${esc(p.mobile||'—')}</a></span></div>
+      ${lead?'':`<div class="kv"><span class="k">Medical</span><span class="v">${(p.medicalConditions||[]).join(', ')||'—'}</span></div>
+      <div class="kv"><span class="k">Dietary</span><span class="v">${(p.dietaryRequirements||[]).join(', ')||'—'}</span></div>
+      ${p.otherMedications?`<div class="kv"><span class="k">Medication</span><span class="v">${esc(p.otherMedications)}</span></div>`:''}
+      <div class="kv"><span class="k">Consents</span><span class="v">${p.consents?Object.values(p.consents).filter(v=>v&&v.granted).length:0}/3 ✓</span></div>`}
+    </div>
+    ${camp}
+    ${lead?'':`<div class="card"><div class="h3" style="margin-top:0">Parent / guardian</div>
+      <div class="kv"><span class="k">Name</span><span class="v">${esc(p.parentGuardianName||'—')}${p.parentRelation?' ('+esc(p.parentRelation)+')':''}</span></div>
+      <div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(p.parentPhone||'')}" style="color:#2563eb;text-decoration:none">${esc(p.parentPhone||'—')}</a></span></div></div>`}
+    ${notesHtml}`;
+  const camperEl=document.getElementById('camper');
+  if(camperEl)camperEl.scrollTop=0;
+  if(push&&STACK[STACK.length-1]!=='camper')STACK.push('camper');
+  _paint('camper','',fullName,p.zone+' Zone');
+  _showScreen('camper');
+}
+
+/* SIGN OUT / IN */
+function signOutPrompt(id,name){
+  modal(`<h3>Sign out · ${esc(name)}</h3><p class="sub" style="margin:4px 0 8px">Signing this youth OUT of camp.</p>
+    <label>Your name</label><input class="fld" id="soLeader" value="${esc(LAST_LEADER||'')}" placeholder="e.g. Sarah Doyle">
+    <label>Reason</label><textarea id="soReason" placeholder="e.g. picked up by parents"></textarea>
+    <label>Were parents met at pickup?</label><div class="seg" id="soPm"><button class="on" data-pm="yes" onclick="soPm(this)">Yes</button><button data-pm="no" onclick="soPm(this)">No</button></div>
+    <button class="btn" onclick="signOutReview('${id}','${esc(name)}')">Review →</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+  window._soPm='yes';
+}
+function soPm(b){document.querySelectorAll('#soPm button').forEach(x=>x.classList.remove('on'));b.classList.add('on');window._soPm=b.dataset.pm;}
+function signOutReview(id,name){
+  const leader=document.getElementById('soLeader').value.trim(),reason=document.getElementById('soReason').value.trim(),pm=window._soPm==='yes';
+  if(!leader){toast('Add your name first');return;}if(!reason){toast('Add a reason');return;}
+  LAST_LEADER=leader;window._soDraft={id,leader,reason,pm};
+  modal(`<h3>Review sign-out</h3><div class="card" style="margin:6px 0 10px">
+    <div class="sub">Student</div><div class="nm">${esc(name)}</div>
+    <div class="sub" style="margin-top:7px">Signed out by</div><div class="nm">${esc(leader)}</div>
+    <div class="sub" style="margin-top:7px">Reason</div><div style="font-size:.9rem">${esc(reason)}</div>
+    <div class="sub" style="margin-top:7px">Parents met</div><div class="nm">${pm?'Yes':'No'}</div></div>
+    <button class="btn red" onclick="signOutConfirm()">Confirm &amp; sign out</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="signOutPrompt('${id}','${esc(name)}')">‹ Edit</button>`);
+}
+async function signOutConfirm(){const d=window._soDraft;if(!d)return;
+  try{await api('/attendance/sign-out',{method:'POST',body:{camperId:d.id,leaderName:d.leader,reason:d.reason,parentsMet:d.pm}});window._soDraft=null;closeModal();toast('Signed out ✓');openCamper(d.id,false);}catch(e){toast(e.message);}}
+function signInPrompt(id,name){
+  modal(`<h3>Sign in · ${esc(name)}</h3><p class="sub" style="margin:4px 0 8px">Signing this youth back IN to camp.</p>
+    <label>Your initials</label><input class="fld" id="siInit" placeholder="e.g. SD" maxlength="6">
+    <button class="btn" onclick="signInConfirm('${id}')">Sign in</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+}
+async function signInConfirm(id){const init=document.getElementById('siInit').value.trim();if(!init){toast('Enter your initials');return;}
+  try{await api('/attendance/sign-in',{method:'POST',body:{camperId:id,leaderName:init}});closeModal();toast('Signed in ✓');openCamper(id,false);}catch(e){toast(e.message);}}
+
+/* ===== SCHEDULE ===== */
+let SCHED_DAY=null;
+RENDER.schedule=async function(){
+  if(!SCHED_DAY)SCHED_DAY=(SETTINGS?.checkInDays&&SETTINGS.checkInDays[0])||null;
+  if(!SCHED_DAY){paint('schedule','<p class="note-hint">No camp days configured.</p>','Schedule','');return;}
+  const items=await api('/schedule?day='+SCHED_DAY);
+  const days=SETTINGS?.checkInDays||[];
+  const daySeg=days.length>1?`<div class="seg">${days.map(d=>`<button class="${d===SCHED_DAY?'on':''}" onclick="selSchedDay('${d}')">${new Date(d+'T12:00:00Z').toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'})}</button>`).join('')}</div>`:'';
+  paint('schedule',daySeg+`<div class="card">${items.length?items.map(i=>`<div style="display:flex;gap:11px;margin-bottom:9px">
+    <div style="font-weight:800;color:var(--blue);width:56px;flex:none">${esc(i.startTime)}</div>
+    <div><div class="nm">${esc(i.title)}${i.isCheckInPoint?' <span class="pill ok" style="font-size:.55rem">check-in</span>':''}</div>
+    <div class="sub">${esc(i.location||'')}</div></div></div>`).join(''):'<p class="sub">No items for this day.</p>'}</div>`,'Schedule',dayLong(SCHED_DAY));
+};
+function selSchedDay(d){SCHED_DAY=d;RENDER.schedule();}
+
+/* ===== DEVOTIONAL ===== */
+let DEVO_DAY=null;
+RENDER.devotional=async function(){
+  if(!DEVO_DAY)DEVO_DAY=(SETTINGS?.checkInDays&&SETTINGS.checkInDays[0])||null;
+  if(!DEVO_DAY){paint('devotional','<p class="note-hint">No camp days configured.</p>','Daily Devotional','');return;}
+  const d=await api('/devotional/'+DEVO_DAY).catch(()=>null);
+  const days=SETTINGS?.checkInDays||[];
+  const daySeg=days.length>1?`<div class="seg">${days.map(dy=>`<button class="${dy===DEVO_DAY?'on':''}" onclick="selDevoDay('${dy}')">${new Date(dy+'T12:00:00Z').toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'})}</button>`).join('')}</div>`:'';
+  paint('devotional',daySeg+(d?`<div class="hero" style="background:radial-gradient(130% 130% at 100% 0%,#0ea5a4,#12233b 78%)">
+    <div class="k">Verse of the day</div><h2 style="font-size:1.04rem;line-height:1.45;font-weight:600">"${esc(d.verse)}"</h2>
+    <div style="color:#bfeeeb;font-size:.82rem;font-weight:700;margin-top:6px">${esc(d.reference)}</div></div>
+    <div class="card"><div class="h3" style="margin-top:0">Reflection</div><p style="font-size:.9rem;color:#374151;line-height:1.6">${esc(d.reflection)}</p></div>
+    <div class="card" style="background:#eef4ff;border-color:#dbe6ff"><div class="h3" style="margin-top:0;color:#2851a3">Prayer</div><p style="font-size:.9rem;color:#1e3a8a;line-height:1.6;font-style:italic">${esc(d.prayer)}</p></div>`
+    :'<p class="note-hint">No devotional set for this day.</p>'),'Daily Devotional',dayLong(DEVO_DAY));
+};
+function selDevoDay(d){DEVO_DAY=d;RENDER.devotional();}
+
+/* ===== FAQ at-camp ===== */
+RENDER.faq=async function(){
+  const items=await api('/faq');
+  paint('faq',items.map(f=>`<div class="card"><div class="h3" style="margin-top:0">${esc(f.question)}</div><p style="font-size:.88rem;color:#475569">${esc(f.answer)}</p></div>`).join(''),'FAQ','Quick answers');
+};
+
+/* ===== NOTES ===== */
+RENDER.testimonies=async function(){
+  // A testimony is stored as a note with category 'testimony' — the backend requires a camper,
+  // so the leader selects which student the testimony is about.
+  const page=await api('/campers?pageSize=300').catch(()=>[]);
+  const items=(Array.isArray(page)?page:page.items||[]).filter(c=>c.kind==='student').sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName));
+  const opts=items.map(c=>`<option value="${c.id}">${esc(c.firstName+' '+c.lastName)} · ${esc(c.churchName)}</option>`).join('');
+  paint('testimonies',`<div class="infobox" style="font-size:.82rem">Record a testimony or God-moment from camp for a student. It is saved with the records that leaders &amp; directors review.</div>
+    <div class="card"><label>Student</label><select id="tmCamper">${opts||'<option value="">No students available</option>'}</select>
+    <label>Your name (leader)</label><input class="fld" id="tmLeader" value="${esc(LAST_LEADER||'')}" placeholder="e.g. Sarah Doyle">
+    <label>Testimony</label><textarea id="tmBody" placeholder="What happened? Whose story is it? What did God do?" style="min-height:120px"></textarea>
+    <button class="btn" onclick="submitTestimony()">Submit testimony</button></div>`,'Submit Testimonies','Day 2+');
+};
+async function submitTestimony(){const camperId=sel('tmCamper'),leader=val('tmLeader'),body=val('tmBody');
+  if(!camperId){toast('Pick a student');return;}if(!body){toast('Write the testimony');return;}LAST_LEADER=leader;
+  const full=leader&&leader!==ACTOR.displayName?`${body}\n— logged by ${leader}`:body;
+  try{await api('/notes',{method:'POST',body:{camperId,body:full,category:'testimony'}});toast('Testimony submitted ✓');const t=document.getElementById('tmBody');if(t)t.value='';}catch(e){toast(e.message);}}
+RENDER.notes=async function(){
+  // /notes/recent returns bare notes (no camper details) — join /campers for name/church/zone/gender/grade.
+  const [notes,page]=await Promise.all([api('/notes/recent'),api('/campers?pageSize=300').catch(()=>[])]);
+  const camps=Array.isArray(page)?page:page.items||[];const cmap={};camps.forEach(c=>{cmap[c.id]=c;});
+  window._notesAll=(notes||[]).map(n=>{const c=cmap[n.camperId]||{};return Object.assign({},n,{camperName:c.firstName?(c.firstName+' '+c.lastName):n.camperId,church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,cat:n.category||'note'});});
+  const churches=[...new Set(window._notesAll.map(n=>n.church).filter(Boolean))].sort();
+  const zonesPresent=[...new Set(window._notesAll.map(n=>n.zone).filter(Boolean))].sort();
+  const recSel=`<div><label>Record</label><select id="ntCat" onchange="drawNotes()"><option value="all">All records</option><option value="testimony">Testimony</option><option value="note">Student note</option></select></div>`;
+  const minSel=`<div><label>Ministry</label><select id="ntChurch" onchange="drawNotes()"><option value="all">All ministries</option>${churches.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>`;
+  const zoneSel=`<div><label>Zone</label><select id="ntZone" onchange="drawNotes()"><option value="all">All zones</option>${zonesPresent.map(z=>`<option value="${z}">${z} Zone</option>`).join('')}</select></div>`;
+  paint('notes',`<button class="btn alt" onclick="exportNotes()">↓ Export (CSV)</button>
+    <div class="selrow">${recSel}${minSel}</div><div class="selrow">${zoneSel}</div>
+    <div id="notesList"></div>`,'Testimonies & Student Notes','All zones · whole camp');
+  drawNotes();
+};
+function drawNotes(){
+  let list=window._notesAll||[];
+  const cat=sel('ntCat')||'all',ch=sel('ntChurch')||'all',z=sel('ntZone')||'all';
+  if(cat!=='all')list=list.filter(n=>(n.cat||'note')===cat);
+  if(ch!=='all')list=list.filter(n=>n.church===ch);
+  if(z!=='all')list=list.filter(n=>n.zone===z);
+  const box=document.getElementById('notesList');if(!box)return;
+  const badge=c=>c==='testimony'?'<span class="pill info">Testimony</span>':'<span class="pill ok">Student note</span>';
+  box.innerHTML=list.length?list.map(n=>{const c=n.cat||'note';const isT=c==='testimony';
+    const right=(n.gender)?`<span class="sub" style="white-space:nowrap">${n.gender==='male'?'♂':'♀'}${n.grade?' · Yr '+n.grade:''}</span>`:'';
+    return `<div class="card"><div class="rowsb" style="align-items:center"><div class="nm">${esc(n.camperName||'—')}</div>${right}</div>
+    <div style="font-size:.86rem;color:#475569;margin:4px 0">${esc(n.body)}</div>
+    <div class="sub">${esc(n.authorName)} · ${dtFmt(n.createdAt)}${n.church?' · '+esc(n.church):''} · ${badge(c)}</div></div>`;}).join(''):'<p class="note-hint">No records match these filters.</p>';
+}
+async function exportNotes(){
+  try{const csv=await api('/notes/export');if(!csv||typeof csv!=='string'){toast('Nothing to export');return;}
+    const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download='testimonies-and-notes-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    toast('Exported ✓');
+  }catch(e){toast(e.message);}}
+
+/* ===== ADMIN CONSOLE ===== */
+RENDER.admin=function(){
+  const isAdmin=ACTOR.role==='admin';
+  const modeTile=isAdmin?`<div class="tile" onclick="switchMode()"><div class="l">Switch to ${CAMP_MODE==='pre-camp'?'At-Camp':'Pre-Camp'}</div></div>`:'';
+  paint('admin',`<div class="infobox">Admin console — configure camp here year-round.</div>
+    <div class="tiles">
+      <div class="tile" onclick="go('adminAccounts')"><div class="l">Accounts &amp; churches</div></div>
+      <div class="tile" onclick="go('adminAccom')"><div class="l">Accommodation</div></div>
+      <div class="tile" onclick="go('adminContacts')"><div class="l">Ministry contacts</div></div>
+      <div class="tile" onclick="go('adminSettings')"><div class="l">Camp settings</div></div>
+      <div class="tile" onclick="go('adminFaq')"><div class="l">FAQ</div></div>
+      <div class="tile" onclick="go('adminDevos')"><div class="l">Devotionals</div></div>
+      <div class="tile" onclick="go('adminSchedEdit')"><div class="l">Schedule</div></div>
+      <div class="tile" onclick="go('adminData')"><div class="l">Data &amp; reset</div></div>
+      ${modeTile}
+    </div>`,'Admin console','Back office');
+};
+
+async function switchMode(){
+  const newMode=CAMP_MODE==='pre-camp'?'at-camp':'pre-camp';
+  const label=newMode==='at-camp'?'AT CAMP (live operations)':'PRE-CAMP (registration prep)';
+  const changes=newMode==='at-camp'
+    ?'Everyone moves to live camp operations — daily check-in, notices and sign-out. Pre-camp registration tiles are hidden.'
+    :'Everyone moves back to pre-camp prep — registrations, payments and accommodation.';
+  if(!confirm('Switch the whole app to '+label+'?\n\n'+changes))return;
+  try{
+    await api('/admin/mode',{method:'POST',body:{campMode:newMode}});
+    CAMP_MODE=newMode;SETTINGS.campMode=newMode;
+    updateModeUI();buildTabs();
+    toast(`Switched to ${label} ✓`);STACK=['home'];await RENDER.home();
+  }catch(e){toast(e.message);}
+}
+
+/* ===== ADMIN ACCOUNTS ===== */
+const ZONE_OPTS=['Yellow','Blue','Green','Red'];
+const zoneSel=(id,s)=>`<select id="${id}">${ZONE_OPTS.map(z=>`<option${z===s?' selected':''}>${z}</option>`).join('')}</select>`;
+RENDER.adminAccounts=async function(){
+  const [users,churches]=await Promise.all([api('/accounts/users'),api('/accounts/churches')]);
+  const leaderRoles=['zoneLeader','director'];
+  const leaders=users.filter(u=>leaderRoles.includes(u.role));
+  const lr=leaders.map(u=>`<div class="row" style="cursor:default"><div style="flex:1;min-width:0">
+    <div class="nm">${esc(u.firstName+' '+u.lastName)} <span style="color:var(--muted)">· ${u.role}</span></div>
+    <div class="sub">${esc(u.username||'')}${u.zone?' · '+u.zone:u.churchName?' · '+u.churchName:''}${u.status==='inactive'?' · inactive':''}</div></div>
+    <button class="btn ghost sm" onclick='editAcct(${JSON.stringify(u).replace(/\'/g,"&#39;")})'>Edit</button><button class="btn red sm" style="margin-left:6px" onclick="delAcct('${u.id}')">Delete</button></div>`).join('')||'<p class="note-hint">No leadership accounts yet.</p>';
+  const chOpts=churches.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const cr=churches.map(c=>`<div class="card" style="background:#fafbff"><div style="font-weight:700;margin-bottom:4px">${esc(c.name)} <span class="pill info">${esc(c.code||'')}</span></div>
+    <label>Zone</label>${zoneSel('cz_'+c.id,c.zone)}
+    <label>Contact email</label><input class="fld" id="ce_${c.id}" type="email" inputmode="email" value="${esc(c.contactEmail||'')}">
+    ${CAMP_MODE==='pre-camp'?`<label>Expected registrations</label><input class="fld" id="cx_${c.id}" value="${esc(c.expectedCount||0)}">`:'' }
+    <div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveChurch('${c.id}')">Save</button><button class="btn red sm" style="flex:1" onclick="delChurch('${c.id}')">Delete church</button></div></div>`).join('');
+  const roleOpts=`<option value="director">Director</option><option value="zoneLeader">Zone leader</option>`;
+  paint('adminAccounts',`
+    <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>
+      ${lr}<div id="acctEdit"></div>
+      <div class="h3">Add account</div>
+      <div style="display:flex;gap:6px"><input class="fld" id="aF" placeholder="First name"><input class="fld" id="aL" placeholder="Last name"></div>
+      <label>Username</label><input class="fld" id="aE" placeholder="e.g. yr10leaders" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <label>Password</label><input class="fld" id="aP" placeholder="min 6 characters">
+      <label>Role</label><select id="aR" onchange="aRoleChange()">${roleOpts}</select>
+      <div id="aChurchWrap"><label>Church</label><select id="aC">${chOpts}</select></div>
+      <div id="aZoneWrap" style="display:none"><label>Zone</label>${zoneSel('aZ')}</div>
+      <button class="btn" onclick="addAcct()">Create account</button></div>
+    <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
+      <div class="warnbox">⚠ Church name must match registration form exactly — registrations are matched by name.</div>
+      <label>Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside">
+      <label>Registration code</label><input class="fld" id="ncCode" placeholder="auto from name if blank, e.g. NORTH">
+      <label>Zone</label>${zoneSel('ncZone')}
+      <label>Youth pastor name</label><input class="fld" id="ncYp" placeholder="e.g. Ps Sam">
+      <label>Login username</label><input class="fld" id="ncEmail" placeholder="e.g. northside" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <label>Password</label><input class="fld" id="ncPass" placeholder="min 6 characters">
+      ${CAMP_MODE==='pre-camp'?`<label>Expected registrations</label><input class="fld" id="ncExp" type="number" inputmode="numeric" min="0" value="0">`:''}
+      <button class="btn" onclick="addChurch()">Create church + account</button></div>
+    <div class="card"><div class="lbl" style="margin-top:0">Churches — zone &amp; contact</div>${cr||'<p class="note-hint">No churches yet.</p>'}</div>`,'Accounts &amp; churches','Admin');
+};
+function aRoleChange(){
+  const r=document.getElementById('aR').value;
+  document.getElementById('aChurchWrap').style.display='none';
+  document.getElementById('aZoneWrap').style.display=r==='zoneLeader'?'block':'none';
+}
+async function addAcct(){const role=sel('aR');const body={firstName:val('aF'),lastName:val('aL'),username:val('aE'),password:val('aP'),role};
+  if(role==='zoneLeader')body.zone=sel('aZ');
+  if(!body.firstName||!body.lastName||!body.username){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
+  try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+function editAcct(u){document.getElementById('acctEdit').innerHTML=`<div class="card" style="background:#fafbff">
+  <div class="lbl" style="margin-top:0">Edit ${esc(u.firstName+' '+u.lastName)}</div>
+  <div style="display:flex;gap:6px"><input class="fld" id="eF" value="${esc(u.firstName)}"><input class="fld" id="eL" value="${esc(u.lastName)}"></div>
+  <label>Username</label><input class="fld" id="eE" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
+  ${u.role==='zoneLeader'?'<label>Zone</label>'+zoneSel('eZ',u.zone):''}
+  <label>Status</label><select id="eS"><option value="active"${u.status!=='inactive'?' selected':''}>Active</option><option value="inactive"${u.status==='inactive'?' selected':''}>Inactive</option></select>
+  <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveAcct('${u.id}','${u.role}')">Save</button>
+  <button class="btn ghost sm" style="flex:1" onclick="document.getElementById('acctEdit').innerHTML=''">Cancel</button></div></div>`;}
+async function saveAcct(id,role){const body={firstName:val('eF'),lastName:val('eL'),username:val('eE'),status:sel('eS')};
+  if(role==='zoneLeader')body.zone=document.getElementById('eZ').value;
+  try{await api('/accounts/users/'+id,{method:'PATCH',body});toast('Saved ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+async function delAcct(id){if(!confirm("Delete this account?"))return;
+  try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
+async function delChurch(id){if(!confirm("Delete this church and its login account?"))return;
+  try{await api("/accounts/churches/"+id,{method:"DELETE"});toast("Church deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
+async function addChurch(){if(!val('ncName')||!val('ncEmail')){toast('Enter church name + login username');return;}if(val('ncPass').length<6){toast('Password 6+ chars');return;}
+  const name=val('ncName');
+  const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'church';
+  const code=(val('ncCode')||name).replace(/[^A-Za-z0-9]/g,'').slice(0,6).toUpperCase()||'CHURCH';
+  const yp=(val('ncYp')||name).trim().split(/\s+/);
+  const body={churchName:name,zone:sel('ncZone'),code,selfRegisterSlug:slug,expectedCount:Number(val('ncExp'))||0,youthPastorName:val('ncYp')||undefined,accountFirstName:yp[0]||name,accountLastName:yp.slice(1).join(' ')||'Team',accountUsername:val('ncEmail'),accountPassword:val('ncPass')};
+  try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+async function saveChurch(id){
+  const body={zone:sel('cz_'+id),contactEmail:val('ce_'+id)};
+  const cx=document.getElementById('cx_'+id);if(cx)body.expectedCount=Number(cx.value)||0;
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body});toast('Church updated ✓');}catch(e){toast(e.message);}}
+
+/* ===== ADMIN ACCOMMODATION ===== */
+RENDER.adminAccom=async function(){
+  // Backend model is accommodation blocks (tent/classroom spaces with capacity + price).
+  const blocks=await api('/accommodation/blocks');
+  window._adminBlocks=blocks||[];
+  const blockCards=(blocks||[]).map(b=>`<div class="card" style="background:#fafbff">
+    <div class="rowsb"><div style="font-weight:700">${b.kind==='tent'?'△':'⌂'} ${esc(b.name)}</div><button class="btn red sm" onclick="delBlock('${b.id}')">Delete</button></div>
+    <div style="display:flex;gap:6px;margin-top:6px"><div style="flex:1"><label style="font-size:.62rem">Name</label><input class="fld" id="bn_${b.id}" value="${esc(b.name)}"></div></div>
+    <div style="display:flex;gap:6px;margin-top:6px"><div style="flex:1"><label style="font-size:.62rem">Capacity</label><input class="fld" id="bc_${b.id}" type="number" inputmode="numeric" min="0" value="${b.capacity}"></div>
+    <div style="flex:1"><label style="font-size:.62rem">Price $</label><input class="fld" id="bp_${b.id}" type="number" inputmode="numeric" min="0" value="${b.price}"></div>
+    <div style="flex:1"><label style="font-size:.62rem">Already taken</label><input class="fld" id="bt_${b.id}" type="number" inputmode="numeric" min="0" value="${b.baseTaken||0}"></div></div>
+    <button class="btn sm" style="width:100%;margin-top:8px" onclick="saveBlock('${b.id}')">Save</button></div>`).join('')||'<p class="note-hint">No spaces yet.</p>';
+  paint('adminAccom',`<div class="infobox">Define the camp's accommodation spaces — tents &amp; classroom blocks with capacity and price. Per-church spot allocation is on the Accommodation allocations page.</div>
+    ${blockCards}
+    <div class="card"><div class="lbl" style="margin-top:0">Add a space</div>
+    <label>Type</label><select id="nbKind"><option value="tent">Tent</option><option value="classroom">Classroom</option></select>
+    <label>Name</label><input class="fld" id="nbName" placeholder="e.g. Classroom Block 2">
+    <div style="display:flex;gap:6px"><div style="flex:1"><label>Capacity</label><input class="fld" id="nbCap" type="number" inputmode="numeric" min="0" value="40"></div>
+    <div style="flex:1"><label>Price $</label><input class="fld" id="nbPrice" type="number" inputmode="numeric" min="0" value="120"></div></div>
+    <button class="btn" onclick="addBlock()">Add space</button></div>`,'Accommodation setup','Tent &amp; classroom spaces');
+};
+async function saveBlock(id){try{await api('/accommodation/blocks/'+id,{method:'PATCH',body:{name:val('bn_'+id),capacity:Number(val('bc_'+id))||0,price:Number(val('bp_'+id))||0,baseTaken:Number(val('bt_'+id))||0}});toast('Saved ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
+async function delBlock(id){if(!confirm('Delete this space?'))return;try{await api('/accommodation/blocks/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminAccom();}catch(e){toast(e.message);}}
+async function addBlock(){if(!val('nbName')){toast('Enter a name');return;}try{await api('/accommodation/blocks',{method:'POST',body:{kind:sel('nbKind'),name:val('nbName'),capacity:Number(val('nbCap'))||0,price:Number(val('nbPrice'))||0}});toast('Space added ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
+
+/* ===== ADMIN FAQ (pre-camp) ===== */
+RENDER.adminFaq=async function(){
+  const faqs=await api('/faq');
+  paint('adminFaq',faqs.map(f=>`<div class="card"><label>Question</label><input class="fld" id="fq_${f.id}" value="${esc(f.question)}">
+    <label>Answer</label><textarea id="fa_${f.id}">${esc(f.answer)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveFaqPre('${f.id}')">Save</button>
+    <button class="btn red sm" style="flex:1" onclick="delFaqPre('${f.id}')">Delete</button></div></div>`).join('')+
+    `<div class="card"><div class="lbl" style="margin-top:0">Add FAQ</div><input class="fld" id="nfq" placeholder="Question"><textarea id="nfa" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqPre()">Add FAQ</button></div>`,'FAQ','Edit answers');
+};
+async function saveFaqPre(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_'+id),answer:val('fa_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+async function delFaqPre(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});RENDER.adminFaq();}catch(e){toast(e.message);}}
+async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('nfq'),answer:val('nfa'),order:99}});toast('Added ✓');RENDER.adminFaq();}catch(e){toast(e.message);}}
+
+/* ===== ADMIN FAQ (at-camp) ===== */
+RENDER.adminFaqEdit=async function(){
+  const items=await api('/faq');
+  paint('adminFaqEdit',items.map(f=>`<div class="card">
+    <label>Question</label><input class="fld" id="fq_q_${f.id}" value="${esc(f.question)}">
+    <label>Answer</label><textarea id="fq_a_${f.id}">${esc(f.answer)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveFaqAt('${f.id}')">Save</button><button class="btn red sm" onclick="delFaqAt('${f.id}')">Delete</button></div></div>`).join('')+
+    `<div class="card"><div class="h3" style="margin-top:0">Add FAQ</div><input class="fld" id="fqNewQ" placeholder="Question"><textarea id="fqNewA" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqAt()">Add FAQ</button></div>`,'FAQ','Edit all answers');
+};
+async function saveFaqAt(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_q_'+id),answer:val('fq_a_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+async function delFaqAt(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});RENDER.adminFaqEdit();}catch(e){toast(e.message);}}
+async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added ✓');RENDER.adminFaqEdit();}catch(e){toast(e.message);}}
+
+/* ===== ADMIN SETTINGS ===== */
+RENDER.adminSettings=async function(){
+  const s=SETTINGS||await api('/settings');
+  paint('adminSettings',`<div class="card">
+    <label>Camp name</label><input class="fld" id="stName" value="${esc(s.campName||'')}">
+    <label>Year</label><input class="fld" id="stYear" type="number" inputmode="numeric" value="${esc(s.year||'')}">
+    <label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" value="${esc(s.startDate||'')}">
+    <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" value="${esc(s.endDate||'')}">
+    <label>Timezone (IANA, e.g. Australia/Brisbane)</label><input class="fld" id="stTz" value="${esc(s.timezone||'')}">
+    <label>Check-in location</label><input class="fld" id="stLoc" value="${esc(s.checkInLocation||'')}">
+    <label>Check-in from</label><input class="fld" id="stFrom" value="${esc(s.checkInFrom||'')}">
+    <label>Register base URL</label><input class="fld" id="stUrl" value="${esc(s.registerBaseUrl||'')}">
+    <label>At-camp check-in days (comma-separated YYYY-MM-DD)</label>
+    <input class="fld" id="stDays" value="${esc((s.checkInDays||[]).join(', '))}">
+    <button class="btn" onclick="saveSettings()">Save camp settings</button>
+    <p class="note-hint">Tent &amp; classroom prices are set per space in Admin → Accommodation. Changing check-in days updates the daily check-in automatically.</p></div>`,'Camp settings','Dates &amp; details');
+};
+async function saveSettings(){
+  try{
+    const days=document.getElementById('stDays').value.split(',').map(x=>x.trim()).filter(Boolean);
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:val('stTz'),checkInLocation:val('stLoc'),checkInFrom:val('stFrom'),registerBaseUrl:val('stUrl'),checkInDays:days}});
+    SETTINGS=await api('/settings');SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
+    toast('Settings saved ✓');
+  }catch(e){toast(e.message);}
+}
+
+/* ===== ADMIN DATA ===== */
+RENDER.adminData=function(){
+  const uploadSection=CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
+    <input type="file" id="fileIn" accept=".csv" class="fld">
+    <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
+    <p class="note-hint">Matches existing students by name — adds new ones and updates changed fields.</p>
+    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>
+    <div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'';
+  paint('adminData',`${uploadSection}
+    <div class="card"><div class="h3" style="margin-top:0">New year</div>
+      <button class="btn" onclick="adminSaveDefaults()">Save baseline (incl. devotionals)</button>
+      <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline.</p>
+      <button class="btn red" style="margin-top:10px" onclick="adminNewYear()">Purge &amp; start new year</button>
+      <p class="note-hint" style="text-align:left">Purges registrations, students, notes &amp; notifications, then restores the saved baseline (requires one). Keeps the admin account &amp; settings. Restored church/zone accounts need passwords reset.</p></div>
+    <div class="card"><div class="h3" style="margin-top:0">Factory reset</div>
+      <button class="btn red" onclick="adminReset()">Full reset (wipe to bare)</button>
+      <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`,'Camp data','Upload / reset');
+};
+/* Standalone import screen — gives director (who has import:run but not the Admin
+   tab) a way to import. Reuses adminUpload()'s #fileIn/#impResult elements. */
+RENDER.import=function(){
+  if(!['director','admin'].includes(ACTOR.role)){paint('import','<p class="note-hint">Importing is restricted to directors and admins.</p>','Import','');return;}
+  paint('import',`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
+    <input type="file" id="fileIn" accept=".csv" class="fld">
+    <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
+    <p class="note-hint">Matches existing students by name (and phone when names clash) — adds new ones and updates changed fields.</p>
+    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`,'Import students','CSV upload');
+};
+async function adminSaveDefaults(){if(!confirm('Save the current scaffold (churches, accounts, accommodation, FAQ, schedule, devotionals) as the new-year baseline?'))return;
+  // Backend returns {ok:true} (no counts).
+  try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved ✓');}catch(e){toast(e.message);}}
+async function adminNewYear(){if(!confirm('Purge registrations, students, notes & notifications and start a new year (restores the saved baseline)? Cannot be undone.'))return;
+  // Backend returns the updated CampSettings (or 404 if no baseline snapshot exists).
+  try{const s=await api('/admin/new-year',{method:'POST'});alert('New year '+(s&&s.year?s.year+' ':'')+'started — people & transient data purged, baseline restored. NOTE: restored church/zone accounts have no password until an admin sets one.');RENDER.adminData();}catch(e){alert(e.message.includes('snapshot')?'No saved baseline — use "Save baseline" first.':e.message);}}
+async function adminReset(){if(!confirm('FULL RESET: wipe ALL data and every non-admin account, keeping only this admin account & settings? No restore. You will be signed out.'))return;
+  try{await api('/admin/reset',{method:'POST'});alert('Full reset complete. Signing out.');logout();}catch(e){toast(e.message);}}
+async function adminClear(){if(!confirm('Clear all notifications?'))return;
+  try{const r=await api('/admin/notifications',{method:'DELETE'});toast('Cleared '+(r.deleted||r.cleared||0)+' notices');}catch(e){toast(e.message);}}
+function adminUpload(){
+  const f=document.getElementById('fileIn')?.files[0];if(!f){toast('Choose a CSV file first');return;}
+  if(!f.name.toLowerCase().endsWith('.csv')){toast('Only CSV files are supported');return;}
+  const reader=new FileReader();
+  reader.onload=async()=>{try{
+    const r=await api('/import/csv',{method:'POST',body:{csvData:reader.result,updateExisting:true}});
+    const box=document.getElementById('impResult');box.style.display='block';
+    box.innerHTML=`<b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors`;
+    toast('Import complete');
+  }catch(e){toast(e.message);}};
+  if(isCsv)reader.readAsText(f);else reader.readAsArrayBuffer(f);
+}
+
+/* ===== ADMIN DEVOTIONALS ===== */
+RENDER.adminDevos=async function(){
+  const days=SETTINGS?.checkInDays||[];
+  if(!days.length){paint('adminDevos','<p class="note-hint">Set the camp dates first (Camp settings).</p>','Devotionals','');return;}
+  const blocks=await Promise.all(days.map(async d=>{
+    const dv=await api('/devotional/'+d).catch(()=>null);
+    const wk=dayLong(d);
+    return `<div class="card"><div class="h3" style="margin-top:0">${wk} · ${d}</div>
+      <textarea id="dv_v_${d}" placeholder="Verse">${esc(dv?.verse||'')}</textarea>
+      <input class="fld" id="dv_r_${d}" placeholder="Reference" style="margin-top:8px" value="${esc(dv?.reference||'')}">
+      <textarea id="dv_f_${d}" placeholder="Reflection" style="margin-top:8px">${esc(dv?.reflection||'')}</textarea>
+      <textarea id="dv_p_${d}" placeholder="Prayer" style="margin-top:8px">${esc(dv?.prayer||'')}</textarea>
+      <button class="btn" onclick="saveDevo('${d}')">Save ${wk}</button></div>`;
+  }));
+  paint('adminDevos',blocks.join(''),'Devotionals','Edit each camp day');
+};
+async function saveDevo(d){try{await api('/devotional',{method:'POST',body:{day:d,verse:val('dv_v_'+d),reference:val('dv_r_'+d),reflection:val('dv_f_'+d),prayer:val('dv_p_'+d)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+
+/* ===== ADMIN SCHEDULE ===== */
+RENDER.adminSchedEdit=async function(){
+  const days=SETTINGS?.checkInDays||[];
+  if(!days.length){paint('adminSchedEdit','<p class="note-hint">Set the camp dates first (Camp settings).</p>','Schedule','');return;}
+  const blocks=await Promise.all(days.map(async d=>{
+    const items=await api('/schedule?day='+d).catch(()=>[]);const wk=dayLong(d);
+    const rows=items.map(i=>`<div class="row"><div style="flex:1;min-width:0"><div class="nm">${esc(i.startTime)} · ${esc(i.title)}</div><div class="sub">${esc(i.location||'')}</div></div><button class="btn ghost sm" style="margin-right:4px" onclick='editSchedPrompt(${JSON.stringify(i)})'>Edit</button><button class="btn red sm" onclick="delSched('${i.id}')">✕</button></div>`).join('')||'<p class="sub">No items.</p>';
+    return `<div class="card"><div class="h3" style="margin-top:0">${wk} · ${d}</div>${rows}
+      <div style="display:flex;gap:6px;margin-top:8px"><input class="fld" id="sc_t_${d}" placeholder="HH:mm" style="flex:0 0 90px"><input class="fld" id="sc_n_${d}" placeholder="Title"></div>
+      <input class="fld" id="sc_l_${d}" placeholder="Location (optional)" style="margin-top:6px">
+      <button class="btn" onclick="addSched('${d}')">Add to ${wk}</button></div>`;
+  }));
+  paint('adminSchedEdit',blocks.join(''),'Schedule','Edit each camp day');
+};
+async function addSched(d){if(!val('sc_t_'+d)||!val('sc_n_'+d)){toast('Enter time + title');return;}
+  try{await api('/schedule',{method:'POST',body:{day:d,startTime:val('sc_t_'+d),title:val('sc_n_'+d),location:val('sc_l_'+d)||undefined,type:'activity',isCheckInPoint:false}});toast('Added ✓');RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
+function editSchedPrompt(i){
+  modal(`<h3>Edit schedule item</h3>
+    <label>Time (HH:mm)</label><input class="fld" id="es_t" value="${esc(i.startTime)}">
+    <label>Title</label><input class="fld" id="es_n" value="${esc(i.title)}">
+    <label>Location</label><input class="fld" id="es_l" value="${esc(i.location||'')}">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <input type="checkbox" id="es_ci" ${i.isCheckInPoint?"checked":""} style="width:auto">
+      <span style="font-size:.88rem">Is a check-in point</span></div>
+    <button class="btn" onclick="saveSchedEdit('${i.id}')">Save changes</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function saveSchedEdit(id){
+  const t=document.getElementById("es_t").value.trim(),n=document.getElementById("es_n").value.trim(),l=document.getElementById("es_l").value.trim();
+  if(!t||!n){toast("Enter time + title");return;}
+  try{await api("/schedule/"+id,{method:"PATCH",body:{startTime:t,title:n,location:l||undefined,isCheckInPoint:document.getElementById("es_ci").checked}});closeModal();toast("Saved ✓");RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
+async function delSched(id){if(!confirm('Delete this item?'))return;try{await api('/schedule/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
+
+/* ===== ADMIN CONTACTS ===== */
+RENDER.adminContacts=async function(){
+  const churches=await api('/accounts/churches');
+  paint('adminContacts',churches.map(c=>{const ct=c.contacts||{};
+    const mp=ct.male?.primary||{},mb=ct.male?.backup||{},fp=ct.female?.primary||{},fb=ct.female?.backup||{};
+    const pair=(lbl,n,p,nv,pv)=>`<label>${lbl}</label><div style="display:flex;gap:6px"><input class="fld" id="${n}" placeholder="Name" value="${esc(nv||'')}"><input class="fld" id="${p}" placeholder="Phone" value="${esc(pv||'')}"></div>`;
+    return `<div class="card"><div class="h3" style="margin-top:0">${esc(c.name)} <span style="color:var(--muted)">· ${esc(c.zone||'—')}</span></div>
+      ${pair('Guys — primary leader','mp_n_'+c.id,'mp_p_'+c.id,mp.name,mp.phone)}
+      ${pair('Guys — secondary leader','mb_n_'+c.id,'mb_p_'+c.id,mb.name,mb.phone)}
+      ${pair('Girls — primary leader','fp_n_'+c.id,'fp_p_'+c.id,fp.name,fp.phone)}
+      ${pair('Girls — secondary leader','fb_n_'+c.id,'fb_p_'+c.id,fb.name,fb.phone)}
+      <button class="btn" onclick="saveContacts('${c.id}')">Save ${esc(c.name)}</button>
+      <p class="note-hint">Leave blank to clear. Numbers are masked until audited reveal.</p></div>`;}).join(''),'Ministry contacts','Primary &amp; backup per gender');
+};
+async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');}catch(e){toast(e.message);}}
+
+/* ===== BOOT ===== */
+document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('username').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show'))closeModal();});
+_initDemoLogin();
+
+/* PWA: register the service worker (network-first HTML shell, network-only API,
+   cache-first assets). On a new SW taking control after a deploy, reload once so
+   users get the latest UI without a manual refresh. */
+if('serviceWorker'in navigator){
+  let _reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(_reloading)return;_reloading=true;location.reload();
+  });
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
+}
+
+</script>
+</body>
+</html>

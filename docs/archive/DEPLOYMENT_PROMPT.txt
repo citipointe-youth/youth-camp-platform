@@ -1,0 +1,105 @@
+YOUTH CAMP PLATFORM — AI DEPLOYMENT PROMPT
+==========================================
+
+Copy the prompt below (between the === lines) and paste it to Claude Code (or
+any capable AI assistant) when you are ready to wire the platform to a real
+database and deploy it. Fill in the [BRACKETED] placeholders before sending.
+
+Read IMPLEMENTATION_PLAN.txt first — it explains the phase-by-phase approach
+and the database/auth options available.
+
+================================================================================
+
+I have a fully built Youth Camp Platform at the path below. It currently runs
+with an in-memory backend (no real database). I want to deploy it with a real
+database and hosting. Please complete the integration end-to-end.
+
+## Project location
+[ABSOLUTE PATH TO Camp Platform FOLDER]
+
+## Read these files first
+- CLAUDE.md — architecture, roles, conventions, swap points
+- IMPLEMENTATION_PLAN.txt — phased approach and options
+- src/container.ts — the composition root you will modify
+- src/repositories/interfaces/entity-repositories.ts — all repo interfaces to implement
+
+## Target stack
+
+Database:      [e.g. Supabase Postgres / PlanetScale MySQL / SQLite+Turso / Firebase Firestore]
+Auth provider: [e.g. Supabase Auth / Clerk / Auth0 / custom JWT]
+Hosting:       [e.g. Railway / Render / Fly.io / AWS App Runner]
+Domain:        [e.g. campplatform.yourchurch.org — or leave blank for auto-generated URL]
+
+## Credentials / connection details
+
+DATABASE_URL:  [paste connection string, or leave blank and I will generate migration scripts]
+AUTH_* keys:   [paste API keys from your auth provider dashboard, or leave blank]
+Hosting token: [Railway/Render/Fly CLI token, or leave blank for manual deploy steps]
+
+## What I want you to do
+
+1. **Database schema**: Create a migration file (SQL or Prisma schema) that maps
+   all entities in src/core/entities/ to the target database. Key relationships:
+   - Camper has many CheckInEntries (Camper.checkInHistory)
+   - Camper has many SignOutEvents (Camper.signOutHistory)
+   - Church has many AccommodationReservations and ChurchContacts
+   - CampSettings is a single-row table
+   - CampDefaults (snapshot) is a single-row table
+
+2. **Repository implementations**: For each interface in
+   src/repositories/interfaces/entity-repositories.ts, create a concrete
+   implementation in src/repositories/[provider]/ that uses the chosen database
+   client. Follow the same method signatures exactly — the services must not need
+   any changes.
+
+3. **Auth integration**: Replace MockAuthProvider in src/services/auth.service.ts
+   with a real implementation using the chosen auth provider. The IAuthProvider
+   interface requires only: verifyCredentials(email, password) → User | null.
+   Keep the existing session token mechanism or replace with JWTs — your call,
+   but document the choice.
+
+4. **Container wiring**: Update src/container.ts to use the new repository
+   implementations and auth provider. This is the only file that should change
+   in the core application layer.
+
+5. **Environment variables**: Create a .env.example file listing all required
+   variables. Do NOT commit real secrets.
+
+6. **Deployment config**: Create the deployment configuration files needed for
+   the chosen host (e.g. railway.toml, render.yaml, fly.toml, Dockerfile).
+   The app runs as: `npm run start` (or `node dist/index.js` after build).
+   It serves the frontend from the `public/` directory as static files.
+
+7. **Data migration**: Provide a script (src/scripts/migrate-seed.ts or similar)
+   that seeds the initial demo data into the real database so the app is usable
+   immediately after deploy.
+
+8. **Verification**: After completing the above, run:
+   - npm run typecheck (must pass with 0 errors)
+   - npm run test (must pass — tests use in-memory repos, should still work)
+   Then do a manual smoke test by starting the server and logging in as admin.
+
+## Constraints and conventions (from CLAUDE.md)
+
+- All imports are extensionless relative paths (ESM, moduleResolution: Bundler)
+- Each folder has an index.ts barrel — export new implementations from it
+- All external input is validated with Zod inside services, not controllers
+- RBAC lives exclusively in src/services/access-control.ts — do not add role
+  checks anywhere else
+- Repos must deep-clone returned objects (prevents mutation of stored state)
+- The admin account (role: 'admin') must never be deletable or deactivatable
+- The accommodation lock (CampSettings.accommodationLocked) must be enforced
+  server-side in AccommodationService, not just in the frontend
+
+## Out of scope for this deployment
+
+- Real email/SMS for notifications (the app has an in-app notification feed;
+  adding real push/SMS is a separate task — see IMPLEMENTATION_PLAN.txt Phase 5)
+- Multi-tenancy (one camp organisation per deployment is fine)
+- CI/CD pipeline (can be added later)
+
+Please confirm you have read CLAUDE.md and IMPLEMENTATION_PLAN.txt before
+proceeding, then work through the steps above in order, running typecheck and
+tests after step 4 to catch any issues early.
+
+================================================================================

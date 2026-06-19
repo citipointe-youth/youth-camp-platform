@@ -1,0 +1,440 @@
+YOUTH CAMP PLATFORM — CHANGELOG
+================================
+Production-deployment work, porting the in-memory camp platform toward a real
+Supabase backend. Reference implementation: ../connection-made-simple-master
+(same hexagonal architecture, already deployed). Design + plan live in
+docs/DEPLOYMENT-DESIGN.md; the audit findings it acts on are summarised there.
+
+IMPORTANT — VERIFICATION CONTEXT (read before trusting any "DONE" below)
+-----------------------------------------------------------------------
+All work to date was authored in an environment with NO Node/npm/tsc/vitest and
+NO network (cannot install a toolchain). Code was therefore verified with a
+Python static/behavioural harness in docs/verification/ (import-export
+resolution, enum-literal conformance, and simulation of each test file's actual
+assertions) PLUS manual review against the entity interfaces. This is a strong
+but INCOMPLETE substitute. The authoritative gate has NOT yet been run:
+
+    npm install && npm run typecheck && npm run test
+
+Until that gate passes on a real machine, treat every "DONE" as "verified by the
+harness, pending compiler confirmation". The KNOWN RISKS section at the bottom
+lists exactly what the harness cannot prove and where a real tsc/vitest is most
+likely to surface something.
+
+-------------------------------------------------------------------------------
+PHASE 0: MAKE-IT-RUN + SAFETY NET  (2026-06-18)
+-------------------------------------------------------------------------------
+- FIXED defect A1 (app would not start): src/index.ts imported a non-existent
+  './data/seed' module. Authored src/data/seed.ts (seedAll) seeding the 6 demo
+  accounts from CLAUDE.md + their churches + a pre-camp CampSettings singleton +
+  accommodation blocks + two check-in schedule points.
+- Split the app factory out of the entrypoint: new src/app.ts exports
+  createAppInstance() (build container -> seed only when PERSISTENCE=memory ->
+  build routes -> createApp); src/index.ts now just awaits it and listens. This
+  mirrors CMS's app.ts and is the shared entry point the future serverless/host
+  handler will reuse.
+- Added 5 CHARACTERISATION test files pinning CURRENT behaviour (incl. known
+  bugs, asserted as-is with markers) for the services slated for the Person
+  unification, so the refactor cannot silently regress them:
+  registrant / camper / checkin / accommodation / admin .characterisation.test.ts
+  Two bugs are deliberately pinned so their Phase-2 fixes are detectable:
+    * accommodation availability ignores reservations (B1)
+    * admin.reset loads the defaults snapshot but never restores it (A4)
+  Harness: check_imports ✓, required-field review ✓.
+
+-------------------------------------------------------------------------------
+PHASE 1: PERSON UNIFICATION (design D2)  (2026-06-18)
+-------------------------------------------------------------------------------
+Goal: collapse the separate Registrant (pre-camp) and Camper (at-camp) entities
+into ONE Person entity. A person is a registrant until their DAY-1 FIRST
+CHECK-IN, at which point they are promoted to a camper (registered -> arrived).
+Staged into verifiable, additive steps because of the no-compiler constraint;
+the destructive switchover (Step 4) is intentionally deferred.
+
+Step 1 — Unified model (ADDITIVE, DONE)
+- src/core/entities/person.ts: the Person entity; PERSON_KINDS (youth|leader,
+  collapsing the old camper|leader vs student|leader mismatch) + PERSON_LIFECYCLES
+  (registered|arrived|checked_out|departed|cancelled) enums; isCamper/isRegistrant
+  predicates; personFromRegistrant/personFromCamper/toPersonKind bridge mappers.
+- person.test.ts (28 assertions). Harness: check_imports ✓, sim_person ✓ (28/28),
+  enum-literal ✓.
+
+Step 2 — Unified repository (ADDITIVE, DONE)
+- IPersonRepository + InMemoryPersonRepository: union of the registrant/camper
+  query surface (search/findByChurch/Zone/Group/Kind/Lifecycle/findCampers/
+  findAtCamp) + bulk deleteAll() (becomes TRUNCATE in Supabase, pre-solving the
+  row-by-row delete timeout, defect A3).
+- Wired into container as repos.people (+ people.json persistence path); legacy
+  registrant/camper repos untouched.
+- person.repository.test.ts (16 assertions). Harness: check_imports ✓ (17 files),
+  sim_person_repo ✓ (16/16).
+
+Step 3 — Unified service + lifecycle engine (ADDITIVE, DONE)
+- src/services/person-lifecycle.ts: pure D2 transitions — applyCheckIn/
+  applySignOut/applySignIn (first sign-in promotes registered->arrived + atCamp;
+  cancelled never auto-promoted; out -> checked_out) + immutable withCheckIn/
+  withSignEvent appenders.
+- src/services/person.service.ts: merged PersonService over repos.people —
+  list (all lifecycles), listRegistrants (pre-camp view), listCampers (at-camp
+  view), get/getProfile; canAccessPerson mirrors the legacy camper RBAC exactly.
+- person-lifecycle.test.ts + person.service.test.ts. Harness: check_imports ✓
+  (21 files), sim_step3 ✓ (23/23), enum-literal ✓ (no stale camper/student/
+  checked_in literals).
+
+Step 4 — Live switchover + cleanup (SCAFFOLDED — destructive half DEFERRED)
+- PREP DONE (additive, harness-verified): PersonService gained its full WRITE +
+  check-in surface — create / update / remove / checkIn / signEvent (checkIn applies
+  the D2 promotion registered→arrived via withCheckIn). Still DORMANT: nothing live
+  calls it, tree still compiles. Tests added; sim_step4 ✓ (8/8), check_imports ✓.
+- The destructive switchover is written up as a precise ordered PATCH PLAN in
+  docs/STEP4-SWITCHOVER.md (repoint routes, migrate consumers, delete legacy code +
+  characterisation tests, SPA kind literals). It is DEFERRED to a toolchain session
+  because it changes SPA-facing JSON shapes and removes the characterisation safety
+  net — must be done with tsc/vitest + the running SPA. Key decisions flagged there
+  (blueCardCollected field, legacy-field DTO vs SPA rewrite, status↔lifecycle map).
+
+-------------------------------------------------------------------------------
+PHASE 2: DEFECT FIXES  (2026-06-18, in progress)
+-------------------------------------------------------------------------------
+(see KNOWN RISKS for the full audit list; tackling SPA/host-independent ones first)
+
+- DECISIONS (operator, 2026-06-18) settling the reset/new-year semantics:
+  * newYear = routine annual rollover: PURGE registrants/campers/notes/
+    notifications + RESTORE scaffold (churches/accounts/accommodation/FAQ/
+    schedule/devotionals) from the saved defaults snapshot; keep admin + settings
+    (bump year, force pre-camp). Requires a snapshot (throws if none).
+  * reset = FULL WIPE to bare: delete ALL data incl. scaffold + all non-admin
+    accounts; keep only the single admin + camp settings; NO snapshot restore.
+  * Defaults snapshot now also captures DEVOTIONALS.
+
+- FIXED defect A3 (row-by-row deletes -> Supabase statement-timeout + per-row
+  JSON rewrite): added deleteAll() to IRepository + InMemoryBaseRepository (one
+  write, returns count; Supabase will map to TRUNCATE). reset/newYear/
+  clearNotifications now use it. Removed the now-redundant deleteAll override on
+  InMemoryPersonRepository (inherited).
+
+- FIXED defect A4 (reset loaded the defaults snapshot then never restored): admin
+  service rewritten per the decisions above. reset() no longer pretends to use the
+  snapshot; newYear() does the restore. saveDefaults() now snapshots devotionals.
+  admin service factory gained noteRepo + devotionalRepo deps (10 -> 12 args;
+  container + test call sites updated). admin.characterisation.test rewritten:
+  the old pinned-bug assertions (reset-no-restore; newYear-keeps-everything) were
+  flipped to the new behaviour, with new restore/wipe coverage.
+  Harness: check_imports ✓ (33 files), sim_a4 ✓ (10/10), arity ✓ (12/12/12),
+  unused-import scan ✓, enum-literal ✓.
+
+- FIXED defect B3 (check-in / dashboard mixed a UTC calendar date with a server-
+  LOCAL clock time; on a UTC host running an AEST camp the "today" rolled at ~10am
+  local). New timezone-aware helpers in utils/date.ts: zonedNow(tz) returns
+  { date, time } BOTH derived from the same IANA zone via Intl; zonedToday(tz);
+  daysUntil now honours its tz arg (previously ignored). checkin.service
+  getCurrentSession() uses zonedNow(camp timezone) — the service gained an
+  ISettingsRepository dep (2 -> 3 args; default 'Australia/Brisbane' if unset).
+  dashboard at-camp branch uses zonedNow(settings.timezone). checkin
+  characterisation test pins the camp zone to UTC (new makeSvc helper + utcSettings)
+  for determinism; stale "buggy" comment updated. Added utils/date.test.ts.
+  Harness: check_imports ✓ (37 files), sim_b3 ✓ (8/8, validated vs Python zoneinfo
+  IANA data), arity ✓ (container + test both pass 3 args), no orphaned refs.
+
+- FIXED defect C1 (CSV import was O(rows): a churchRepo.findAll + camperRepo.
+  findByChurch scan PER ROW, plus a save() PER ROW = a full JSON-file rewrite each).
+  Now: load churches + campers ONCE into Maps (church-by-name, camper-by-
+  churchId+name indices); de-duplicate rows for the same person within a single
+  file (last row wins — prevents two writes / future ON CONFLICT errors); stage all
+  changes and write them in ONE batched camperRepo.saveMany() call. Added saveMany()
+  to IRepository + InMemoryBaseRepository (single persistence write; Supabase will
+  map to a chunked bulk INSERT — pairs with deleteAll from A3). Added
+  import.service.test.ts (first import tests: RBAC, counts, dedup, updateExisting).
+  Total camper-repo round-trips: ~2 reads + 1 write, regardless of import size
+  (was ~3 per row). Harness: check_imports ✓ (39 files), sim_c1 ✓ (8/8),
+  no save/saveMany overrides (all repos inherit), enum-literal ✓.
+  NOTE: import still references the legacy Camper entity (student/leader) — migrates
+  to Person/youth in the deferred Phase-1 Step 4.
+
+- HARDENED import matching with PHONE disambiguation (resolves audit finding P1).
+  Campers are pooled by churchId+name; matching rules (pickMatch): a row WITH a phone
+  matches a candidate with the same phone (digits-only, format-insensitive), falling
+  back to a lone phone-less candidate (re-import adding a phone); a row WITHOUT a phone
+  matches only a lone candidate (re-import omitting phone), and is ambiguous against
+  2+ candidates. So two people with the same name in the same church are kept distinct
+  by phone, and the prior empty-churchId collision (different church-less people
+  colliding on name) is gone. Matches are mutated IN PLACE in the pool (one entry per
+  person; in-file duplicates collapse). Added 4 same-name/phone test cases.
+  Harness: sim_c1 ✓ (9/9 incl. twin create/update/omit-phone cases), check_imports ✓,
+  no orphaned vars from the refactor.
+
+- FIXED defect B1 (accommodation availability ignored occupants). The service had
+  a correct computeLiveTaken(blocks, registrants) helper that was NEVER CALLED —
+  the live getLiveBlocks() path used liveTaken=baseTaken / available=capacity-
+  baseTaken, so assigned people never reduced availability and a block could be
+  silently over-assigned. Fix:
+  * New pure module src/services/accommodation-occupancy.ts (computeLiveTaken,
+    liveTakenForBlock, availableForBlock) — single source of truth.
+  * AccommodationService now takes IRegistrantRepository; getLiveBlocks() and
+    getBlock() route through the module (occupants subtracted; cancelled excluded;
+    match by kind + label===block.name).
+  * DashboardService accommodationSummary uses the same module (was duplicating the
+    flat baseTaken math).
+  * DOCUMENTED DECISION: live occupancy counts ASSIGNED OCCUPANTS only; church-level
+    `reservations` (held spots) are NOT subtracted — see KNOWN RISKS [R8].
+  * The accommodation characterisation test's pinned-bug assertions were flipped to
+    the corrected behaviour (this is the intended signal that the fix landed); new
+    accommodation-occupancy.test.ts added.
+  Harness: check_imports ✓ (25 files), sim_b1 ✓ (14/14), enum-literal ✓, call-site
+  arity ✓ (container + test both pass 4 args).
+
+- FIXED defect CSV-BOM: parseCsv now strips a leading UTF-8 BOM (new stripBom()).
+  Excel/Elvanto exports prepend U+FEFF, which made the first header parse as
+  "﻿firstName" and silently fail to match. Added src/utils/csv.test.ts (first CSV
+  tests). Harness: sim_c2_bom ✓.
+
+- FIXED defect C2 (registrant.remind): remind() now mirrors chase() — it SKIPS
+  CANCELLED registrants (previously counted them) and applies the zoneLeader zone
+  scope chase() has (defensive; RBAC currently gates remind to church/director/
+  admin, but the scope is correct if reminder:send is ever granted to zoneLeader).
+  remind still does NOT send real email/SMS (out of scope, Phase F) — the comment
+  now says so honestly. The characterisation test's pinned-bug assertion (admin
+  counted cancelled r5 -> 4) was flipped to the fixed value (3). Harness:
+  check_imports ✓ (28 files), sim_c2_bom ✓ (11/11).
+
+-------------------------------------------------------------------------------
+PHASE 4: SECURITY HARDENING  (2026-06-18, in progress)
+-------------------------------------------------------------------------------
+- FIXED the #1 deployment blocker: replaced the in-memory token Map with STATELESS
+  HMAC-SIGNED SESSIONS (auth.service). The old Map was fatal on serverless/multi-
+  instance — each cold start began empty (logging everyone out) and a token minted
+  on one instance was unknown to another. Tokens are now "<base64url payload>.<sig>"
+  carrying the full actor (no DB lookup per request); SESSION_SECRET env var drives
+  the HMAC with a prod startup warning if unset. logout() is now a client-side
+  no-op (stateless tokens can't be server-revoked — the documented trade-off; they
+  expire after the 12h TTL). auth.service.test updated for the new token shape +
+  added tamper-rejection and expiry cases.
+- Added HTTP SECURITY HEADERS (X-Content-Type-Options, X-Frame-Options DENY,
+  Referrer-Policy, Permissions-Policy) and a CORS '*'-in-production startup warning
+  (express-adapter). Set trust proxy so req.ip honours X-Forwarded-For.
+- Added LOGIN RATE LIMITING: 10 attempts / IP / 15-min window -> 429 + Retry-After
+  (ported RateLimiter util from CMS). In-memory, so per-instance (acceptable brute-
+  force backstop; a shared store would be needed for a hard global limit — see R5).
+  Harness: check_imports ✓ (44 files), sim_phase4 ✓ (11/11, HMAC validated vs
+  Python hmac.compare_digest), no tokenStore refs remain, no unused imports.
+  NOTE: kept scrypt password hashing (cryptographically sound; no existing hashes
+  to migrate, so bcrypt+rehash from CMS was not needed under the security-parity
+  decision). RLS + error sanitization still pending (RLS needs the Supabase layer).
+
+-------------------------------------------------------------------------------
+PHASE 2 (cont.): CALCULATED-VALUE FIXES  (2026-06-18)
+-------------------------------------------------------------------------------
+Audit of every count/total/derived metric (the previous app had averages bugs).
+Pre-camp registrant math (breakdown, totals, per-church) was sound; four defects
+were found in the AT-CAMP dashboard + notification audience, all fixed:
+
+- FIXED D1: at-camp dashboard "current session" returned the EARLIEST started
+  session, not the latest (todaySessions is ascending; .find() took the first
+  <= now). At 8pm with AM+PM check-ins it reported AM as current, and DISAGREED
+  with checkin.service (which correctly takes the last). Now walks from the end.
+- FIXED D2: totalAtCamp / totalExpected / checkInsDue were computed over the WHOLE
+  camp for every role — a church/zone login saw camp-wide figures as its own. Now
+  scoped via canAccessCamper (the B4 audit item, fixed early).
+- FIXED D3: checkInsDue ignored check-OUT and wasn't per-session — any 'in' for any
+  of today's sessions marked a camper done for the whole day (wrong for a twice-
+  daily camp). Now measured against the CURRENT session: due unless the latest entry
+  for that session is 'in'.
+- FIXED D4: notification estimateAudience used church.expectedCount (a manual
+  planning number, default 0) for church scope while camp/zone counted campers —
+  inconsistent basis, often 0 with campers present. Now counts non-cancelled campers
+  for all scopes.
+  Added dashboard.service.test.ts (9 cases). Harness: sim_dashboard ✓ (9/9),
+  check_imports ✓, no orphans (atCampers removed cleanly, canAccessCamper used).
+
+-------------------------------------------------------------------------------
+LOGIN = USERNAME, ACCOUNT FLEXIBILITY, UI HARDENING  (2026-06-18)
+-------------------------------------------------------------------------------
+- LOGINS ARE NOW USERNAMES, not fake emails. User.email -> User.username (a plain
+  string login id, e.g. "victory", "grade7g", "director"; case-insensitive). This
+  is distinct from real contact emails, which stay on Person/Church (unchanged).
+  Touched: user entity, IUserRepository (findByEmail -> findByUsername), auth.schema
+  (z.string().email() -> plain username), auth.service login, account.schema +
+  account.service (create/update/createChurchWithAccount: accountEmail ->
+  accountUsername; uniqueness now on username), seed.ts (6 demo usernames),
+  migrations 001/002 (users.email -> users.username), and the SPA (login field,
+  doLogin, all account-management forms/labels/handlers). Person/Church contact
+  email fields + maskEmail untouched. Tests updated (auth + admin characterisation).
+- ACCOUNT/PASSWORD FLEXIBILITY parity with connection-made-simple:
+  * Password minimum relaxed 8 -> 6 (CreateUser/SetPassword/church account; SPA copy).
+  * Editable username (admin Edit Account) with a uniqueness check on change.
+  * NEW AccountService.toggleStatus(actor, id) — activate/deactivate an account; the
+    single admin can't be deactivated (mirrors CMS). (Wire a UI toggle in S4/UI pass.)
+  * Username charset validated (letters/digits/. _ -), 2–40 chars.
+- UI HARDENING (from the UI audit P1s):
+  * Demo quick-login + prefilled credentials are GONE from production — the demo
+    panel is injected by _initDemoLogin() ONLY on localhost/dev hosts. Login fields
+    ship empty with autocomplete/autocapitalize hints.
+  * Numeric inputs (capacity, price, baseTaken, expected count, year) now use
+    type=number + inputmode=numeric; church contact email uses type=email — correct
+    mobile keyboards for the data-entry flows.
+  Harness: check_imports ✓ (52 files), all sims ✓, no stale email-login refs.
+  STILL OPEN from the UI audit (not done here): loading skeletons, modal
+  backdrop/Esc dismiss, broader a11y (ARIA/roles, reconsider maximum-scale),
+  residual Unicode glyph icons -> SVG. Logged for a dedicated UI pass.
+
+-------------------------------------------------------------------------------
+ROLE-BY-FEATURE AUDIT FIXES  (2026-06-18)
+-------------------------------------------------------------------------------
+Audited every feature across church / zoneLeader / director / admin. Backend RBAC
++ scoping verified SOUND everywhere (incl. notification delete, which IS role-gated
+and zone-scoped — an initial concern that proved unfounded). Fixed the UI↔backend
+mismatches found:
+
+- FIXED R4 (notes on profile): a church login can now SEE notes on an individual
+  camper's profile (its own campers only — backend GET /notes/camper/:id allows
+  note:write, which church holds, and scopes to the camper's church). There is still
+  NO consolidated notes list for church (the Notes tab stays zone/director/admin via
+  canReadNotes()). New SPA helper canReadCamperNotes() includes church; removed the
+  misleading "(zone/director only)" note header.
+- FIXED R6 (director import unreachable): director has import:run but the importer
+  lived in the admin-only Admin tab. Added a director-only "Import Students" tile on
+  the at-camp home → a standalone RENDER.import screen (reuses adminUpload). Admin
+  still has it under Admin → Data.
+- FIXED R10/R11/R12 (stale admin UI strings misrepresenting the A3/A4 backend):
+  * Reset button/copy/confirm now say "Full reset (wipe to bare) — deletes ALL data
+    + non-admin accounts, keeps only admin + settings, no restore" (was the false
+    "purge + re-seed demo").
+  * adminSaveDefaults no longer reads non-existent r.churches/r.users counts (backend
+    returns {ok:true}); copy notes it snapshots devotionals too.
+  * adminNewYear reads the returned CampSettings (was reading a non-existent
+    {purged,restored} shape → showed undefined); handles the no-baseline 404; warns
+    that restored accounts need passwords reset (R9).
+- Confirmed INTENTIONAL (not bugs): blue-card "mark collected" hidden from church
+  (R5, director/admin policy); schedule getAll/getByDay reads open to all authed
+  (underscore _actor); church at-camp Search/Check-in scoped to own church server-side
+  (R3 — a UI label hint could help but not a defect).
+SPA edits only (public/index.html); backend harness unaffected (regression ✓).
+
+-------------------------------------------------------------------------------
+PHASE 3: SUPABASE SCHEMA  (2026-06-18, in progress)
+-------------------------------------------------------------------------------
+- Added supabase/migrations/ targeting the UNIFIED model (D2) with hybrid mapping
+  (D4):
+    001_initial_schema.sql — TEXT primary keys (camp generates ids in-app, not db
+      uuids); `people` table (registrants+campers, distinguished by lifecycle;
+      kind youth|leader); child tables check_in_history / sign_out_history /
+      reservations (queried/aggregated); JSONB for fixed-shape blobs
+      churches.contacts, people.consents, defaults.snapshot; settings + defaults as
+      fixed-text-PK singletons (concurrent-cold-start safe); indexes on
+      people(church_id/zone/lifecycle), check_in_history(person_id/session_id),
+      notifications(created_at desc).
+    002_seed_admin.sql — single admin + settings singleton (password_hash NULL —
+      operator MUST set one before first login; see R5/runbook).
+    003_enable_rls.sql — RLS on all 16 tables (app uses the superuser DATABASE_URL
+      which bypasses RLS; denies a leaked anon key).
+- Verification: new docs/verification/check_schema.py cross-checks every entity
+  field against a table column — ALL real fields map (child-table + JSONB-nested
+  fields correctly excluded; two checker false-positives confirmed by eye).
+- NOT VERIFIABLE HERE: the SQL cannot be executed (no Postgres). Column types,
+  constraints, and the actual apply need a real Supabase. The repository layer that
+  READS/WRITES these tables (src/repositories/supabase/) is NOT yet written — it is
+  the next Phase-3 step and needs the `postgres` client + tsc to be done safely.
+
+===============================================================================
+KNOWN RISKS / VERIFY LATER  (the point of this log)
+===============================================================================
+A future session — especially the first one with a real toolchain — should work
+through these. Ordered by likelihood of biting.
+
+[R1] AUTHORITATIVE GATE NEVER RUN. Run `npm install && npm run typecheck &&
+     npm run test` first. The Python harness cannot prove: structural type
+     ASSIGNABILITY (e.g. an object that's close-but-not-assignable to an
+     interface), generic inference in the repo base classes, or
+     noUncheckedIndexedAccess corners. Expect the first tsc run to surface a
+     small number of these. None should be deep — the logic is simulated-correct.
+
+[R2] PHASE 1 IS HALF-MIGRATED BY DESIGN. The unified Person model/repo/service
+     exist and are tested, but NOTHING LIVE USES THEM YET — the app still runs on
+     the legacy Registrant/Camper entities, repos and services. repos.people is
+     constructed and init'd but is empty (seed.ts does not populate it). Do NOT
+     assume the unification is active. Step 4 is the switchover; until it lands,
+     person.* code is dead-but-tested scaffolding. This is intentional, not a bug.
+
+[R3] STEP 4 SWITCHOVER HAZARDS (when you do it):
+     - SPA contract: public/index.html reads bare JSON (no envelope). /campers
+       returns a bare array; check-in status has a specific roster shape. Keep
+       those shapes when repointing routes to PersonService, or the SPA breaks.
+     - SPA still branches on kind 'camper'/'student'; grep and switch to 'youth'.
+     - The legacy characterisation tests (registrant/camper/checkin) PIN the OLD
+       services. When you delete those services, migrate or delete the matching
+       characterisation tests in the same commit or the suite won't compile.
+     - checkIn.checkIn() currently sets status 'checked_in'; the promotion must
+       set lifecycle 'arrived' + atCamp via withCheckIn. Don't leave both paths.
+
+[R4] OUTSTANDING AUDIT DEFECTS (not yet fixed; full detail in DEPLOYMENT-DESIGN
+     §3 / the audit):
+     - B1: FIXED 2026-06-18 (see Phase 2 above) — accommodation availability now
+       counts assigned occupants. Reservations question deferred to [R8].
+     - A4: FIXED 2026-06-18 — see Phase 2. reset = full wipe (no restore);
+       newYear = purge + restore scaffold from snapshot.
+     - A3: FIXED 2026-06-18 — deleteAll() added to IRepository; reset/newYear/
+       clearNotifications use it (Supabase will map to TRUNCATE).
+     - B3: FIXED 2026-06-18 — zonedNow/zonedToday in utils/date.ts; checkin +
+       dashboard derive today+now from settings.timezone. daysUntil honours tz.
+     - B4: dashboard checkInsDue/totalExpected are unscoped (leak camp-wide
+       counts to church/zone logins). Resolved naturally once lifecycle counting
+       lands, but verify.
+     - C1: FIXED 2026-06-18 — index churches+campers once, in-file dedup, single
+       saveMany() batched write.
+     - C2: FIXED 2026-06-18 — remind() now skips cancelled + applies zoneLeader
+       scope (mirrors chase). Real email/SMS still out of scope (Phase F).
+     - CSV: FIXED 2026-06-18 — parseCsv now strips a leading UTF-8 BOM (stripBom).
+
+[R5] SECURITY PORT PARTLY DONE (Phase 4, 2026-06-18): stateless HMAC sessions,
+     security headers, login rate limiting + CORS '*' prod warning are DONE.
+     STILL PENDING: (a) RLS on Supabase tables (needs the Supabase layer, Phase 3);
+     (b) error-response sanitization audit for production; (c) the login rate
+     limiter is in-memory/per-instance — for a hard global limit on multi-instance
+     hosting it needs a shared store. (d) MUST set SESSION_SECRET in the deploy env
+     (a startup warning fires if unset in production) — add to the operator runbook.
+
+[R6] HOSTING UNDECIDED: Supabase chosen; NOT Vercel; target is the org's existing
+     domain. Whether that domain can run a long-lived Node process (vs static
+     hosting needing a subdomain on a container host) is still open and gates the
+     deployment/ops section.
+
+[R7] HARNESS FALSE-POSITIVES are documented in docs/verification/README.md
+     (timezone vs zone regex; shorthand-property + nested-object miscounts in the
+     required-field checker). If the harness flags something, confirm by eye
+     before treating it as real.
+
+[R12] SUPABASE deleteAll() RETURN-TYPE NIT (scaffolding). supabase.people.ts
+      implements deleteAll(): Promise<number> via `delete ... returning id` (countable
+      but slower than truncate). The interface mandates a number, but a future
+      `truncate ... cascade` returns no count. When finishing the Supabase repos either
+      keep delete-returning, or change IRepository.deleteAll to Promise<void> (CMS's
+      choice) and update the one count-consuming caller (admin.clearNotifications).
+      (Audit finding P2.)
+
+[R11] SUPABASE SCHEMA UNVERIFIED + REPO LAYER MISSING. The migrations in
+      supabase/migrations/ were authored without a Postgres to apply them against —
+      verify column types/constraints on first `supabase db push`. The schema targets
+      the UNIFIED `people` table (post Phase-1 Step 4); if Step 4 hasn't landed, the
+      live app still uses separate registrant/camper repos and there is NO Supabase
+      repository implementation yet (src/repositories/supabase/ is empty). Writing
+      those repos needs the `postgres` client + tsc. 002_seed_admin sets a NULL
+      password_hash — set a real one before first login.
+
+[R10] zonedNow() MIDNIGHT EDGE CASE. Some Node/V8 versions emit hour '24' for
+      midnight under Intl.DateTimeFormat({hour12:false}); zonedNow maps '24'->'00'.
+      Verify on the deploy Node version that midnight check-in points resolve to
+      '00:00' (a date.test.ts case covers this). Low risk, version-dependent.
+
+[R9] NEW-YEAR RESTORES ACCOUNTS WITHOUT PASSWORDS. The defaults snapshot strips
+     passwordHash (correct — don't persist hashes in a snapshot), so newYear restores
+     church/zone accounts with passwordHash=undefined. They cannot log in until an
+     admin sets a password (Admin -> Accounts). Document this in the operator runbook,
+     OR add a post-rollover "set passwords" step / temporary-password generator. The
+     single admin account keeps its real hash (it is preserved, not restored).
+
+[R8] OPEN PRODUCT DECISION (from the B1 fix): should church-level `reservations`
+     (held spots not yet assigned to individuals) ALSO reduce block availability,
+     to stop a church over-holding? The B1 fix counts assigned occupants only.
+     `accommodation-occupancy.ts` is the single place to change if yes. Tie this to
+     finalising the per-church spot model and the setReservations capacity check
+     (the latter also closes the reservation double-booking race noted in the audit).
