@@ -4,7 +4,7 @@
 // mapping (D4): scalar columns on `people`, JSONB `consents`, and the check-in /
 // sign-out histories hydrated from CHILD TABLES (check_in_history, sign_out_history).
 // This is the pattern the other Supabase repos should follow. NOT compiled or run.
-import type { SqlClient } from './client';
+import type { SqlClient, TxClient } from './client';
 import type { IPersonRepository } from '../interfaces/entity-repositories';
 import type { Person } from '../../core/entities/person';
 import type { CheckInEntry, SignOutEvent } from '../../core/entities/person';
@@ -185,7 +185,7 @@ export class SupabasePersonRepository implements IPersonRepository {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (terms.length === 0) return [];
     const rows = await this.sql`select * from people order by last_name`;
-    const matched = rows.filter((r) => {
+    const matched = rows.filter((r: Record<string, unknown>) => {
       const full = `${r['first_name']} ${r['last_name']}`.toLowerCase();
       return terms.every((t) => full.includes(t));
     });
@@ -196,7 +196,7 @@ export class SupabasePersonRepository implements IPersonRepository {
 
   /** Upsert the `people` row + REPLACE its history child rows in one transaction. */
   async save(person: Person): Promise<Person> {
-    await this.sql.begin(async (tx) => {
+    await this.sql.begin(async (tx: TxClient) => {
       await tx`
         insert into people ${tx(personColumns(person))}
         on conflict (id) do update set ${tx(personColumns(person), ...PERSON_UPDATE_COLS)}
@@ -208,7 +208,7 @@ export class SupabasePersonRepository implements IPersonRepository {
 
   async saveMany(people: Person[]): Promise<Person[]> {
     if (people.length === 0) return [];
-    await this.sql.begin(async (tx) => {
+    await this.sql.begin(async (tx: TxClient) => {
       for (const batch of chunk(people)) {
         await tx`
           insert into people ${tx(batch.map(personColumns))}
@@ -286,7 +286,7 @@ const PERSON_UPDATE_COLS = [
 ] as const;
 
 /** Delete + reinsert a person's history child rows (authoritative replace). */
-async function replaceHistories(tx: SqlClient, p: Person): Promise<void> {
+async function replaceHistories(tx: TxClient, p: Person): Promise<void> {
   await tx`delete from check_in_history where person_id = ${p.id}`;
   if (p.checkInHistory.length > 0) {
     await tx`insert into check_in_history ${tx(

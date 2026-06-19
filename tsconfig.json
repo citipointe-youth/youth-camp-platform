@@ -12,6 +12,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests"],
-  "exclude": ["src/repositories/supabase"]
+  "include": ["src", "tests"]
 }

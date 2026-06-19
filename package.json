@@ -4,7 +4,9 @@
   "private": true,
   "description": "Youth Camp Platform — combined pre-camp Hub + on-ground Leaders Portal. Admin can switch the app between modes. Platform-agnostic (in-memory + JSON persistence).",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
@@ -13,6 +15,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
+    "postgres": "^3.4.9",
     "zod": "^3.23.8"
   },
   "devDependencies": {

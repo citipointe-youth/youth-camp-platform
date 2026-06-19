@@ -1,11 +1,9 @@
-// ⚠️ UNVERIFIED SCAFFOLDING — see src/repositories/supabase/README.md.
-// Authored without a Node toolchain or live Postgres; ported from
-// connection-made-simple. Requires `npm i postgres`, `tsc`, and a real Supabase
-// before use.
 import postgres from 'postgres';
 import { env } from '../../config/env';
 
 export type SqlClient = ReturnType<typeof postgres>;
+/** Type for the transaction-scoped client passed to sql.begin() callbacks. */
+export type TxClient = postgres.TransactionSql<{}>;
 
 let _client: SqlClient | undefined;
 
