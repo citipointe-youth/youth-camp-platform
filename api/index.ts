@@ -1,23 +1,33 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { Express } from 'express';
-import { createAppInstance } from '../src/app';
 
-// Cache the Express app across warm invocations (Vercel reuses the module).
-let appPromise: Promise<Express> | undefined;
+type AppFn = (req: unknown, res: unknown) => void;
 
-function getApp(): Promise<Express> {
+let appPromise: Promise<AppFn> | undefined;
+
+function getApp(): Promise<AppFn> {
   if (!appPromise) {
-    appPromise = createAppInstance().catch((err: unknown) => {
-      // Reset so the next cold start retries.
-      appPromise = undefined;
-      throw err;
-    });
+    appPromise = import('../src/app')
+      .then((m) => m.createAppInstance() as Promise<AppFn>)
+      .catch((err: unknown) => {
+        console.error('[api] App initialization failed:', err);
+        appPromise = undefined;
+        throw err;
+      });
   }
   return appPromise;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const app = await getApp();
-  // Delegate to Express — it handles the request/response directly.
-  app(req as never, res as never);
+  try {
+    const app = await getApp();
+    app(req, res);
+  } catch (err) {
+    console.error('[api] Handler error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+    }
+  }
 }
