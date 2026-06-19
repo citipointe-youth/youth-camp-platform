@@ -1,5 +1,4 @@
 import type { Actor } from '../core/entities/user';
-import type { Camper } from '../core/entities/camper';
 import type { NotificationScope, UserRole } from '../core/types/enums';
 import { ForbiddenError } from '../core/errors/app-error';
 
@@ -103,32 +102,6 @@ export function canAccessChurch(actor: Actor, churchId: string, churchZone?: str
 export function assertCanAccessChurch(actor: Actor, churchId: string, churchZone?: string): void {
   if (!canAccessChurch(actor, churchId, churchZone)) {
     throw new ForbiddenError('Access denied to this church');
-  }
-}
-
-/**
- * Returns true if the actor can access the given camper.
- * - church: own church
- * - zoneLeader: own zone
- * - director/admin: all
- */
-export function canAccessCamper(actor: Actor, camper: Camper): boolean {
-  switch (actor.role) {
-    case 'admin':
-    case 'director':
-      return true;
-    case 'zoneLeader':
-      return actor.zone != null && camper.zone === actor.zone;
-    case 'church':
-      return actor.churchId === camper.churchId;
-    default:
-      return false;
-  }
-}
-
-export function assertCanAccessCamper(actor: Actor, camper: Camper): void {
-  if (!canAccessCamper(actor, camper)) {
-    throw new ForbiddenError('Access denied to this camper');
   }
 }
 

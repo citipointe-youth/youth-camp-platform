@@ -1,7 +1,7 @@
 import type { IPersonRepository } from '../repositories/interfaces/entity-repositories';
 import type { Person } from '../core/entities/person';
 import { isCamper, isRegistrant } from '../core/entities/person';
-import type { CheckInEntry, SignOutEvent } from '../core/entities/camper';
+import type { CheckInEntry, SignOutEvent } from '../core/entities/person';
 import type { Actor } from '../core/entities/user';
 import { assertCan, canAccessChurch } from './access-control';
 import { NotFoundError, BadRequestError } from '../core/errors/app-error';

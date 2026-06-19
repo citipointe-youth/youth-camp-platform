@@ -8,7 +8,7 @@ import {
   InMemoryChurchRepository,
 } from '../repositories/in-memory';
 import type { Person } from '../core/entities/person';
-import type { CheckInEntry } from '../core/entities/camper';
+import type { CheckInEntry } from '../core/entities/person';
 import type { ScheduleItem } from '../core/entities/schedule';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';

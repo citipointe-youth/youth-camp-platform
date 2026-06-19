@@ -4,8 +4,6 @@ import { NullPersistence } from '../persistence/persistence';
 
 import type { User } from '../../core/entities/user';
 import type { Church } from '../../core/entities/church';
-import type { Registrant } from '../../core/entities/registrant';
-import type { Camper } from '../../core/entities/camper';
 import type { Person } from '../../core/entities/person';
 import { isCamper } from '../../core/entities/person';
 import type { AccommodationBlock } from '../../core/entities/accommodation';
@@ -22,8 +20,6 @@ import type { UserRole } from '../../core/types/enums';
 import type {
   IUserRepository,
   IChurchRepository,
-  IRegistrantRepository,
-  ICamperRepository,
   IPersonRepository,
   IAccommodationRepository,
   IZoneRepository,
@@ -98,94 +94,6 @@ export class InMemoryChurchRepository
       if (church.selfRegisterSlug === slug) return this.clone(church);
     }
     return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Registrants
-// ---------------------------------------------------------------------------
-export class InMemoryRegistrantRepository
-  extends InMemoryBaseRepository<Registrant>
-  implements IRegistrantRepository
-{
-  constructor(persistence?: IPersistenceAdapter<Registrant>) {
-    super(persistence);
-  }
-
-  async findByChurch(churchId: string): Promise<Registrant[]> {
-    return Array.from(this.store.values())
-      .filter((r) => r.churchId === churchId)
-      .map((r) => this.clone(r));
-  }
-
-  async findByKind(kind: string): Promise<Registrant[]> {
-    return Array.from(this.store.values())
-      .filter((r) => r.kind === kind)
-      .map((r) => this.clone(r));
-  }
-
-  async findByStatus(status: string): Promise<Registrant[]> {
-    return Array.from(this.store.values())
-      .filter((r) => r.status === status)
-      .map((r) => this.clone(r));
-  }
-
-  async findByChurchAndStatus(churchId: string, status: string): Promise<Registrant[]> {
-    return Array.from(this.store.values())
-      .filter((r) => r.churchId === churchId && r.status === status)
-      .map((r) => this.clone(r));
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Campers
-// ---------------------------------------------------------------------------
-export class InMemoryCamperRepository
-  extends InMemoryBaseRepository<Camper>
-  implements ICamperRepository
-{
-  constructor(persistence?: IPersistenceAdapter<Camper>) {
-    super(persistence);
-  }
-
-  async search(q: string): Promise<Camper[]> {
-    const lower = q.toLowerCase();
-    return Array.from(this.store.values())
-      .filter((c) => {
-        const fullName = `${c.firstName} ${c.lastName}`.toLowerCase();
-        return fullName.includes(lower) || c.firstName.toLowerCase().includes(lower) || c.lastName.toLowerCase().includes(lower);
-      })
-      .map((c) => this.clone(c));
-  }
-
-  async findByZone(zone: string): Promise<Camper[]> {
-    return Array.from(this.store.values())
-      .filter((c) => c.zone === zone)
-      .map((c) => this.clone(c));
-  }
-
-  async findByChurch(churchId: string): Promise<Camper[]> {
-    return Array.from(this.store.values())
-      .filter((c) => c.churchId === churchId)
-      .map((c) => this.clone(c));
-  }
-
-  async findByGroup(groupId: string): Promise<Camper[]> {
-    return Array.from(this.store.values())
-      .filter((c) => c.groupId === groupId)
-      .map((c) => this.clone(c));
-  }
-
-  async findByStatus(status: string): Promise<Camper[]> {
-    return Array.from(this.store.values())
-      .filter((c) => c.status === status)
-      .map((c) => this.clone(c));
-  }
-
-  async findAtCamp(): Promise<Camper[]> {
-    return Array.from(this.store.values())
-      .filter((c) => c.atCamp)
-      .map((c) => this.clone(c));
   }
 }
 

@@ -1,6 +1,4 @@
 export * from './auth.schema';
-export * from './registrant.schema';
-export * from './camper.schema';
 export * from './checkin.schema';
 export * from './notification.schema';
 export * from './account.schema';

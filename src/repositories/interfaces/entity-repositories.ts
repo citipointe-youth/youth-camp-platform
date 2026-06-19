@@ -1,8 +1,6 @@
 import type { IRepository } from './base.repository';
 import type { User } from '../../core/entities/user';
 import type { Church } from '../../core/entities/church';
-import type { Registrant } from '../../core/entities/registrant';
-import type { Camper } from '../../core/entities/camper';
 import type { Person } from '../../core/entities/person';
 import type { AccommodationBlock } from '../../core/entities/accommodation';
 import type { Zone } from '../../core/entities/zone';
@@ -25,22 +23,6 @@ export interface IChurchRepository extends IRepository<Church> {
   findByCode(code: string): Promise<Church | null>;
   findByZone(zone: string): Promise<Church[]>;
   findBySlug(slug: string): Promise<Church | null>;
-}
-
-export interface IRegistrantRepository extends IRepository<Registrant> {
-  findByChurch(churchId: string): Promise<Registrant[]>;
-  findByKind(kind: string): Promise<Registrant[]>;
-  findByStatus(status: string): Promise<Registrant[]>;
-  findByChurchAndStatus(churchId: string, status: string): Promise<Registrant[]>;
-}
-
-export interface ICamperRepository extends IRepository<Camper> {
-  search(q: string): Promise<Camper[]>;
-  findByZone(zone: string): Promise<Camper[]>;
-  findByChurch(churchId: string): Promise<Camper[]>;
-  findByGroup(groupId: string): Promise<Camper[]>;
-  findByStatus(status: string): Promise<Camper[]>;
-  findAtCamp(): Promise<Camper[]>;
 }
 
 /**

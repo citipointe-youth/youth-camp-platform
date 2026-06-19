@@ -1,7 +1,5 @@
 export * from './user';
 export * from './church';
-export * from './registrant';
-export * from './camper';
 export * from './person';
 export * from './accommodation';
 export * from './zone';

@@ -5,8 +5,6 @@ import { join } from 'node:path';
 import {
   InMemoryUserRepository,
   InMemoryChurchRepository,
-  InMemoryRegistrantRepository,
-  InMemoryCamperRepository,
   InMemoryPersonRepository,
   InMemoryAccommodationRepository,
   InMemoryZoneRepository,
@@ -23,8 +21,6 @@ import { JsonFilePersistence } from './repositories/persistence';
 import type {
   IUserRepository,
   IChurchRepository,
-  IRegistrantRepository,
-  ICamperRepository,
   IPersonRepository,
   IAccommodationRepository,
   IZoneRepository,
@@ -39,8 +35,6 @@ import type {
 } from './repositories/interfaces';
 import type { User } from './core/entities/user';
 import type { Church } from './core/entities/church';
-import type { Registrant } from './core/entities/registrant';
-import type { Camper } from './core/entities/camper';
 import type { Person } from './core/entities/person';
 import type { AccommodationBlock } from './core/entities/accommodation';
 import type { Zone } from './core/entities/zone';
@@ -55,14 +49,11 @@ import type { CampSettings, CampDefaults } from './core/entities/settings';
 // Services
 import { makeAuthService, type AuthService } from './services/auth.service';
 import { makeSettingsService, type SettingsService } from './services/settings.service';
-import { makeRegistrantService, type RegistrantService } from './services/registrant.service';
 import { makeAccommodationService, type AccommodationService } from './services/accommodation.service';
-import { makeCamperService, type CamperService } from './services/camper.service';
 import { makeCheckInService, type CheckInService } from './services/checkin.service';
 import { makeNotificationService, type NotificationService } from './services/notification.service';
 import { makeSearchService, type SearchService } from './services/search.service';
 import { makeNoteService, type NoteService } from './services/note.service';
-import { makeAttendanceService, type AttendanceService } from './services/attendance.service';
 import { makeScheduleService, type ScheduleService } from './services/schedule.service';
 import { makeContentService, type ContentService } from './services/content.service';
 import { makeImportService, type ImportService } from './services/import.service';
@@ -74,8 +65,6 @@ import { makePersonService, type PersonService } from './services/person.service
 export interface Repositories {
   users: IUserRepository;
   churches: IChurchRepository;
-  registrants: IRegistrantRepository;
-  campers: ICamperRepository;
   people: IPersonRepository;
   accommodation: IAccommodationRepository;
   zones: IZoneRepository;
@@ -93,14 +82,11 @@ export interface Services {
   auth: AuthService;
   settings: SettingsService;
   person: PersonService;
-  registrant: RegistrantService;
   accommodation: AccommodationService;
-  camper: CamperService;
   checkIn: CheckInService;
   notification: NotificationService;
   search: SearchService;
   note: NoteService;
-  attendance: AttendanceService;
   schedule: ScheduleService;
   content: ContentService;
   importService: ImportService;
@@ -129,12 +115,6 @@ export async function buildContainer(): Promise<Container> {
   );
   const churches: IChurchRepository = new InMemoryChurchRepository(
     useJson ? makeJsonPersistence<Church>('churches.json') : undefined,
-  );
-  const registrants: IRegistrantRepository = new InMemoryRegistrantRepository(
-    useJson ? makeJsonPersistence<Registrant>('registrants.json') : undefined,
-  );
-  const campers: ICamperRepository = new InMemoryCamperRepository(
-    useJson ? makeJsonPersistence<Camper>('campers.json') : undefined,
   );
   const people: IPersonRepository = new InMemoryPersonRepository(
     useJson ? makeJsonPersistence<Person>('people.json') : undefined,
@@ -173,8 +153,6 @@ export async function buildContainer(): Promise<Container> {
   const repos: Repositories = {
     users,
     churches,
-    registrants,
-    campers,
     people,
     accommodation: accommodationRepo,
     zones,
@@ -192,8 +170,6 @@ export async function buildContainer(): Promise<Container> {
   await Promise.all([
     users.init(),
     churches.init(),
-    registrants.init(),
-    campers.init(),
     people.init(),
     accommodationRepo.init(),
     zones.init(),
@@ -211,14 +187,11 @@ export async function buildContainer(): Promise<Container> {
   const auth = makeAuthService(users);
   const settings = makeSettingsService(settingsRepo);
   const personSvc = makePersonService(people);
-  const registrantSvc = makeRegistrantService(registrants);
   const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
-  const camper = makeCamperService(campers);
   const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
   const notification = makeNotificationService(notifications, people, churches);
   const search = makeSearchService(people, churches);
   const note = makeNoteService(notes, people);
-  const attendance = makeAttendanceService(campers);
   const schedule = makeScheduleService(scheduleRepo);
   const content = makeContentService(faqs, devotionals);
   const importSvc = makeImportService(people, churches);
@@ -248,14 +221,11 @@ export async function buildContainer(): Promise<Container> {
     auth,
     settings,
     person: personSvc,
-    registrant: registrantSvc,
     accommodation: accommodationSvc,
-    camper,
     checkIn,
     notification,
     search,
     note,
-    attendance,
     schedule,
     content,
     importService: importSvc,

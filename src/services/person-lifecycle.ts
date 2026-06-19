@@ -1,5 +1,5 @@
 import type { Person } from '../core/entities/person';
-import type { CheckInEntry, SignOutEvent } from '../core/entities/camper';
+import type { CheckInEntry, SignOutEvent } from '../core/entities/person';
 import type { PersonLifecycle } from '../core/types/enums';
 
 /**

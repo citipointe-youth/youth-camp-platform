@@ -3,11 +3,9 @@ import {
   can,
   assertCan,
   canAccessChurch,
-  canAccessCamper,
   canSendNotification,
 } from './access-control';
 import type { Actor } from '../core/entities/user';
-import type { Camper } from '../core/entities/camper';
 import { ForbiddenError } from '../core/errors/app-error';
 
 function actor(role: Actor['role'], over: Partial<Actor> = {}): Actor {
@@ -69,25 +67,6 @@ describe('access-control: canAccessChurch()', () => {
   it('director and admin see every church', () => {
     expect(canAccessChurch(actor('director'), 'cX')).toBe(true);
     expect(canAccessChurch(actor('admin'), 'cX')).toBe(true);
-  });
-});
-
-describe('access-control: canAccessCamper()', () => {
-  const camper = { churchId: 'c1', zone: 'Yellow' } as unknown as Camper;
-
-  it('church matches by churchId', () => {
-    expect(canAccessCamper(actor('church', { churchId: 'c1' }), camper)).toBe(true);
-    expect(canAccessCamper(actor('church', { churchId: 'c2' }), camper)).toBe(false);
-  });
-
-  it('zoneLeader matches by zone', () => {
-    expect(canAccessCamper(actor('zoneLeader', { zone: 'Yellow' }), camper)).toBe(true);
-    expect(canAccessCamper(actor('zoneLeader', { zone: 'Blue' }), camper)).toBe(false);
-  });
-
-  it('director/admin can access any camper', () => {
-    expect(canAccessCamper(actor('director'), camper)).toBe(true);
-    expect(canAccessCamper(actor('admin'), camper)).toBe(true);
   });
 });
 

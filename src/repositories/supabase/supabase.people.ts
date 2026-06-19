@@ -7,7 +7,7 @@
 import type { SqlClient } from './client';
 import type { IPersonRepository } from '../interfaces/entity-repositories';
 import type { Person } from '../../core/entities/person';
-import type { CheckInEntry, SignOutEvent } from '../../core/entities/camper';
+import type { CheckInEntry, SignOutEvent } from '../../core/entities/person';
 import { isCamper } from '../../core/entities/person';
 import { chunk } from './bulk';
 

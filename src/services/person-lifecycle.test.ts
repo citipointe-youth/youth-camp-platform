@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { applyCheckIn, applySignOut, applySignIn, withCheckIn, withSignEvent } from './person-lifecycle';
 import type { Person } from '../core/entities/person';
-import type { CheckInEntry, SignOutEvent } from '../core/entities/camper';
+import type { CheckInEntry, SignOutEvent } from '../core/entities/person';
 
 // ---------------------------------------------------------------------------
 // Locks the design-D2 promotion rule: Day-1 first check-in promotes a registrant
