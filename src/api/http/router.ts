@@ -20,7 +20,7 @@ import { makeAdminController } from '../controllers/admin.controller';
 export function buildRoutes(services: Services): Route[] {
   const auth = makeAuthController({ auth: services.auth, users: services.users });
   const dashboard = makeDashboardController({ dashboard: services.dashboard, settings: services.settings });
-  const registrant = makeRegistrantController({ registrant: services.registrant });
+  const registrant = makeRegistrantController({ person: services.person });
   const accommodation = makeAccommodationController({ accommodation: services.accommodation });
   const camper = makeCamperController({ camper: services.camper });
   const checkIn = makeCheckInController({ checkIn: services.checkIn });

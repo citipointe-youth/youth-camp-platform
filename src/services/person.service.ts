@@ -227,10 +227,12 @@ export function makePersonService(repo: IPersonRepository): PersonService {
     async update(actor, id, patch) {
       assertCan(actor, 'registrant:write');
       const existing = await getOwned(actor, id);
-      // Identity + lifecycle/history are not patchable here (lifecycle changes only
-      // via checkIn/signEvent); guard church/zone moves through the scope check.
-      const { id: _i, lifecycle: _l, atCamp: _a, checkInHistory: _ch, signOutHistory: _sh, createdAt: _c, ...safe } = patch;
-      const updated: Person = { ...existing, ...safe, id: existing.id, updatedAt: nowISO() };
+      // History, atCamp, and createdAt are never patchable; lifecycle is restricted to
+      // registered ↔ cancelled (camp-state transitions go via checkIn/signEvent).
+      const { id: _i, atCamp: _a, checkInHistory: _ch, signOutHistory: _sh, createdAt: _c, lifecycle, ...safeRest } = patch;
+      const nextLifecycle =
+        lifecycle === 'cancelled' || lifecycle === 'registered' ? lifecycle : existing.lifecycle;
+      const updated: Person = { ...existing, ...safeRest, id: existing.id, lifecycle: nextLifecycle, updatedAt: nowISO() };
       return repo.save(updated);
     },
 

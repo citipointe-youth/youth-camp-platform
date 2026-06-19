@@ -69,6 +69,7 @@ import { makeImportService, type ImportService } from './services/import.service
 import { makeAccountService, type AccountService } from './services/account.service';
 import { makeDashboardService, type DashboardService } from './services/dashboard.service';
 import { makeAdminService, type AdminService } from './services/admin.service';
+import { makePersonService, type PersonService } from './services/person.service';
 
 export interface Repositories {
   users: IUserRepository;
@@ -91,6 +92,7 @@ export interface Repositories {
 export interface Services {
   auth: AuthService;
   settings: SettingsService;
+  person: PersonService;
   registrant: RegistrantService;
   accommodation: AccommodationService;
   camper: CamperService;
@@ -208,6 +210,7 @@ export async function buildContainer(): Promise<Container> {
   // ----- Services -----
   const auth = makeAuthService(users);
   const settings = makeSettingsService(settingsRepo);
+  const personSvc = makePersonService(people);
   const registrantSvc = makeRegistrantService(registrants);
   const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, registrants);
   const camper = makeCamperService(campers);
@@ -246,6 +249,7 @@ export async function buildContainer(): Promise<Container> {
   const services: Services = {
     auth,
     settings,
+    person: personSvc,
     registrant: registrantSvc,
     accommodation: accommodationSvc,
     camper,
