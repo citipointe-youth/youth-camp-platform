@@ -1,7 +1,7 @@
-import type { IAccommodationRepository, IChurchRepository, ISettingsRepository, IRegistrantRepository } from '../repositories/interfaces/entity-repositories';
+import type { IAccommodationRepository, IChurchRepository, ISettingsRepository, IPersonRepository } from '../repositories/interfaces/entity-repositories';
 import type { AccommodationBlock } from '../core/entities/accommodation';
 import type { AccommodationReservation } from '../core/entities/church';
-import type { Registrant } from '../core/entities/registrant';
+import type { Person } from '../core/entities/person';
 import type { Actor } from '../core/entities/user';
 import { assertCan, assertCanAccessChurch } from './access-control';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
@@ -23,14 +23,14 @@ export interface AccommodationService {
   deleteBlock(actor: Actor, id: string): Promise<void>;
   setReservations(actor: Actor, input: unknown): Promise<AccommodationReservation[]>;
   listHeldByChurch(actor: Actor, churchId: string): Promise<AccommodationReservation[]>;
-  computeLiveTaken(blocks: AccommodationBlock[], registrants: Registrant[]): Map<string, number>;
+  computeLiveTaken(blocks: AccommodationBlock[], persons: Person[]): Map<string, number>;
 }
 
 export function makeAccommodationService(
   blockRepo: IAccommodationRepository,
   churchRepo: IChurchRepository,
   settingsRepo: ISettingsRepository,
-  registrantRepo: IRegistrantRepository,
+  personRepo: IPersonRepository,
 ): AccommodationService {
   async function assertNotLocked(actor: Actor): Promise<void> {
     if (actor.role === 'admin') return;
@@ -42,14 +42,14 @@ export function makeAccommodationService(
 
   // Thin wrapper over the pure occupancy module (single source of truth, see
   // accommodation-occupancy.ts). Kept on the interface for callers/tests.
-  function computeLiveTaken(blocks: AccommodationBlock[], registrants: Registrant[]): Map<string, number> {
-    return computeLiveTakenPure(blocks, registrants);
+  function computeLiveTaken(blocks: AccommodationBlock[], persons: Person[]): Map<string, number> {
+    return computeLiveTakenPure(blocks, persons);
   }
 
   // B1 FIX: live blocks now subtract assigned occupants (was baseTaken only).
   async function getLiveBlocks(): Promise<LiveBlock[]> {
-    const [blocks, registrants] = await Promise.all([blockRepo.findAll(), registrantRepo.findAll()]);
-    const taken = computeLiveTakenPure(blocks, registrants);
+    const [blocks, persons] = await Promise.all([blockRepo.findAll(), personRepo.findAll()]);
+    const taken = computeLiveTakenPure(blocks, persons);
     return blocks.map((b) => {
       const liveTaken = taken.get(b.id) ?? b.baseTaken;
       return { ...b, liveTaken, available: availableForBlock(b, liveTaken) };
@@ -68,8 +68,8 @@ export function makeAccommodationService(
       assertCan(actor, 'registrant:read');
       const block = await blockRepo.findById(id);
       if (!block) throw new NotFoundError('Accommodation block not found');
-      const registrants = await registrantRepo.findAll();
-      const liveTaken = computeLiveTakenPure([block], registrants).get(block.id) ?? block.baseTaken;
+      const persons = await personRepo.findAll();
+      const liveTaken = computeLiveTakenPure([block], persons).get(block.id) ?? block.baseTaken;
       return { ...block, liveTaken, available: availableForBlock(block, liveTaken) };
     },
 

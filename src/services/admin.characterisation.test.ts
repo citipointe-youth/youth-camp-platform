@@ -3,8 +3,7 @@ import { makeAdminService } from './admin.service';
 import {
   InMemoryUserRepository,
   InMemoryChurchRepository,
-  InMemoryRegistrantRepository,
-  InMemoryCamperRepository,
+  InMemoryPersonRepository,
   InMemoryAccommodationRepository,
   InMemoryFaqRepository,
   InMemoryScheduleRepository,
@@ -16,8 +15,7 @@ import {
 } from '../repositories/in-memory';
 import type { User, Actor } from '../core/entities/user';
 import type { Church } from '../core/entities/church';
-import type { Registrant } from '../core/entities/registrant';
-import type { Camper } from '../core/entities/camper';
+import type { Person } from '../core/entities/person';
 import type { AccommodationBlock } from '../core/entities/accommodation';
 import type { FaqItem } from '../core/entities/content';
 import type { ScheduleItem } from '../core/entities/schedule';
@@ -76,27 +74,28 @@ function church(over: Partial<Church>): Church {
   };
 }
 
-function reg(over: Partial<Registrant>): Registrant {
+function person(over: Partial<Person>): Person {
   return {
-    id: 'r',
+    id: 'p',
     firstName: 'A',
     lastName: 'B',
     gender: 'male',
-    kind: 'camper',
+    kind: 'youth',
     paymentStatus: 'unpaid',
-    blueCardCollected: false,
     churchId: 'c1',
     churchName: 'Victory',
     zone: 'Yellow',
-    status: 'registered',
+    lifecycle: 'registered',
+    atCamp: false,
+    medicalConditions: [],
+    dietaryRequirements: [],
+    consents: { medical: { granted: false, timestamp: null }, media: { granted: false, timestamp: null }, supervision: { granted: false, timestamp: null } },
+    checkInHistory: [],
+    signOutHistory: [],
     createdAt: NOW,
     updatedAt: NOW,
     ...over,
-  } as Registrant;
-}
-
-function camper(over: Partial<Camper>): Camper {
-  return { id: 'cmp', firstName: 'A', lastName: 'B', ...over } as Camper;
+  };
 }
 
 function block(over: Partial<AccommodationBlock>): AccommodationBlock {
@@ -179,8 +178,7 @@ function settings(over: Partial<CampSettings> = {}): CampSettings {
 interface Repos {
   userRepo: InMemoryUserRepository;
   churchRepo: InMemoryChurchRepository;
-  registrantRepo: InMemoryRegistrantRepository;
-  camperRepo: InMemoryCamperRepository;
+  personRepo: InMemoryPersonRepository;
   accommodationRepo: InMemoryAccommodationRepository;
   faqRepo: InMemoryFaqRepository;
   scheduleRepo: InMemoryScheduleRepository;
@@ -195,8 +193,7 @@ async function makeRepos(): Promise<Repos> {
   const repos: Repos = {
     userRepo: new InMemoryUserRepository(),
     churchRepo: new InMemoryChurchRepository(),
-    registrantRepo: new InMemoryRegistrantRepository(),
-    camperRepo: new InMemoryCamperRepository(),
+    personRepo: new InMemoryPersonRepository(),
     accommodationRepo: new InMemoryAccommodationRepository(),
     faqRepo: new InMemoryFaqRepository(),
     scheduleRepo: new InMemoryScheduleRepository(),
@@ -209,8 +206,7 @@ async function makeRepos(): Promise<Repos> {
   await Promise.all([
     repos.userRepo.init(),
     repos.churchRepo.init(),
-    repos.registrantRepo.init(),
-    repos.camperRepo.init(),
+    repos.personRepo.init(),
     repos.accommodationRepo.init(),
     repos.faqRepo.init(),
     repos.scheduleRepo.init(),
@@ -227,8 +223,7 @@ function build(r: Repos) {
   return makeAdminService(
     r.userRepo,
     r.churchRepo,
-    r.registrantRepo,
-    r.camperRepo,
+    r.personRepo,
     r.accommodationRepo,
     r.faqRepo,
     r.scheduleRepo,
@@ -247,10 +242,8 @@ async function seedEverything(r: Repos): Promise<void> {
     r.userRepo.save(user({ id: 'u2', username: 'churchb', role: 'church', churchId: 'c1' })),
     r.churchRepo.save(church({ id: 'c1' })),
     r.churchRepo.save(church({ id: 'c2', code: 'GRC', selfRegisterSlug: 'grace' })),
-    r.registrantRepo.save(reg({ id: 'r1' })),
-    r.registrantRepo.save(reg({ id: 'r2' })),
-    r.camperRepo.save(camper({ id: 'cmp1' })),
-    r.camperRepo.save(camper({ id: 'cmp2' })),
+    r.personRepo.save(person({ id: 'p1' })),
+    r.personRepo.save(person({ id: 'p2', lifecycle: 'arrived', atCamp: true })),
     r.accommodationRepo.save(block({ id: 'b1' })),
     r.faqRepo.save(faq({ id: 'f1' })),
     r.scheduleRepo.save(scheduleItem({ id: 's1' })),
@@ -286,8 +279,7 @@ describe('AdminService.reset', () => {
     const result = await svc.reset(actor('admin'));
     expect(result).toEqual({ ok: true });
 
-    expect(await repos.registrantRepo.findAll()).toEqual([]);
-    expect(await repos.camperRepo.findAll()).toEqual([]);
+    expect(await repos.personRepo.findAll()).toEqual([]);
     expect(await repos.churchRepo.findAll()).toEqual([]);
     expect(await repos.accommodationRepo.findAll()).toEqual([]);
     expect(await repos.faqRepo.findAll()).toEqual([]);
@@ -430,12 +422,11 @@ describe('AdminService.newYear', () => {
     expect(persisted!.campMode).toBe('pre-camp');
   });
 
-  it('purges people + transient data (registrants, campers, notes, notifications)', async () => {
+  it('purges people + transient data (notes, notifications)', async () => {
     await saveBaseline();
     const svc = build(repos);
     await svc.newYear(actor('admin'), 2027);
-    expect(await repos.registrantRepo.findAll()).toEqual([]);
-    expect(await repos.camperRepo.findAll()).toEqual([]);
+    expect(await repos.personRepo.findAll()).toEqual([]);
     expect(await repos.noteRepo.findAll()).toEqual([]);
     expect(await repos.notifRepo.findAll()).toEqual([]);
   });

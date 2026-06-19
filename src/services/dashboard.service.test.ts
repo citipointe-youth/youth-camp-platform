@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeDashboardService } from './dashboard.service';
 import {
-  InMemoryRegistrantRepository,
-  InMemoryCamperRepository,
+  InMemoryPersonRepository,
   InMemoryAccommodationRepository,
   InMemoryNotificationRepository,
   InMemoryScheduleRepository,
   InMemoryChurchRepository,
 } from '../repositories/in-memory';
-import type { Camper, CheckInEntry } from '../core/entities/camper';
+import type { Person } from '../core/entities/person';
+import type { CheckInEntry } from '../core/entities/camper';
 import type { ScheduleItem } from '../core/entities/schedule';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';
@@ -33,13 +33,15 @@ function ci(sessionId: string, type: 'in' | 'out', ts: string): CheckInEntry {
   return { id: `ci_${sessionId}_${type}_${ts}`, sessionId, sessionLabel: sessionId, type, leaderId: 'l', timestamp: ts };
 }
 
-function camper(over: Partial<Camper> = {}): Camper {
+function camper(over: Partial<Person> = {}): Person {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: 'c', firstName: 'A', lastName: 'B', gender: 'male', zone: 'Yellow', kind: 'student',
+    id: 'c', firstName: 'A', lastName: 'B', gender: 'male', zone: 'Yellow', kind: 'youth',
     medicalConditions: [], dietaryRequirements: [],
     consents: { medical: { granted: false, timestamp: null }, media: { granted: false, timestamp: null }, supervision: { granted: false, timestamp: null } },
-    churchId: 'c1', churchName: 'Victory', atCamp: false, status: 'registered',
+    churchId: 'c1', churchName: 'Victory', atCamp: false,
+    paymentStatus: 'unpaid', accommodationKind: null, accommodationLabel: null,
+    lifecycle: 'arrived', // at-camp default so isCamper() returns true
     checkInHistory: [], signOutHistory: [], createdAt: now, updatedAt: now, ...over,
   };
 }
@@ -59,15 +61,14 @@ function settings(): CampSettings {
 }
 
 async function build() {
-  const registrantRepo = new InMemoryRegistrantRepository();
-  const camperRepo = new InMemoryCamperRepository();
+  const personRepo = new InMemoryPersonRepository();
   const accommodationRepo = new InMemoryAccommodationRepository();
   const notifRepo = new InMemoryNotificationRepository();
   const scheduleRepo = new InMemoryScheduleRepository();
   const churchRepo = new InMemoryChurchRepository();
-  for (const r of [registrantRepo, camperRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo]) await r.init();
-  const svc = makeDashboardService(registrantRepo, camperRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo);
-  return { svc, camperRepo, scheduleRepo };
+  for (const r of [personRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo]) await r.init();
+  const svc = makeDashboardService(personRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo);
+  return { svc, personRepo, scheduleRepo };
 }
 
 describe('at-camp dashboard — D1 current session = latest started', () => {
@@ -94,9 +95,9 @@ describe('at-camp dashboard — D1 current session = latest started', () => {
 describe('at-camp dashboard — D2 scoping', () => {
   it('a church login sees only its own church in totals', async () => {
     const h = await build();
-    await h.camperRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
-    await h.camperRepo.save(camper({ id: 'c1b', churchId: 'c1', atCamp: false }));
-    await h.camperRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c1b', churchId: 'c1', atCamp: false }));
+    await h.personRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
     const res = await h.svc.home(actor('church', { churchId: 'c1' }), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.totalExpected).toBe(2); // c1a + c1b, NOT c2a
@@ -105,8 +106,8 @@ describe('at-camp dashboard — D2 scoping', () => {
 
   it('admin sees the whole camp', async () => {
     const h = await build();
-    await h.camperRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
-    await h.camperRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.totalExpected).toBe(2);
@@ -115,8 +116,8 @@ describe('at-camp dashboard — D2 scoping', () => {
 
   it('excludes cancelled campers from totalExpected', async () => {
     const h = await build();
-    await h.camperRepo.save(camper({ id: 'live', status: 'registered' }));
-    await h.camperRepo.save(camper({ id: 'gone', status: 'cancelled' }));
+    await h.personRepo.save(camper({ id: 'live', lifecycle: 'arrived' }));
+    await h.personRepo.save(camper({ id: 'gone', lifecycle: 'cancelled' })); // not a camper
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.totalExpected).toBe(1);
@@ -127,7 +128,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('counts a camper as due when never checked in to the current session', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.camperRepo.save(camper({ id: 'x' })); // no check-ins
+    await h.personRepo.save(camper({ id: 'x' })); // no check-ins
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.checkInsDue).toBe(1);
@@ -136,7 +137,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('a camper checked IN to the current session is NOT due', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.camperRepo.save(camper({ id: 'x', checkInHistory: [ci('cur', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', checkInHistory: [ci('cur', 'in', '2026-07-01T08:00:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.checkInsDue).toBe(0);
@@ -145,7 +146,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('a camper who checked in then OUT of the current session IS due again (D3)', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.camperRepo.save(camper({ id: 'x', checkInHistory: [
+    await h.personRepo.save(camper({ id: 'x', checkInHistory: [
       ci('cur', 'in', '2026-07-01T08:00:00Z'),
       ci('cur', 'out', '2026-07-01T09:00:00Z'),
     ] }));
@@ -158,7 +159,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
     const h = await build();
     await h.scheduleRepo.save(session('am', '00:00'));
     await h.scheduleRepo.save(session('pm', '00:01')); // current (latest started)
-    await h.camperRepo.save(camper({ id: 'x', checkInHistory: [ci('am', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', checkInHistory: [ci('am', 'in', '2026-07-01T08:00:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.currentSession?.id).toBe('pm');

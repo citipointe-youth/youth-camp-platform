@@ -1,7 +1,7 @@
-import type { ICamperRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
-import type { Camper } from '../core/entities/camper';
+import type { IPersonRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
+import type { Person } from '../core/entities/person';
 import type { Actor } from '../core/entities/user';
-import type { ConsentType } from '../core/types/enums';
+import type { ConsentType, PersonKind } from '../core/types/enums';
 import { CONSENT_TYPES } from '../core/types/enums';
 import { assertCan } from './access-control';
 import { BadRequestError } from '../core/errors/app-error';
@@ -28,7 +28,7 @@ export interface ImportService {
   importCsv(actor: Actor, input: unknown): Promise<ImportResult>;
 }
 
-function defaultConsents(): Camper['consents'] {
+function defaultConsents(): Person['consents'] {
   const result = {} as Record<ConsentType, { granted: boolean; timestamp: string | null }>;
   for (const t of CONSENT_TYPES) {
     result[t] = { granted: false, timestamp: null };
@@ -36,21 +36,26 @@ function defaultConsents(): Camper['consents'] {
   return result;
 }
 
-function parseGender(val: string): Camper['gender'] {
+function parseGender(val: string): Person['gender'] {
   const v = val.toLowerCase().trim();
   if (v === 'male' || v === 'm') return 'male';
   if (v === 'female' || v === 'f') return 'female';
   return 'other';
 }
 
-function parseGrade(val: string): Camper['grade'] | null {
+function parseGrade(val: string): Person['grade'] | null {
   const n = parseInt(val, 10);
-  if ([7, 8, 9, 10, 11, 12].includes(n)) return n as Camper['grade'];
+  if ([7, 8, 9, 10, 11, 12].includes(n)) return n as Person['grade'];
   return null;
 }
 
+function parseKind(val: string): PersonKind {
+  // CSV may have legacy 'student' kind — map to unified 'youth'
+  return val.trim() === 'leader' ? 'leader' : 'youth';
+}
+
 export function makeImportService(
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
   churchRepo: IChurchRepository,
 ): ImportService {
   return {
@@ -66,13 +71,13 @@ export function makeImportService(
       const errors: ImportResult['errors'] = [];
 
       // C1 FIX: load reference data ONCE up front (was a per-row churchRepo.findAll
-      // + camperRepo.findByChurch scan), then batch all writes (was a per-row save,
+      // + personRepo.findByChurch scan), then batch all writes (was a per-row save,
       // i.e. a full JSON rewrite per row).
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
       for (const c of churches) churchIdByName.set(c.name.toLowerCase(), c.id);
 
-      // Working set: every existing camper, pooled by churchId+lowercased name. We
+      // Working set: every existing person, pooled by churchId+lowercased name. We
       // keep a LIST per key (not a single record) so two different people with the
       // SAME name in the SAME church can be told apart by PHONE NUMBER (see pickMatch
       // for the exact rules — a phone-bearing row matches by phone; a phone-less row
@@ -80,17 +85,17 @@ export function makeImportService(
       // pool — so a pool never holds two entries for one person, and duplicate rows
       // for the same person collapse. This also removes the empty-church collision
       // (audit P1): church-less people are pooled together but separated by phone.
-      const allCampers = await camperRepo.findAll();
+      const allPersons = await personRepo.findAll();
       const nameChurchKey = (churchId: string, first: string, last: string): string =>
         `${churchId}::${first.toLowerCase()}::${last.toLowerCase()}`;
       const phoneKey = (mobile: string | null | undefined): string =>
         (mobile ?? '').replace(/\D/g, ''); // digits only; '' when absent
-      const poolByNameChurch = new Map<string, Camper[]>();
-      for (const c of allCampers) {
-        const k = nameChurchKey(c.churchId, c.firstName, c.lastName);
+      const poolByNameChurch = new Map<string, Person[]>();
+      for (const p of allPersons) {
+        const k = nameChurchKey(p.churchId, p.firstName, p.lastName);
         const pool = poolByNameChurch.get(k);
-        if (pool) pool.push(c);
-        else poolByNameChurch.set(k, [c]);
+        if (pool) pool.push(p);
+        else poolByNameChurch.set(k, [p]);
       }
 
       // Match rules for a row (given its phone) against a name+church pool:
@@ -100,10 +105,10 @@ export function makeImportService(
       //    phone to the single existing record);
       //  - the row has NO phone → match a lone candidate (re-import omitting phone);
       //    ambiguous against 2+ candidates → no match (caller treats as new).
-      function pickMatch(pool: Camper[] | undefined, phone: string): Camper | undefined {
+      function pickMatch(pool: Person[] | undefined, phone: string): Person | undefined {
         if (!pool || pool.length === 0) return undefined;
         if (phone) {
-          const byPhone = pool.find((c) => phoneKey(c.mobile) === phone);
+          const byPhone = pool.find((p) => phoneKey(p.mobile) === phone);
           if (byPhone) return byPhone;
           // No phone match: only adopt a lone candidate if it has no phone yet.
           if (pool.length === 1 && !phoneKey(pool[0]!.mobile)) return pool[0];
@@ -112,8 +117,8 @@ export function makeImportService(
         return pool.length === 1 ? pool[0] : undefined;
       }
 
-      // Campers created or updated this import, keyed by id — the batched write set.
-      const touched = new Map<string, Camper>();
+      // People created or updated this import, keyed by id — the batched write set.
+      const touched = new Map<string, Person>();
       // Ids created during THIS import (so a matched-again row isn't miscounted as an
       // update, and isn't blocked by updateExisting=false).
       const createdIds = new Set<string>();
@@ -144,7 +149,7 @@ export function makeImportService(
           const zone = (row['zone'] ?? row['Zone'] ?? opts.defaultZone ?? '').trim();
           const gender = parseGender(row['gender'] ?? row['Gender'] ?? 'other');
           const grade = parseGrade(row['grade'] ?? row['Grade'] ?? '');
-          const kind = (row['kind'] ?? row['Kind'] ?? 'student').trim() as Camper['kind'];
+          const kind = parseKind(row['kind'] ?? row['Kind'] ?? 'youth');
           const dob = (row['dateOfBirth'] ?? row['dob'] ?? row['DOB'] ?? '').trim() || null;
           const mobile = (row['mobile'] ?? row['Mobile'] ?? '').trim() || null;
           const email = (row['email'] ?? row['Email'] ?? '').trim() || null;
@@ -163,14 +168,14 @@ export function makeImportService(
 
           const now = nowISO();
 
-          // An existing DB camper not flagged for update is left untouched.
+          // An existing DB person not flagged for update is left untouched.
           if (match && isExisting && !opts.updateExisting) {
             skipped++;
           } else if (match) {
-            // Update path: existing DB camper (updateExisting), or a duplicate row for
+            // Update path: existing DB person (updateExisting), or a duplicate row for
             // a person already created/updated earlier in THIS file. Mutate in place so
             // the pool keeps exactly one entry per person and the write set dedups.
-            const merged: Camper = {
+            const merged: Person = {
               ...match,
               firstName,
               lastName,
@@ -180,7 +185,7 @@ export function makeImportService(
               mobile,
               email,
               zone: zone || match.zone,
-              kind: (kind === 'student' || kind === 'leader') ? kind : match.kind,
+              kind,
               medicalConditions: medical ? [medical] : match.medicalConditions,
               dietaryRequirements: dietary ? [dietary] : match.dietaryRequirements,
               parentGuardianName: parentName ?? match.parentGuardianName,
@@ -196,8 +201,8 @@ export function makeImportService(
             touched.set(merged.id, merged);
             if (isExisting && firstTouch) updated++;
           } else {
-            const camper: Camper = {
-              id: newId('camper'),
+            const person: Person = {
+              id: newId('person'),
               firstName,
               lastName,
               gender,
@@ -206,7 +211,7 @@ export function makeImportService(
               school: (row['school'] ?? '').trim() || null,
               zone,
               groupId: null,
-              kind: (kind === 'student' || kind === 'leader') ? kind : 'student',
+              kind,
               mobile,
               email,
               suburb: null,
@@ -223,20 +228,23 @@ export function makeImportService(
               blueCardExpiry: null,
               churchId: resolvedChurchId,
               churchName: churchName || resolvedChurchId,
+              paymentStatus: 'unpaid',
+              accommodationKind: null,
+              accommodationLabel: null,
+              lifecycle: 'registered',
               atCamp: false,
-              status: 'registered',
               checkInHistory: [],
               signOutHistory: [],
               createdAt: now,
               updatedAt: now,
             };
-            touched.set(camper.id, camper);
-            createdIds.add(camper.id);
+            touched.set(person.id, person);
+            createdIds.add(person.id);
             // Add to the pool so a later duplicate row (same name+church, matching
             // phone when needed) updates THIS new record instead of creating a second.
             const p = poolByNameChurch.get(nck);
-            if (p) p.push(camper);
-            else poolByNameChurch.set(nck, [camper]);
+            if (p) p.push(person);
+            else poolByNameChurch.set(nck, [person]);
             created++;
           }
         } catch (err) {
@@ -249,7 +257,7 @@ export function makeImportService(
       }
 
       // Single batched write for the whole import (was one save per row).
-      if (touched.size > 0) await camperRepo.saveMany([...touched.values()]);
+      if (touched.size > 0) await personRepo.saveMany([...touched.values()]);
 
       return { created, updated, skipped, errors };
     },

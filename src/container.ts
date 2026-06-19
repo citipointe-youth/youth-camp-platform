@@ -212,20 +212,19 @@ export async function buildContainer(): Promise<Container> {
   const settings = makeSettingsService(settingsRepo);
   const personSvc = makePersonService(people);
   const registrantSvc = makeRegistrantService(registrants);
-  const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, registrants);
+  const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
   const camper = makeCamperService(campers);
   const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
-  const notification = makeNotificationService(notifications, campers, churches);
-  const search = makeSearchService(campers, churches);
-  const note = makeNoteService(notes, campers);
+  const notification = makeNotificationService(notifications, people, churches);
+  const search = makeSearchService(people, churches);
+  const note = makeNoteService(notes, people);
   const attendance = makeAttendanceService(campers);
   const schedule = makeScheduleService(scheduleRepo);
   const content = makeContentService(faqs, devotionals);
-  const importSvc = makeImportService(campers, churches);
+  const importSvc = makeImportService(people, churches);
   const account = makeAccountService(users, churches);
   const dashboard = makeDashboardService(
-    registrants,
-    campers,
+    people,
     accommodationRepo,
     notifications,
     scheduleRepo,
@@ -234,8 +233,7 @@ export async function buildContainer(): Promise<Container> {
   const admin = makeAdminService(
     users,
     churches,
-    registrants,
-    campers,
+    people,
     accommodationRepo,
     faqs,
     scheduleRepo,

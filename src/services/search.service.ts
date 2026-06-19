@@ -1,8 +1,10 @@
-import type { ICamperRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
-import type { Camper } from '../core/entities/camper';
+import type { IPersonRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
+import type { Person } from '../core/entities/person';
 import type { Church, ChurchContact } from '../core/entities/church';
 import type { Actor } from '../core/entities/user';
-import { assertCan, canAccessCamper } from './access-control';
+import { assertCan } from './access-control';
+import { isCamper } from '../core/entities/person';
+import { canAccessPerson } from './person.service';
 import { NotFoundError } from '../core/errors/app-error';
 import { maskPhone } from '../utils/mask';
 import { createLogger } from '../utils/logger';
@@ -10,7 +12,7 @@ import { createLogger } from '../utils/logger';
 const logger = createLogger('search');
 
 export interface SearchResult {
-  camper: Camper;
+  camper: Person;
   contacts: MaskedContact[];
 }
 
@@ -61,16 +63,16 @@ function makeContacts(church: Church, gender: 'male' | 'female'): MaskedContact[
 }
 
 export function makeSearchService(
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
   churchRepo: IChurchRepository,
 ): SearchService {
-  async function getContactsForCamper(camper: Camper): Promise<{ masked: MaskedContact[]; raw: Map<string, ChurchContact & { gender: 'male' | 'female'; type: 'primary' | 'backup' }> }> {
-    const church = await churchRepo.findById(camper.churchId);
+  async function getContactsForPerson(person: Person): Promise<{ masked: MaskedContact[]; raw: Map<string, ChurchContact & { gender: 'male' | 'female'; type: 'primary' | 'backup' }> }> {
+    const church = await churchRepo.findById(person.churchId);
     if (!church) {
       return { masked: [], raw: new Map() };
     }
 
-    const gender = camper.gender === 'female' ? 'female' : 'male';
+    const gender = person.gender === 'female' ? 'female' : 'male';
     const oppositeGender = gender === 'male' ? 'female' : 'male';
 
     const primary = makeContacts(church, gender);
@@ -93,36 +95,36 @@ export function makeSearchService(
   return {
     async search(actor, q) {
       assertCan(actor, 'camper:read');
-      const campers = await camperRepo.search(q);
-      const scoped = campers.filter((c) => canAccessCamper(actor, c));
+      const persons = await personRepo.search(q);
+      const scoped = persons.filter((p) => isCamper(p) && canAccessPerson(actor, p));
 
       const results: SearchResult[] = [];
-      for (const camper of scoped) {
-        const { masked } = await getContactsForCamper(camper);
-        results.push({ camper, contacts: masked });
+      for (const person of scoped) {
+        const { masked } = await getContactsForPerson(person);
+        results.push({ camper: person, contacts: masked });
       }
       return results;
     },
 
     async resolveContacts(actor, camperId) {
       assertCan(actor, 'camper:read');
-      const camper = await camperRepo.findById(camperId);
-      if (!camper) throw new NotFoundError('Camper not found');
-      if (!canAccessCamper(actor, camper)) {
+      const person = await personRepo.findById(camperId);
+      if (!person || !isCamper(person)) throw new NotFoundError('Camper not found');
+      if (!canAccessPerson(actor, person)) {
         throw new NotFoundError('Camper not found');
       }
-      const { masked } = await getContactsForCamper(camper);
+      const { masked } = await getContactsForPerson(person);
       return masked;
     },
 
     async revealContact(actor, camperId, contactRole) {
       assertCan(actor, 'camper:read:sensitive');
-      const camper = await camperRepo.findById(camperId);
-      if (!camper) throw new NotFoundError('Camper not found');
-      if (!canAccessCamper(actor, camper)) {
+      const person = await personRepo.findById(camperId);
+      if (!person || !isCamper(person)) throw new NotFoundError('Camper not found');
+      if (!canAccessPerson(actor, person)) {
         throw new NotFoundError('Camper not found');
       }
-      const { masked, raw } = await getContactsForCamper(camper);
+      const { masked, raw } = await getContactsForPerson(person);
       const rawContact = raw.get(contactRole);
       if (!rawContact) throw new NotFoundError('Contact role not found');
       const maskedEntry = masked.find((m) => m.role === contactRole);

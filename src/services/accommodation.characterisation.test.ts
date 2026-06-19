@@ -4,13 +4,13 @@ import {
   InMemoryAccommodationRepository,
   InMemoryChurchRepository,
   InMemorySettingsRepository,
-  InMemoryRegistrantRepository,
+  InMemoryPersonRepository,
 } from '../repositories/in-memory';
 import type { AccommodationBlock } from '../core/entities/accommodation';
 import type { Church, AccommodationReservation } from '../core/entities/church';
 import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
-import type { Registrant } from '../core/entities/registrant';
+import type { Person } from '../core/entities/person';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
 
 // ---------------------------------------------------------------------------
@@ -55,23 +55,29 @@ function church(over: Partial<Church>): Church {
   };
 }
 
-function reg(over: Partial<Registrant>): Registrant {
+function reg(over: Partial<Person> & { status?: 'registered' | 'cancelled' }): Person {
   const now = new Date().toISOString();
+  const { status, ...rest } = over;
   return {
     id: 'r',
     firstName: 'A',
     lastName: 'B',
     gender: 'male',
-    kind: 'camper',
+    kind: 'youth',
     paymentStatus: 'unpaid',
-    blueCardCollected: false,
     churchId: 'c1',
     churchName: 'Victory',
     zone: 'Yellow',
-    status: 'registered',
+    lifecycle: status === 'cancelled' ? 'cancelled' : 'registered',
+    atCamp: false,
+    medicalConditions: [],
+    dietaryRequirements: [],
+    consents: { medical: { granted: false, timestamp: null }, media: { granted: false, timestamp: null }, supervision: { granted: false, timestamp: null } },
+    checkInHistory: [],
+    signOutHistory: [],
     createdAt: now,
     updatedAt: now,
-    ...over,
+    ...rest,
   };
 }
 
@@ -100,28 +106,28 @@ async function build(opts: {
   blocks?: AccommodationBlock[];
   churches?: Church[];
   settings?: CampSettings | null;
-  registrants?: Registrant[];
+  registrants?: Person[];
 } = {}): Promise<{
   svc: ReturnType<typeof makeAccommodationService>;
   blockRepo: InMemoryAccommodationRepository;
   churchRepo: InMemoryChurchRepository;
   settingsRepo: InMemorySettingsRepository;
-  registrantRepo: InMemoryRegistrantRepository;
+  personRepo: InMemoryPersonRepository;
 }> {
   const blockRepo = new InMemoryAccommodationRepository();
   const churchRepo = new InMemoryChurchRepository();
   const settingsRepo = new InMemorySettingsRepository();
-  const registrantRepo = new InMemoryRegistrantRepository();
+  const personRepo = new InMemoryPersonRepository();
   await blockRepo.init();
   await churchRepo.init();
   await settingsRepo.init();
-  await registrantRepo.init();
+  await personRepo.init();
   for (const b of opts.blocks ?? []) await blockRepo.save(b);
   for (const c of opts.churches ?? []) await churchRepo.save(c);
-  for (const r of opts.registrants ?? []) await registrantRepo.save(r);
+  for (const r of opts.registrants ?? []) await personRepo.save(r);
   if (opts.settings) await settingsRepo.saveSingleton(opts.settings);
-  const svc = makeAccommodationService(blockRepo, churchRepo, settingsRepo, registrantRepo);
-  return { svc, blockRepo, churchRepo, settingsRepo, registrantRepo };
+  const svc = makeAccommodationService(blockRepo, churchRepo, settingsRepo, personRepo);
+  return { svc, blockRepo, churchRepo, settingsRepo, personRepo };
 }
 
 // ---------------------------------------------------------------------------
@@ -228,13 +234,13 @@ describe('AccommodationService.getBlock', () => {
 // computeLiveTaken — exposed helper (this DOES count reservations-free occupancy)
 // ---------------------------------------------------------------------------
 describe('AccommodationService.computeLiveTaken (helper, not used by listBlocks)', () => {
-  it('starts from baseTaken and adds one per matching non-cancelled registrant', async () => {
+  it('starts from baseTaken and adds one per matching non-cancelled person', async () => {
     const { svc } = await build();
     const blocks = [
       block({ id: 'b1', kind: 'tent', name: 'Tent A', baseTaken: 1 }),
       block({ id: 'b2', kind: 'classroom', name: 'Room 1', baseTaken: 0 }),
     ];
-    const registrants = [
+    const persons = [
       reg({ id: 'r1', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
       reg({ id: 'r2', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
       reg({ id: 'r3', accommodationKind: 'classroom', accommodationLabel: 'Room 1', status: 'cancelled' }),
@@ -242,7 +248,7 @@ describe('AccommodationService.computeLiveTaken (helper, not used by listBlocks)
       reg({ id: 'r5', accommodationKind: 'tent', accommodationLabel: 'No Such' }), // no match
       reg({ id: 'r6', accommodationKind: null, accommodationLabel: null }), // unassigned
     ];
-    const taken = svc.computeLiveTaken(blocks, registrants);
+    const taken = svc.computeLiveTaken(blocks, persons);
     expect(taken.get('b1')).toBe(3); // baseTaken 1 + r1 + r2
     expect(taken.get('b2')).toBe(1); // baseTaken 0 + r4 (r3 cancelled, skipped)
   });

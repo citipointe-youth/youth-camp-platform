@@ -1,7 +1,8 @@
-import type { INotificationRepository, ICamperRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
+import type { INotificationRepository, IPersonRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
 import type { Notification } from '../core/entities/notification';
 import type { Actor } from '../core/entities/user';
 import { assertCanSendNotification } from './access-control';
+import { isCamper } from '../core/entities/person';
 import { CreateNotificationSchema } from '../core/validation/notification.schema';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
@@ -17,7 +18,7 @@ export interface NotificationService {
 
 export function makeNotificationService(
   notifRepo: INotificationRepository,
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
   churchRepo: IChurchRepository,
 ): NotificationService {
   // D4 FIX: estimate the audience as a count of non-cancelled CAMPERS for every
@@ -27,16 +28,16 @@ export function makeNotificationService(
   // campers present.
   async function estimateAudience(scope: string, zone?: string | null, churchId?: string | null): Promise<number> {
     if (scope === 'camp') {
-      const all = await camperRepo.findAll();
-      return all.filter((c) => c.status !== 'cancelled').length;
+      const all = await personRepo.findCampers();
+      return all.length; // findCampers() already excludes cancelled (lifecycle ∈ {arrived,checked_out,departed})
     }
     if (scope === 'zone' && zone) {
-      const zoned = await camperRepo.findByZone(zone);
-      return zoned.filter((c) => c.status !== 'cancelled').length;
+      const zoned = await personRepo.findByZone(zone);
+      return zoned.filter((p) => isCamper(p)).length;
     }
     if (scope === 'church' && churchId) {
-      const churchCampers = await camperRepo.findByChurch(churchId);
-      return churchCampers.filter((c) => c.status !== 'cancelled').length;
+      const churchPersons = await personRepo.findByChurch(churchId);
+      return churchPersons.filter((p) => isCamper(p)).length;
     }
     return 0;
   }

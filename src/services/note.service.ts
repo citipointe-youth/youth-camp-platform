@@ -1,7 +1,9 @@
-import type { INoteRepository, ICamperRepository } from '../repositories/interfaces/entity-repositories';
+import type { INoteRepository, IPersonRepository } from '../repositories/interfaces/entity-repositories';
 import type { StudentNote } from '../core/entities/note';
 import type { Actor } from '../core/entities/user';
-import { assertCan, canAccessCamper } from './access-control';
+import { assertCan } from './access-control';
+import { isCamper } from '../core/entities/person';
+import { canAccessPerson } from './person.service';
 import { NotFoundError } from '../core/errors/app-error';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
@@ -24,15 +26,15 @@ export interface NoteService {
 
 export function makeNoteService(
   noteRepo: INoteRepository,
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
 ): NoteService {
   return {
     async add(actor, input) {
       assertCan(actor, 'note:write');
       const data = AddNoteSchema.parse(input);
-      const camper = await camperRepo.findById(data.camperId);
-      if (!camper) throw new NotFoundError('Camper not found');
-      if (!canAccessCamper(actor, camper)) throw new NotFoundError('Camper not found');
+      const camper = await personRepo.findById(data.camperId);
+      if (!camper || !isCamper(camper)) throw new NotFoundError('Camper not found');
+      if (!canAccessPerson(actor, camper)) throw new NotFoundError('Camper not found');
 
       const note: StudentNote = {
         id: newId('note'),
@@ -50,9 +52,9 @@ export function makeNoteService(
 
     async forCamper(actor, camperId) {
       assertCan(actor, 'note:write');
-      const camper = await camperRepo.findById(camperId);
-      if (!camper) throw new NotFoundError('Camper not found');
-      if (!canAccessCamper(actor, camper)) throw new NotFoundError('Camper not found');
+      const camper = await personRepo.findById(camperId);
+      if (!camper || !isCamper(camper)) throw new NotFoundError('Camper not found');
+      if (!canAccessPerson(actor, camper)) throw new NotFoundError('Camper not found');
       return noteRepo.findByCamper(camperId);
     },
 
@@ -61,9 +63,9 @@ export function makeNoteService(
       const notes = await noteRepo.findRecent(limit * 3); // fetch more, then filter
       const result: StudentNote[] = [];
       for (const note of notes) {
-        const camper = await camperRepo.findById(note.camperId);
-        if (!camper) continue;
-        if (!canAccessCamper(actor, camper)) continue;
+        const camper = await personRepo.findById(note.camperId);
+        if (!camper || !isCamper(camper)) continue;
+        if (!canAccessPerson(actor, camper)) continue;
         result.push(note);
         if (result.length >= limit) break;
       }
@@ -76,9 +78,9 @@ export function makeNoteService(
       const headers = ['Time', 'Student', 'Logged by', 'Church', 'Gender', 'Grade', 'Category', 'Note'];
       const rows: string[][] = [];
       for (const note of notes) {
-        const camper = await camperRepo.findById(note.camperId);
-        if (!camper) continue;
-        if (!canAccessCamper(actor, camper)) continue;
+        const camper = await personRepo.findById(note.camperId);
+        if (!camper || !isCamper(camper)) continue;
+        if (!canAccessPerson(actor, camper)) continue;
         rows.push([
           note.createdAt,
           `${camper.firstName} ${camper.lastName}`,

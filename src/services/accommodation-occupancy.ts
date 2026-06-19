@@ -26,7 +26,8 @@ import type { AccommodationBlock } from '../core/entities/accommodation';
 export interface AccommodationOccupant {
   accommodationKind?: string | null;
   accommodationLabel?: string | null;
-  status?: string | null; // 'cancelled' occupants are excluded
+  status?: string | null; // 'cancelled' occupants are excluded (Registrant/legacy)
+  lifecycle?: string | null; // 'cancelled' occupants are excluded (Person/unified)
 }
 
 /** Map of blockId -> live taken count (baseTaken + matching non-cancelled occupants). */
@@ -39,7 +40,7 @@ export function computeLiveTaken(
     taken.set(block.id, block.baseTaken);
   }
   for (const o of occupants) {
-    if (o.status === 'cancelled') continue;
+    if (o.status === 'cancelled' || o.lifecycle === 'cancelled') continue;
     if (!o.accommodationLabel) continue;
     for (const block of blocks) {
       if (block.kind === o.accommodationKind && block.name === o.accommodationLabel) {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeImportService } from './import.service';
-import { InMemoryCamperRepository, InMemoryChurchRepository } from '../repositories/in-memory';
+import { InMemoryPersonRepository, InMemoryChurchRepository } from '../repositories/in-memory';
 import type { Church } from '../core/entities/church';
 import type { Actor } from '../core/entities/user';
 import { ForbiddenError, BadRequestError } from '../core/errors/app-error';
@@ -25,13 +25,13 @@ function church(over: Partial<Church>): Church {
 }
 
 async function build(churches: Church[] = [church({ id: 'c1', name: 'Victory' })]) {
-  const camperRepo = new InMemoryCamperRepository();
+  const personRepo = new InMemoryPersonRepository();
   const churchRepo = new InMemoryChurchRepository();
-  await camperRepo.init();
+  await personRepo.init();
   await churchRepo.init();
   for (const c of churches) await churchRepo.save(c);
-  const svc = makeImportService(camperRepo, churchRepo);
-  return { svc, camperRepo, churchRepo };
+  const svc = makeImportService(personRepo, churchRepo);
+  return { svc, personRepo, churchRepo };
 }
 
 describe('ImportService.importCsv — RBAC + validation', () => {
@@ -56,7 +56,7 @@ describe('ImportService.importCsv — create / counts', () => {
     const csv = 'First Name,Last Name,Church,Zone,Grade\nAda,Lovelace,Victory,Yellow,9\nGrace,Hopper,Victory,Yellow,8';
     const res = await h.svc.importCsv(actor('admin'), { csvData: csv });
     expect(res).toMatchObject({ created: 2, updated: 0, skipped: 0 });
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(2);
     expect(all.every((c) => c.churchId === 'c1')).toBe(true);
   });
@@ -74,7 +74,7 @@ describe('ImportService.importCsv — create / counts', () => {
     const csv = 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,9\nAda,Lovelace,Victory,11';
     const res = await h.svc.importCsv(actor('admin'), { csvData: csv });
     expect(res.created).toBe(1); // not 2 — same person de-duped
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(1);
     expect(all[0]!.grade).toBe(11); // last row wins
   });
@@ -91,7 +91,7 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
       'Sam,Lee,Victory,0400 222 222,11';
     const res = await h.svc.importCsv(actor('admin'), { csvData: csv });
     expect(res.created).toBe(2); // distinct phones => two distinct people
-    expect((await h.camperRepo.findAll())).toHaveLength(2);
+    expect((await h.personRepo.findAll())).toHaveLength(2);
   });
 
   it('treats same name + same church + same phone as ONE person (collapsed)', async () => {
@@ -101,7 +101,7 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
       'Sam,Lee,Victory,0400111111,11'; // same digits, different formatting
     const res = await h.svc.importCsv(actor('admin'), { csvData: csv });
     expect(res.created).toBe(1);
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(1);
     expect(all[0]!.grade).toBe(11);
   });
@@ -113,7 +113,7 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
       updateExisting: true,
     });
     expect(res).toMatchObject({ created: 0, updated: 1 });
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(1);
     expect(all[0]!.grade).toBe(12);
   });
@@ -130,7 +130,7 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
       updateExisting: true,
     });
     expect(res).toMatchObject({ created: 0, updated: 1 });
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(2);
     const twin1 = all.find((c) => (c.mobile ?? '').replace(/\D/g, '') === '0400111111');
     const twin2 = all.find((c) => (c.mobile ?? '').replace(/\D/g, '') === '0400222222');
@@ -145,7 +145,7 @@ describe('ImportService.importCsv — updateExisting', () => {
     await h.svc.importCsv(actor('admin'), { csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,9' });
     const res = await h.svc.importCsv(actor('admin'), { csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,12' });
     expect(res).toMatchObject({ created: 0, updated: 0, skipped: 1 });
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all[0]!.grade).toBe(9); // unchanged
   });
 
@@ -154,7 +154,7 @@ describe('ImportService.importCsv — updateExisting', () => {
     await h.svc.importCsv(actor('admin'), { csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,9' });
     const res = await h.svc.importCsv(actor('admin'), { csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,12', updateExisting: true });
     expect(res).toMatchObject({ created: 0, updated: 1, skipped: 0 });
-    const all = await h.camperRepo.findAll();
+    const all = await h.personRepo.findAll();
     expect(all).toHaveLength(1);
     expect(all[0]!.grade).toBe(12);
   });

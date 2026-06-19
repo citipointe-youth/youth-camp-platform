@@ -1,6 +1,5 @@
 import type {
-  IRegistrantRepository,
-  ICamperRepository,
+  IPersonRepository,
   IAccommodationRepository,
   INotificationRepository,
   IScheduleRepository,
@@ -10,7 +9,8 @@ import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
 import { daysUntil, zonedNow } from '../utils/date';
 import { computeLiveTaken } from './accommodation-occupancy';
-import { canAccessCamper } from './access-control';
+import { isRegistrant, isCamper } from '../core/entities/person';
+import { canAccessPerson } from './person.service';
 
 export interface PreCampDashboard {
   mode: 'pre-camp';
@@ -60,8 +60,7 @@ export interface DashboardService {
 }
 
 export function makeDashboardService(
-  registrantRepo: IRegistrantRepository,
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
   accommodationRepo: IAccommodationRepository,
   notifRepo: INotificationRepository,
   scheduleRepo: IScheduleRepository,
@@ -71,21 +70,21 @@ export function makeDashboardService(
     async home(actor, settings) {
       if (settings.campMode === 'pre-camp') {
         // Pre-camp dashboard
-        const allRegistrants = await registrantRepo.findAll();
-        const scoped = allRegistrants.filter((r) => {
-          if (r.status === 'cancelled') return false;
+        const allPersons = await personRepo.findAll();
+        const scoped = allPersons.filter((p) => {
+          if (!isRegistrant(p)) return false;
           if (actor.role === 'admin' || actor.role === 'director') return true;
-          if (actor.role === 'zoneLeader') return actor.zone != null && r.zone === actor.zone;
-          return r.churchId === actor.churchId;
+          if (actor.role === 'zoneLeader') return actor.zone != null && p.zone === actor.zone;
+          return p.churchId === actor.churchId;
         });
 
-        const unpaidCount = scoped.filter((r) => r.paymentStatus === 'unpaid').length;
-        const noBlueCardCount = scoped.filter((r) => r.kind === 'leader' && !r.blueCardCollected).length;
+        const unpaidCount = scoped.filter((p) => p.paymentStatus === 'unpaid').length;
+        const noBlueCardCount = scoped.filter((p) => p.kind === 'leader' && p.blueCardNumber == null).length;
 
         // B1 FIX: accommodation summary now reflects assigned occupants, not just
         // baseTaken — via the shared occupancy module (accommodation-occupancy.ts).
         const blocks = await accommodationRepo.findAll();
-        const takenByBlock = computeLiveTaken(blocks, allRegistrants);
+        const takenByBlock = computeLiveTaken(blocks, allPersons);
         const accommodationSummary = blocks.map((b) => {
           const taken = takenByBlock.get(b.id) ?? b.baseTaken;
           return {
@@ -105,8 +104,8 @@ export function makeDashboardService(
           startDate: settings.startDate,
           daysToGo: daysUntil(settings.startDate, settings.timezone),
           totalRegistrants: scoped.length,
-          totalCampers: scoped.filter((r) => r.kind === 'camper').length,
-          totalLeaders: scoped.filter((r) => r.kind === 'leader').length,
+          totalCampers: scoped.filter((p) => p.kind === 'youth').length,
+          totalLeaders: scoped.filter((p) => p.kind === 'leader').length,
           unpaidCount,
           noBlueCardCount,
           accommodationSummary,
@@ -115,14 +114,14 @@ export function makeDashboardService(
         if (actor.role === 'admin' || actor.role === 'director') {
           const churches = await churchRepo.findAll();
           const breakdown = churches.map((ch) => {
-            const churchRegs = scoped.filter((r) => r.churchId === ch.id);
+            const churchRegs = scoped.filter((p) => p.churchId === ch.id);
             return {
               churchId: ch.id,
               churchName: ch.name,
               zone: ch.zone,
               registrants: churchRegs.length,
-              unpaid: churchRegs.filter((r) => r.paymentStatus === 'unpaid').length,
-              noBlueCard: churchRegs.filter((r) => r.kind === 'leader' && !r.blueCardCollected).length,
+              unpaid: churchRegs.filter((p) => p.paymentStatus === 'unpaid').length,
+              noBlueCard: churchRegs.filter((p) => p.kind === 'leader' && p.blueCardNumber == null).length,
             };
           });
           dashboard.perChurchBreakdown = breakdown;
@@ -135,9 +134,10 @@ export function makeDashboardService(
         // zoneLeader → own zone, director/admin → all). Previously totalExpected /
         // checkInsDue counted the WHOLE camp for every role, so a church login saw
         // camp-wide figures presented as its own.
-        const allCampers = (await camperRepo.findAll()).filter((c) => canAccessCamper(actor, c));
-        const totalAtCamp = allCampers.filter((c) => c.atCamp).length;
-        const totalExpected = allCampers.filter((c) => c.status !== 'cancelled').length;
+        const allPersons = await personRepo.findAll();
+        const allCampers = allPersons.filter((p) => isCamper(p) && canAccessPerson(actor, p));
+        const totalAtCamp = allCampers.filter((p) => p.atCamp).length;
+        const totalExpected = allCampers.length; // isCamper already excludes cancelled
 
         // Get check-in sessions for today. B3 FIX: today + now from the camp timezone.
         const { date: todayStr, time: nowTime } = zonedNow(settings.timezone || 'Australia/Brisbane');
@@ -165,9 +165,8 @@ export function makeDashboardService(
         // Previously any 'in' for ANY of today's sessions marked them done for the
         // whole day — wrong for a twice-daily camp.
         const checkInsDue = currentSession
-          ? allCampers.filter((c) => {
-              if (c.status === 'cancelled') return false;
-              const entries = c.checkInHistory.filter((e) => e.sessionId === currentSession.id);
+          ? allCampers.filter((p) => {
+              const entries = p.checkInHistory.filter((e) => e.sessionId === currentSession.id);
               const last = entries[entries.length - 1];
               return last?.type !== 'in';
             }).length

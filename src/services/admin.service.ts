@@ -1,8 +1,7 @@
 import type {
   IUserRepository,
   IChurchRepository,
-  IRegistrantRepository,
-  ICamperRepository,
+  IPersonRepository,
   IAccommodationRepository,
   IFaqRepository,
   IScheduleRepository,
@@ -37,8 +36,7 @@ export interface AdminService {
 export function makeAdminService(
   userRepo: IUserRepository,
   churchRepo: IChurchRepository,
-  registrantRepo: IRegistrantRepository,
-  camperRepo: ICamperRepository,
+  personRepo: IPersonRepository,
   accommodationRepo: IAccommodationRepository,
   faqRepo: IFaqRepository,
   scheduleRepo: IScheduleRepository,
@@ -70,8 +68,7 @@ export function makeAdminService(
       if (actor.role !== 'admin') throw new ForbiddenError('Only admin can reset data');
 
       await Promise.all([
-        registrantRepo.deleteAll(),
-        camperRepo.deleteAll(),
+        personRepo.deleteAll(),
         churchRepo.deleteAll(),
         accommodationRepo.deleteAll(),
         faqRepo.deleteAll(),
@@ -131,8 +128,7 @@ export function makeAdminService(
 
       // Purge this year's people + transient data.
       await Promise.all([
-        registrantRepo.deleteAll(),
-        camperRepo.deleteAll(),
+        personRepo.deleteAll(),
         noteRepo.deleteAll(),
         notifRepo.deleteAll(),
       ]);
