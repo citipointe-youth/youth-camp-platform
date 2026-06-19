@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "description": "Youth Camp Platform — combined pre-camp Hub + on-ground Leaders Portal. Admin can switch the app between modes. Platform-agnostic (in-memory + JSON persistence).",
-  "type": "module",
   "engines": {
     "node": ">=20"
   },
