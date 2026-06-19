@@ -18,6 +18,22 @@ import {
   InMemorySnapshotRepository,
 } from './repositories/in-memory';
 import { JsonFilePersistence } from './repositories/persistence';
+import {
+  SupabaseUserRepository,
+  SupabaseChurchRepository,
+  SupabasePersonRepository,
+  SupabaseAccommodationRepository,
+  SupabaseZoneRepository,
+  SupabaseGroupRepository,
+  SupabaseNoteRepository,
+  SupabaseNotificationRepository,
+  SupabaseScheduleRepository,
+  SupabaseDevotionalRepository,
+  SupabaseFaqRepository,
+  SupabaseSettingsRepository,
+  SupabaseDefaultsRepository,
+} from './repositories/supabase';
+import { getSqlClient } from './repositories/supabase/client';
 import type {
   IUserRepository,
   IChurchRepository,
@@ -108,6 +124,63 @@ function makeJsonPersistence<T>(filename: string) {
 
 export async function buildContainer(): Promise<Container> {
   // ----- Repositories -----
+
+  // Supabase production backend — all repos share one pooled SQL client.
+  if (env.PERSISTENCE === 'supabase') {
+    const sql = getSqlClient();
+    const users: IUserRepository = new SupabaseUserRepository(sql);
+    const churches: IChurchRepository = new SupabaseChurchRepository(sql);
+    const people: IPersonRepository = new SupabasePersonRepository(sql);
+    const accommodationRepo: IAccommodationRepository = new SupabaseAccommodationRepository(sql);
+    const zones: IZoneRepository = new SupabaseZoneRepository(sql);
+    const groups: IGroupRepository = new SupabaseGroupRepository(sql);
+    const notes: INoteRepository = new SupabaseNoteRepository(sql);
+    const notifications: INotificationRepository = new SupabaseNotificationRepository(sql);
+    const scheduleRepo: IScheduleRepository = new SupabaseScheduleRepository(sql);
+    const devotionals: IDevotionalRepository = new SupabaseDevotionalRepository(sql);
+    const faqs: IFaqRepository = new SupabaseFaqRepository(sql);
+    const settingsRepo: ISettingsRepository = new SupabaseSettingsRepository(sql);
+    const snapshots: ISnapshotRepository = new SupabaseDefaultsRepository(sql);
+
+    const repos: Repositories = {
+      users, churches, people, accommodation: accommodationRepo,
+      zones, groups, notes, notifications, schedule: scheduleRepo,
+      devotionals, faqs, settings: settingsRepo, snapshots,
+    };
+
+    await Promise.all([
+      users.init(), churches.init(), people.init(), accommodationRepo.init(),
+      zones.init(), groups.init(), notes.init(), notifications.init(),
+      scheduleRepo.init(), devotionals.init(), faqs.init(), settingsRepo.init(), snapshots.init(),
+    ]);
+
+    const auth = makeAuthService(users);
+    const settings = makeSettingsService(settingsRepo);
+    const personSvc = makePersonService(people);
+    const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
+    const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
+    const notification = makeNotificationService(notifications, people, churches);
+    const search = makeSearchService(people, churches);
+    const note = makeNoteService(notes, people);
+    const schedule = makeScheduleService(scheduleRepo);
+    const content = makeContentService(faqs, devotionals);
+    const importSvc = makeImportService(people, churches);
+    const account = makeAccountService(users, churches);
+    const dashboard = makeDashboardService(people, accommodationRepo, notifications, scheduleRepo, churches);
+    const admin = makeAdminService(
+      users, churches, people, accommodationRepo, faqs, scheduleRepo,
+      notifications, notes, devotionals, settingsRepo, snapshots,
+    );
+
+    const services: Services = {
+      auth, settings, person: personSvc, accommodation: accommodationSvc,
+      checkIn, notification, search, note, schedule, content,
+      importService: importSvc, account, dashboard, admin, users,
+    };
+
+    return { repos, services };
+  }
+
   const useJson = env.PERSISTENCE === 'json';
 
   const users: IUserRepository = new InMemoryUserRepository(

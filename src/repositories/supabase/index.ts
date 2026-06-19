@@ -1,0 +1,13 @@
+export { SupabaseUserRepository } from './supabase.users';
+export { SupabaseChurchRepository } from './supabase.churches';
+export { SupabasePersonRepository } from './supabase.people';
+export { SupabaseAccommodationRepository } from './supabase.accommodation';
+export { SupabaseZoneRepository } from './supabase.zones';
+export { SupabaseGroupRepository } from './supabase.groups';
+export { SupabaseNoteRepository } from './supabase.notes';
+export { SupabaseNotificationRepository } from './supabase.notifications';
+export { SupabaseScheduleRepository } from './supabase.schedule';
+export { SupabaseDevotionalRepository } from './supabase.devotionals';
+export { SupabaseFaqRepository } from './supabase.faqs';
+export { SupabaseSettingsRepository } from './supabase.settings';
+export { SupabaseDefaultsRepository } from './supabase.defaults';
