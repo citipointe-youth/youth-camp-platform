@@ -6,7 +6,7 @@ const APP_SHELL = ['/'];
 // through to the cache-first asset path below and can get the SPA's HTML cached under
 // that URL — which then breaks JSON parsing ("unexpected token <"). When you add a new
 // top-level API route to the backend, add it here AND bump CACHE above.
-const API_RE = /^\/(auth|home|settings|admin|registrants|accommodation|campers|checkin|attendance|notes|search|notifications|schedule|faq|devotional|import|accounts|health)(\/|$|\?)/;
+const API_RE = /^\/(auth|home|settings|admin|registrants|accommodation|campers|checkin|attendance|notes|search|notifications|schedule|faq|devotional|import|accounts|health|setup)(\/|$|\?)/;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

@@ -1,5 +1,7 @@
 import type { Route } from './types';
 import type { Services } from '../../container';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../core/errors/app-error';
+import { hashPassword } from '../../utils/crypto';
 import { makeAuthController } from '../controllers/auth.controller';
 import { makeDashboardController } from '../controllers/dashboard.controller';
 import { makeRegistrantController } from '../controllers/registrant.controller';
@@ -36,6 +38,20 @@ export function buildRoutes(services: Services): Route[] {
   const admin = makeAdminController({ admin: services.admin });
 
   return [
+    // ----- First-run admin setup (permanently disabled once admin has a password) -----
+    { method: 'POST', path: '/setup', auth: false, handler: async (req) => {
+      const body = req.body as { username?: string; password?: string };
+      if (!body.username || !body.password) throw new BadRequestError('username and password required');
+      if (body.password.length < 8) throw new BadRequestError('Password must be at least 8 characters');
+      const admins = await services.users.findByRole('admin');
+      const admin = admins[0];
+      if (!admin) throw new NotFoundError('No admin account found — run migrations first');
+      if (admin.passwordHash) throw new ForbiddenError('Admin password already set');
+      const hash = await hashPassword(body.password);
+      await services.users.save({ ...admin, username: body.username, passwordHash: hash });
+      return { ok: true };
+    }},
+
     // ----- Auth -----
     { method: 'POST', path: '/auth/login', auth: false, handler: (r) => auth.login(r) },
     { method: 'GET', path: '/auth/me', auth: true, handler: (r) => auth.me(r) },
