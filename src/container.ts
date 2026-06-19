@@ -214,7 +214,7 @@ export async function buildContainer(): Promise<Container> {
   const registrantSvc = makeRegistrantService(registrants);
   const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, registrants);
   const camper = makeCamperService(campers);
-  const checkIn = makeCheckInService(scheduleRepo, campers, settingsRepo);
+  const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
   const notification = makeNotificationService(notifications, campers, churches);
   const search = makeSearchService(campers, churches);
   const note = makeNoteService(notes, campers);

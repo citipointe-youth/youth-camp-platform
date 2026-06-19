@@ -22,13 +22,13 @@ export function buildRoutes(services: Services): Route[] {
   const dashboard = makeDashboardController({ dashboard: services.dashboard, settings: services.settings });
   const registrant = makeRegistrantController({ person: services.person });
   const accommodation = makeAccommodationController({ accommodation: services.accommodation });
-  const camper = makeCamperController({ camper: services.camper });
-  const checkIn = makeCheckInController({ checkIn: services.checkIn });
+  const camper = makeCamperController({ person: services.person });
+  const checkIn = makeCheckInController({ checkIn: services.checkIn, person: services.person });
   const search = makeSearchController({ search: services.search });
   const notification = makeNotificationController({ notification: services.notification });
   const schedule = makeScheduleController({ schedule: services.schedule });
   const note = makeNoteController({ note: services.note });
-  const attendance = makeAttendanceController({ attendance: services.attendance });
+  const attendance = makeAttendanceController({ person: services.person });
   const content = makeContentController({ content: services.content });
   const importCtrl = makeImportController({ importService: services.importService });
   const account = makeAccountController({ account: services.account });
@@ -76,7 +76,6 @@ export function buildRoutes(services: Services): Route[] {
 
     // ----- Campers (at-camp / Portal) -----
     { method: 'GET', path: '/campers', auth: true, handler: (r) => camper.list(r) },
-    { method: 'POST', path: '/campers', auth: true, handler: (r) => camper.create(r) },
     { method: 'GET', path: '/campers/:id', auth: true, handler: (r) => camper.get(r) },
     { method: 'PATCH', path: '/campers/:id', auth: true, handler: (r) => camper.update(r) },
 
