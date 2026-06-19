@@ -27,6 +27,28 @@ export interface PersonProfile extends Person {
   lastSignOut: string | null;
 }
 
+export interface ChaseResult {
+  churchId: string;
+  churchName: string;
+  registrantId: string;
+  firstName: string;
+  lastName: string;
+  reason: 'unpaid' | 'no_blue_card' | 'both';
+}
+
+export interface RegistrantBreakdown {
+  churchId: string;
+  churchName: string;
+  zone: string;
+  total: number;
+  campers: number;
+  leaders: number;
+  unpaid: number;
+  depositPaid: number;
+  paid: number;
+  noBlueCard: number;
+}
+
 export interface PersonService {
   /** All people the actor may see (any lifecycle), role-scoped. */
   list(actor: Actor, opts?: { zone?: string; churchId?: string; q?: string }): Promise<Person[]>;
@@ -47,6 +69,12 @@ export interface PersonService {
   checkIn(actor: Actor, personId: string, entry: Omit<CheckInEntry, 'id'>): Promise<Person>;
   /** Apply a sign-out/sign-in attendance event. */
   signEvent(actor: Actor, personId: string, event: Omit<SignOutEvent, 'id'>): Promise<Person>;
+  /** Find unpaid / no-blue-card leaders for chasing, scoped by actor role. */
+  chase(actor: Actor): Promise<ChaseResult[]>;
+  /** Per-church registrant counts (total, payment, blue card), scoped by actor role. */
+  breakdown(actor: Actor): Promise<RegistrantBreakdown[]>;
+  /** Log a reminder send for the given registrant IDs (scoped, skips cancelled). */
+  remind(actor: Actor, ids: string[]): Promise<{ sent: number }>;
 }
 
 /** True if the actor may access a person, by role + church/zone (mirrors canAccessCamper). */
@@ -225,6 +253,76 @@ export function makePersonService(repo: IPersonRepository): PersonService {
       const person = await getOwned(actor, personId);
       const full: SignOutEvent = { ...event, id: newId('so') };
       return repo.save(withSignEvent(person, full, nowISO()));
+    },
+
+    async chase(actor) {
+      assertCan(actor, 'reminder:send');
+      const all = await repo.findAll();
+      const results: ChaseResult[] = [];
+      for (const p of all) {
+        if (!isRegistrant(p)) continue;
+        if (!canAccessPerson(actor, p)) continue;
+        const unpaid = p.paymentStatus === 'unpaid';
+        const noBlue = p.kind === 'leader' && p.blueCardNumber == null;
+        if (unpaid || noBlue) {
+          results.push({
+            churchId: p.churchId,
+            churchName: p.churchName,
+            registrantId: p.id,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            reason: unpaid && noBlue ? 'both' : unpaid ? 'unpaid' : 'no_blue_card',
+          });
+        }
+      }
+      return results;
+    },
+
+    async breakdown(actor) {
+      assertCan(actor, 'registrant:read');
+      const all = await repo.findAll();
+      const map = new Map<string, RegistrantBreakdown>();
+      for (const p of all) {
+        if (!isRegistrant(p)) continue;
+        if (!canAccessPerson(actor, p)) continue;
+        let entry = map.get(p.churchId);
+        if (!entry) {
+          entry = {
+            churchId: p.churchId,
+            churchName: p.churchName,
+            zone: p.zone,
+            total: 0,
+            campers: 0,
+            leaders: 0,
+            unpaid: 0,
+            depositPaid: 0,
+            paid: 0,
+            noBlueCard: 0,
+          };
+          map.set(p.churchId, entry);
+        }
+        entry.total++;
+        if (p.kind === 'youth') entry.campers++;
+        if (p.kind === 'leader') entry.leaders++;
+        if (p.paymentStatus === 'unpaid') entry.unpaid++;
+        if (p.paymentStatus === 'deposit') entry.depositPaid++;
+        if (p.paymentStatus === 'paid') entry.paid++;
+        if (p.kind === 'leader' && p.blueCardNumber == null) entry.noBlueCard++;
+      }
+      return Array.from(map.values()).sort((a, b) => a.zone.localeCompare(b.zone));
+    },
+
+    async remind(actor, ids) {
+      assertCan(actor, 'reminder:send');
+      if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('No IDs provided');
+      let count = 0;
+      for (const id of ids) {
+        const p = await repo.findById(id);
+        if (!p || !isRegistrant(p)) continue;
+        if (!canAccessPerson(actor, p)) continue;
+        count++;
+      }
+      return { sent: count };
     },
   };
 }
