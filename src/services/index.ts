@@ -9,6 +9,8 @@ export * from './note.service';
 export * from './schedule.service';
 export * from './content.service';
 export * from './import.service';
+export * from './elvanto-mapping';
+export * from './export.service';
 export * from './account.service';
 export * from './dashboard.service';
 export * from './admin.service';

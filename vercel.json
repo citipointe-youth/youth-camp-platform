@@ -1,17 +1,11 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/index.ts", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/sw.js", "dest": "/public/sw.js" },
-    { "src": "/manifest.json", "dest": "/public/manifest.json" },
-    { "src": "/icons/(.*)", "dest": "/public/icons/$1" },
-    {
-      "src": "/(auth|home|settings|admin|registrants|accommodation|campers|checkin|attendance|notes|search|notifications|schedule|faq|devotional|import|accounts|health|setup)(.*)",
-      "dest": "/api/index.ts"
-    },
-    { "src": "/(.*)", "dest": "/public/index.html" }
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "public/**",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
   ]
 }

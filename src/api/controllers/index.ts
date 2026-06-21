@@ -11,6 +11,7 @@ export * from './note.controller';
 export * from './attendance.controller';
 export * from './content.controller';
 export * from './import.controller';
+export * from './export.controller';
 export * from './account.controller';
 export * from './settings.controller';
 export * from './admin.controller';

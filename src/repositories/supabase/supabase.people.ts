@@ -7,7 +7,7 @@
 import type { SqlClient, TxClient } from './client';
 import type { IPersonRepository } from '../interfaces/entity-repositories';
 import type { Person } from '../../core/entities/person';
-import type { CheckInEntry, SignOutEvent } from '../../core/entities/person';
+import type { CheckInEntry, SignOutEvent, ElvantoMeta } from '../../core/entities/person';
 import { isCamper } from '../../core/entities/person';
 import { chunk } from './bulk';
 
@@ -71,6 +71,9 @@ function toPerson(
     medicalConditions: (row['medical_conditions'] as string[] | null) ?? [],
     dietaryRequirements: (row['dietary_requirements'] as string[] | null) ?? [],
     otherMedications: (row['other_medications'] as string | null) ?? null,
+    medicareNumber: (row['medicare_number'] as string | null) ?? null,
+    churchUnlistedNote: (row['church_unlisted_note'] as string | null) ?? null,
+    elvantoMeta: (row['elvanto_meta'] as ElvantoMeta | null) ?? null,
     parentGuardianName: (row['parent_guardian_name'] as string | null) ?? null,
     parentPhone: (row['parent_phone'] as string | null) ?? null,
     parentRelation: (row['parent_relation'] as string | null) ?? null,
@@ -259,6 +262,9 @@ function personColumns(p: Person): Record<string, unknown> {
     medical_conditions: p.medicalConditions,
     dietary_requirements: p.dietaryRequirements,
     other_medications: p.otherMedications ?? null,
+    medicare_number: p.medicareNumber ?? null,
+    church_unlisted_note: p.churchUnlistedNote ?? null,
+    elvanto_meta: p.elvantoMeta ?? null,
     parent_guardian_name: p.parentGuardianName ?? null,
     parent_phone: p.parentPhone ?? null,
     parent_relation: p.parentRelation ?? null,

@@ -193,6 +193,7 @@ textarea{min-height:78px;resize:vertical;}
     <section class="screen" id="adminSettings"></section>
     <section class="screen" id="adminData"></section>
     <section class="screen" id="import"></section>
+    <section class="screen" id="data"></section>
     <section class="screen" id="adminDevos"></section>
     <section class="screen" id="adminFaqEdit"></section>
     <section class="screen" id="adminSchedEdit"></section>
@@ -354,6 +355,7 @@ const TAB_OF={home:'home',codes:'home',people:'people',student:'people',help:'he
   admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
   adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
   checkin:'checkin',search:'search',notifs:'notifs',compose:'notifs',
+  data:'data',
   camper:'home',myyouth:'home',firstday:'home',schedule:'home',devotional:'home',faq:'home',notes:'home',testimonies:'home',budget:'home',accom:'home',import:'home'};
 
 function _showScreen(id){
@@ -409,6 +411,7 @@ function buildTabs(){
   let tabs;
   if(CAMP_MODE==='pre-camp'){
     tabs=[['home','home','Home'],['people','users','My Youth']];
+    if(ACTOR&&['director','admin'].includes(ACTOR.role))tabs.push(['data','users','Data']);
     if(ACTOR&&ACTOR.role==='admin'){tabs.push(['notifs','bell','Notices']);tabs.push(['admin','gear','Admin']);}
     else{tabs.push(['help','help','Help']);tabs.push(['notifs','bell','Notices']);}
   }else{
@@ -1362,6 +1365,79 @@ RENDER.import=function(){
     <p class="note-hint">Matches existing students by name (and phone when names clash) — adds new ones and updates changed fields.</p>
     <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`,'Import students','CSV upload');
 };
+
+/* ===== DATA (director/admin): filterable registration table + Elvanto-format export ===== */
+let _dataCache=null; // cached /registrants for client-side filtering
+RENDER.data=async function(){
+  if(!['director','admin'].includes(ACTOR.role)){paint('data','<p class="note-hint">This area is restricted to directors and admins.</p>','Data','');return;}
+  const [regs,churches]=await Promise.all([
+    api('/registrants').catch(()=>[]),
+    api('/accounts/churches').catch(()=>[]),
+  ]);
+  _dataCache=regs||[];
+  const chOpts=['<option value="">All churches</option>'].concat(
+    (churches||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`)).join('');
+  const gradeOpts=['<option value="">All grades</option>','<option value="leader">Leaders</option>']
+    .concat([7,8,9,10,11,12].map(g=>`<option value="${g}">Grade ${g}</option>`)).join('');
+  paint('data',`<div class="card">
+    <div class="h3" style="margin-top:0">Registration data</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <select class="fld" id="dfCh" style="flex:1;min-width:140px" onchange="dataApply()">${chOpts}</select>
+      <select class="fld" id="dfGen" style="flex:1;min-width:110px" onchange="dataApply()">
+        <option value="">All genders</option><option value="male">Male</option><option value="female">Female</option></select>
+      <select class="fld" id="dfGr" style="flex:1;min-width:120px" onchange="dataApply()">${gradeOpts}</select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="dataExport(true)">Export filtered</button>
+      <button class="btn ghost" onclick="dataExport(false)">Export all</button>
+    </div>
+    <div id="dataCount" class="note-hint" style="margin-top:6px"></div>
+    <div style="overflow-x:auto;margin-top:8px"><table id="dataTbl" style="min-width:860px;border-collapse:collapse;font-size:.8rem"></table></div>
+  </div>`,'Data','Registrations');
+  dataApply();
+};
+function dataFilters(){
+  return {
+    churchId:document.getElementById('dfCh')?.value||'',
+    gender:document.getElementById('dfGen')?.value||'',
+    grade:document.getElementById('dfGr')?.value||'',
+  };
+}
+function dataApply(){
+  const f=dataFilters();const rows=(_dataCache||[]).filter(r=>{
+    if(f.churchId&&r.churchId!==f.churchId)return false;
+    if(f.gender&&r.gender!==f.gender)return false;
+    if(f.grade==='leader'){if(r.kind!=='leader')return false;}
+    else if(f.grade){if(r.kind==='leader'||String(r.grade??'')!==f.grade)return false;}
+    return true;
+  });
+  const hdr=['Name','Church','Gender','Grade','Mobile','Medical','Dietary','Other','Blue card'];
+  const td=v=>`<td style="border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(v||'—')}</td>`;
+  const body=rows.map(r=>{
+    const grade=r.kind==='leader'?'Leader':(r.grade??'—');
+    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.mobile)}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
+  }).join('');
+  const t=document.getElementById('dataTbl');
+  if(t)t.innerHTML=`<thead><tr>${hdr.map(h=>`<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted)">${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="9" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
+  const c=document.getElementById('dataCount');if(c)c.textContent=`${rows.length} of ${(_dataCache||[]).length} registrants`;
+}
+async function dataExport(filtered){
+  try{
+    let qs='';
+    if(filtered){const f=dataFilters();const params=new URLSearchParams();
+      if(f.churchId)params.set('churchId',f.churchId);
+      if(f.gender)params.set('gender',f.gender);
+      if(f.grade==='leader')params.set('kind','leader');
+      else if(f.grade)params.set('grade',f.grade);
+      const s=params.toString();if(s)qs='?'+s;}
+    const csv=await api('/export/registrants'+qs);
+    if(!csv||typeof csv!=='string'){toast('Nothing to export');return;}
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    const a=document.createElement('a');a.href=url;
+    a.download='camp-registrations-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }catch(e){toast(e.message);}
+}
 async function adminSaveDefaults(){if(!confirm('Save the current scaffold (churches, accounts, accommodation, FAQ, schedule, devotionals) as the new-year baseline?'))return;
   // Backend returns {ok:true} (no counts).
   try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved ✓');}catch(e){toast(e.message);}}
