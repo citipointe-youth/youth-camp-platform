@@ -67,12 +67,14 @@ export function makeExportService(
       assertCan(actor, 'import:run');
       const [persons, churches] = await Promise.all([personRepo.findAll(), churchRepo.findAll()]);
       const nameById = new Map(churches.map((c) => [c.id, c.name] as const));
+      // Insertion (import) order is preserved — no sort — so an export lines up row-for-row
+      // with the source CSV for validation ("reverse of the import"). The on-screen Data
+      // table does its own client-side ordering independently.
       const rows = persons
         .filter((p) => !filters.churchId || p.churchId === filters.churchId)
         .filter((p) => !filters.gender || p.gender === filters.gender)
         .filter((p) => !filters.kind || p.kind === filters.kind)
         .filter((p) => !filters.grade || String(p.grade ?? '') === filters.grade)
-        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
         .map((p) => personToElvantoRow(p, nameById.get(p.churchId) ?? p.churchName));
       return toCsvString([...ELVANTO_HEADERS], rows);
     },
