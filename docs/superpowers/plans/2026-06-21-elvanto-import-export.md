@@ -220,23 +220,52 @@ git commit -m "feat: add elvanto-mapping (headers + value normalizers)"
 
 ---
 
-### Task 2: `Person` entity — add `medicareNumber` + `churchUnlistedNote`
+### Task 2: `Person` entity — add `medicareNumber`, `churchUnlistedNote`, `elvantoMeta`
+
+`elvantoMeta` holds the 5 Elvanto submission-metadata columns verbatim (Date Submitted,
+Submission Status, the raw Person cell, Person Status, Today's Date) so an export round-trips
+**byte-for-byte** for unmodified data — the only diffs that appear are the deliberate cleanups
+(e.g. `NA`→blank). App-created people have `elvantoMeta: null` (export reconstructs `Person` =
+`Last, First` and leaves the 4 metadata columns blank for them).
 
 **Files:**
-- Modify: `src/core/entities/person.ts` (the `// ----- contact + care -----` block)
+- Modify: `src/core/entities/person.ts` (the `// ----- contact + care -----` block + a new `ElvantoMeta` interface)
 - Modify: `src/services/person.service.ts:203` (create-path Person literal)
 - Modify: `src/repositories/supabase/supabase.people.ts:73` (row→Person) and `:261` (Person→row)
 
 **Interfaces:**
-- Produces: `Person.medicareNumber?: string | null`, `Person.churchUnlistedNote?: string | null`.
+- Produces:
+  - `Person.medicareNumber?: string | null`, `Person.churchUnlistedNote?: string | null`
+  - `ElvantoMeta = { dateSubmitted: string|null; submissionStatus: string|null; person: string|null; personStatus: string|null; todaysDate: string|null }`
+  - `Person.elvantoMeta?: ElvantoMeta | null`
 
-- [ ] **Step 1: Add the fields to the entity**
+- [ ] **Step 1: Add the fields + interface to the entity**
 
-In `src/core/entities/person.ts`, inside the `contact + care` group (after `otherMedications?: string | null;`):
+In `src/core/entities/person.ts`, add the interface near the top (after the existing
+`SignOutEvent` interface):
+
+```ts
+/** Raw Elvanto submission-metadata columns, kept verbatim for byte-for-byte export round-trip. */
+export interface ElvantoMeta {
+  dateSubmitted: string | null;
+  submissionStatus: string | null;
+  person: string | null;
+  personStatus: string | null;
+  todaysDate: string | null;
+}
+```
+
+Inside the `contact + care` group (after `otherMedications?: string | null;`):
 
 ```ts
   medicareNumber?: string | null;
   churchUnlistedNote?: string | null;
+```
+
+And in the bottom metadata group (just before `createdAt: ISODateString;`):
+
+```ts
+  elvantoMeta?: ElvantoMeta | null;
 ```
 
 - [ ] **Step 2: Default them where Person is constructed**
@@ -246,6 +275,7 @@ In `src/services/person.service.ts`, in the create literal next to `otherMedicat
 ```ts
         medicareNumber: null,
         churchUnlistedNote: null,
+        elvantoMeta: null,
 ```
 
 In `src/repositories/supabase/supabase.people.ts`, in the row→Person mapper next to `otherMedications: ...` add:
@@ -253,6 +283,7 @@ In `src/repositories/supabase/supabase.people.ts`, in the row→Person mapper ne
 ```ts
     medicareNumber: (row['medicare_number'] as string | null) ?? null,
     churchUnlistedNote: (row['church_unlisted_note'] as string | null) ?? null,
+    elvantoMeta: (row['elvanto_meta'] as import('../../core/entities/person').ElvantoMeta | null) ?? null,
 ```
 
 and in the Person→row mapper next to `other_medications: ...` add:
@@ -260,7 +291,11 @@ and in the Person→row mapper next to `other_medications: ...` add:
 ```ts
     medicare_number: p.medicareNumber ?? null,
     church_unlisted_note: p.churchUnlistedNote ?? null,
+    elvanto_meta: p.elvantoMeta ?? null,
 ```
+
+> If the supabase mapper file already imports the `Person` type, reuse that import for
+> `ElvantoMeta` instead of the inline `import('...')` form.
 
 - [ ] **Step 3: Typecheck**
 
@@ -271,7 +306,7 @@ Expected: no errors (fields are optional; import.service still compiles).
 
 ```bash
 git add src/core/entities/person.ts src/services/person.service.ts src/repositories/supabase/supabase.people.ts
-git commit -m "feat: add medicareNumber + churchUnlistedNote to Person"
+git commit -m "feat: add medicareNumber, churchUnlistedNote, elvantoMeta to Person"
 ```
 
 ---
@@ -556,6 +591,16 @@ export function makeImportService(
           const parentPhone = field(row, 'Parent/Guardian Phone Number', 'parentPhone', 'parent_phone') || null;
           const zone = field(row, 'zone', 'Zone') || opts.defaultZone || '';
 
+          // Verbatim submission metadata (kept for byte-for-byte export round-trip).
+          const raw = (h: string): string => (row[h] ?? '').trim();
+          const elvantoMeta = {
+            dateSubmitted: raw('Date Submitted'),
+            submissionStatus: raw('Submission Status'),
+            person: raw('Person'),
+            personStatus: raw('Person Status'),
+            todaysDate: raw("Today's Date"),
+          };
+
           const submitted = normalizeDate(field(row, 'Date Submitted'));
           const consentTs = submitted ? `${submitted}T00:00:00.000Z` : now;
           const consents = buildConsents(
@@ -595,6 +640,7 @@ export function makeImportService(
               blueCardNumber: blueCardNumber ?? match.blueCardNumber,
               blueCardExpiry: blueCardExpiry ?? match.blueCardExpiry,
               churchUnlistedNote: churchUnlistedNote ?? match.churchUnlistedNote,
+              elvantoMeta,
               consents,
               parentGuardianName: parentName ?? match.parentGuardianName,
               parentRelation: parentRelation ?? match.parentRelation,
@@ -630,6 +676,7 @@ export function makeImportService(
               otherMedications,
               medicareNumber,
               churchUnlistedNote,
+              elvantoMeta,
               consents,
               parentGuardianName: parentName,
               parentPhone,
@@ -777,6 +824,11 @@ describe('export.service', () => {
       expect(reimported[f]).toEqual(original[f]);
     }
     expect(reimported.consents.medical.granted).toBe(original.consents.medical.granted);
+
+    // Byte-for-byte idempotence: exporting the re-imported data reproduces the same CSV.
+    const exp2 = makeExportService(fresh.personRepo, fresh.churchRepo);
+    const csv2 = await exp2.exportRegistrants(actor('admin'), {});
+    expect(csv2).toBe(csv);
   });
 
   it('respects the gender filter', async () => {
@@ -816,11 +868,15 @@ export function personToElvantoRow(p: Person, churchName: string): string[] {
     p.consents[t]?.granted ? 'Yes' : '';
   const gradeText = p.kind === 'leader' ? '18+ Leader' : p.grade != null ? String(p.grade) : '';
   const genderText = p.gender === 'male' ? 'Male' : p.gender === 'female' ? 'Female' : '';
+  const meta = p.elvantoMeta ?? null;
+  // Imported people reproduce the source metadata verbatim (incl. an originally-blank Person
+  // cell); app-created people (no meta) reconstruct Person and leave metadata blank.
+  const personCell = meta ? meta.person ?? '' : `${p.lastName}, ${p.firstName}`;
   return [
-    '', // Date Submitted (submission metadata — not modelled)
-    '', // Submission Status
-    `${p.lastName}, ${p.firstName}`, // Person
-    '', // Person Status
+    meta?.dateSubmitted ?? '', // Date Submitted
+    meta?.submissionStatus ?? '', // Submission Status
+    personCell, // Person
+    meta?.personStatus ?? '', // Person Status
     p.firstName,
     p.lastName,
     genderText,
@@ -845,7 +901,7 @@ export function personToElvantoRow(p: Person, churchName: string): string[] {
     p.parentGuardianName ?? '',
     p.parentRelation ?? '',
     p.parentPhone ?? '',
-    '', // Today's Date
+    meta?.todaysDate ?? '', // Today's Date
   ];
 }
 
@@ -1196,10 +1252,11 @@ Use the next sequential prefix following the highest existing number.
 - [ ] **Step 2: Write the migration**
 
 ```sql
--- Adds the two Person fields needed for full Elvanto round-trip fidelity.
+-- Adds the Person fields needed for full Elvanto round-trip fidelity.
 alter table if exists people
   add column if not exists medicare_number text,
-  add column if not exists church_unlisted_note text;
+  add column if not exists church_unlisted_note text,
+  add column if not exists elvanto_meta jsonb;
 ```
 
 > Match the people table name to whatever the existing migrations use (e.g. `people`); if the column-naming convention differs, follow the existing migrations' casing.
