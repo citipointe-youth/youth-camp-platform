@@ -73,6 +73,7 @@ import { makeNoteService, type NoteService } from './services/note.service';
 import { makeScheduleService, type ScheduleService } from './services/schedule.service';
 import { makeContentService, type ContentService } from './services/content.service';
 import { makeImportService, type ImportService } from './services/import.service';
+import { makeExportService, type ExportService } from './services/export.service';
 import { makeAccountService, type AccountService } from './services/account.service';
 import { makeDashboardService, type DashboardService } from './services/dashboard.service';
 import { makeAdminService, type AdminService } from './services/admin.service';
@@ -106,6 +107,7 @@ export interface Services {
   schedule: ScheduleService;
   content: ContentService;
   importService: ImportService;
+  exportService: ExportService;
   account: AccountService;
   dashboard: DashboardService;
   admin: AdminService;
@@ -165,6 +167,7 @@ export async function buildContainer(): Promise<Container> {
     const schedule = makeScheduleService(scheduleRepo);
     const content = makeContentService(faqs, devotionals);
     const importSvc = makeImportService(people, churches);
+    const exportSvc = makeExportService(people, churches);
     const account = makeAccountService(users, churches);
     const dashboard = makeDashboardService(people, accommodationRepo, notifications, scheduleRepo, churches);
     const admin = makeAdminService(
@@ -175,7 +178,7 @@ export async function buildContainer(): Promise<Container> {
     const services: Services = {
       auth, settings, person: personSvc, accommodation: accommodationSvc,
       checkIn, notification, search, note, schedule, content,
-      importService: importSvc, account, dashboard, admin, users,
+      importService: importSvc, exportService: exportSvc, account, dashboard, admin, users,
     };
 
     return { repos, services };
@@ -268,6 +271,7 @@ export async function buildContainer(): Promise<Container> {
   const schedule = makeScheduleService(scheduleRepo);
   const content = makeContentService(faqs, devotionals);
   const importSvc = makeImportService(people, churches);
+  const exportSvc = makeExportService(people, churches);
   const account = makeAccountService(users, churches);
   const dashboard = makeDashboardService(
     people,
@@ -302,6 +306,7 @@ export async function buildContainer(): Promise<Container> {
     schedule,
     content,
     importService: importSvc,
+    exportService: exportSvc,
     account,
     dashboard,
     admin,

@@ -27,6 +27,18 @@ export interface RegistrantDto {
   dietaryRequirements: string[];
   blueCardNumber: string | null;
   blueCardExpiry: string | null;
+  email: string | null;
+  dateOfBirth: string | null;
+  suburb: string | null;
+  postcode: string | null;
+  state: string | null;
+  otherMedications: string | null;
+  medicareNumber: string | null;
+  churchUnlistedNote: string | null;
+  parentRelation: string | null;
+  consentMedical: boolean;
+  consentMedia: boolean;
+  consentSupervision: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +104,18 @@ export function toRegistrantDto(p: Person): RegistrantDto {
     dietaryRequirements: p.dietaryRequirements,
     blueCardNumber: p.blueCardNumber ?? null,
     blueCardExpiry: p.blueCardExpiry ?? null,
+    email: p.email ?? null,
+    dateOfBirth: p.dateOfBirth ?? null,
+    suburb: p.suburb ?? null,
+    postcode: p.postcode ?? null,
+    state: p.state ?? null,
+    otherMedications: p.otherMedications ?? null,
+    medicareNumber: p.medicareNumber ?? null,
+    churchUnlistedNote: p.churchUnlistedNote ?? null,
+    parentRelation: p.parentRelation ?? null,
+    consentMedical: p.consents.medical?.granted ?? false,
+    consentMedia: p.consents.media?.granted ?? false,
+    consentSupervision: p.consents.supervision?.granted ?? false,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

@@ -15,6 +15,7 @@ import { makeNoteController } from '../controllers/note.controller';
 import { makeAttendanceController } from '../controllers/attendance.controller';
 import { makeContentController } from '../controllers/content.controller';
 import { makeImportController } from '../controllers/import.controller';
+import { makeExportController } from '../controllers/export.controller';
 import { makeAccountController } from '../controllers/account.controller';
 import { makeSettingsController } from '../controllers/settings.controller';
 import { makeAdminController } from '../controllers/admin.controller';
@@ -33,6 +34,7 @@ export function buildRoutes(services: Services): Route[] {
   const attendance = makeAttendanceController({ person: services.person });
   const content = makeContentController({ content: services.content });
   const importCtrl = makeImportController({ importService: services.importService });
+  const exportCtrl = makeExportController({ exportService: services.exportService });
   const account = makeAccountController({ account: services.account });
   const settingsCtrl = makeSettingsController({ settings: services.settings });
   const admin = makeAdminController({ admin: services.admin });
@@ -137,6 +139,7 @@ export function buildRoutes(services: Services): Route[] {
 
     // ----- Import -----
     { method: 'POST', path: '/import/csv', auth: true, handler: (r) => importCtrl.run(r) },
+    { method: 'GET', path: '/export/registrants', auth: true, handler: (r) => exportCtrl.registrants(r) },
 
     // ----- Account management -----
     { method: 'GET', path: '/accounts/users', auth: true, handler: (r) => account.list(r) },
