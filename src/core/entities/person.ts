@@ -28,6 +28,15 @@ export interface SignOutEvent {
   timestamp: ISODateString;
 }
 
+/** Raw Elvanto submission-metadata columns, kept verbatim for byte-for-byte export round-trip. */
+export interface ElvantoMeta {
+  dateSubmitted: string | null;
+  submissionStatus: string | null;
+  person: string | null;
+  personStatus: string | null;
+  todaysDate: string | null;
+}
+
 /**
  * Person — the unified pre-camp/at-camp entity (design D2).
  *
@@ -74,6 +83,8 @@ export interface Person {
   medicalConditions: string[];
   dietaryRequirements: string[];
   otherMedications?: string | null;
+  medicareNumber?: string | null;
+  churchUnlistedNote?: string | null;
   parentGuardianName?: string | null;
   parentPhone?: string | null;
   parentRelation?: string | null;
@@ -93,6 +104,8 @@ export interface Person {
   // ----- at-camp history (child tables in Supabase, per D4) -----
   checkInHistory: CheckInEntry[];
   signOutHistory: SignOutEvent[];
+
+  elvantoMeta?: ElvantoMeta | null;
 
   createdAt: ISODateString;
   updatedAt: ISODateString;
