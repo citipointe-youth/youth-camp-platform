@@ -1,13 +1,16 @@
 import type { IPersonRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
 import type { Person } from '../core/entities/person';
+import type { Church } from '../core/entities/church';
 import type { Actor } from '../core/entities/user';
-import type { ConsentType, PersonKind } from '../core/types/enums';
-import { CONSENT_TYPES } from '../core/types/enums';
+import type { ConsentType } from '../core/types/enums';
 import { assertCan } from './access-control';
 import { BadRequestError } from '../core/errors/app-error';
 import { parseCsv } from '../utils/csv';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
+import {
+  cleanCareText, field, normalizeDate, parseGradeOrLeader, yesToConsent,
+} from './elvanto-mapping';
 import { z } from 'zod';
 
 const ImportOptionsSchema = z.object({
@@ -22,18 +25,12 @@ export interface ImportResult {
   updated: number;
   skipped: number;
   errors: Array<{ row: number; message: string }>;
+  warnings: Array<{ row: number; message: string }>;
+  churchesCreated: string[];
 }
 
 export interface ImportService {
   importCsv(actor: Actor, input: unknown): Promise<ImportResult>;
-}
-
-function defaultConsents(): Person['consents'] {
-  const result = {} as Record<ConsentType, { granted: boolean; timestamp: string | null }>;
-  for (const t of CONSENT_TYPES) {
-    result[t] = { granted: false, timestamp: null };
-  }
-  return result;
 }
 
 function parseGender(val: string): Person['gender'] {
@@ -43,15 +40,13 @@ function parseGender(val: string): Person['gender'] {
   return 'other';
 }
 
-function parseGrade(val: string): Person['grade'] | null {
-  const n = parseInt(val, 10);
-  if ([7, 8, 9, 10, 11, 12].includes(n)) return n as Person['grade'];
-  return null;
-}
-
-function parseKind(val: string): PersonKind {
-  // CSV may have legacy 'student' kind — map to unified 'youth'
-  return val.trim() === 'leader' ? 'leader' : 'youth';
+function slugCode(name: string, taken: Set<string>): string {
+  const base = name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8) || 'CHURCH';
+  let code = base;
+  let n = 1;
+  while (taken.has(code)) code = `${base}${n++}`.slice(0, 10);
+  taken.add(code);
+  return code;
 }
 
 export function makeImportService(
@@ -69,27 +64,20 @@ export function makeImportService(
       let updated = 0;
       let skipped = 0;
       const errors: ImportResult['errors'] = [];
+      const warnings: ImportResult['warnings'] = [];
+      const churchesCreated: string[] = [];
 
-      // C1 FIX: load reference data ONCE up front (was a per-row churchRepo.findAll
-      // + personRepo.findByChurch scan), then batch all writes (was a per-row save,
-      // i.e. a full JSON rewrite per row).
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
       for (const c of churches) churchIdByName.set(c.name.toLowerCase(), c.id);
+      const takenCodes = new Set<string>(churches.map((c) => c.code));
+      const newlyCreated = new Map<string, string>(); // lowercased name -> id
 
-      // Working set: every existing person, pooled by churchId+lowercased name. We
-      // keep a LIST per key (not a single record) so two different people with the
-      // SAME name in the SAME church can be told apart by PHONE NUMBER (see pickMatch
-      // for the exact rules — a phone-bearing row matches by phone; a phone-less row
-      // matches only a lone candidate). Rows that match are mutated IN PLACE in the
-      // pool — so a pool never holds two entries for one person, and duplicate rows
-      // for the same person collapse. This also removes the empty-church collision
-      // (audit P1): church-less people are pooled together but separated by phone.
       const allPersons = await personRepo.findAll();
       const nameChurchKey = (churchId: string, first: string, last: string): string =>
         `${churchId}::${first.toLowerCase()}::${last.toLowerCase()}`;
       const phoneKey = (mobile: string | null | undefined): string =>
-        (mobile ?? '').replace(/\D/g, ''); // digits only; '' when absent
+        (mobile ?? '').replace(/\D/g, '');
       const poolByNameChurch = new Map<string, Person[]>();
       for (const p of allPersons) {
         const k = nameChurchKey(p.churchId, p.firstName, p.lastName);
@@ -98,83 +86,138 @@ export function makeImportService(
         else poolByNameChurch.set(k, [p]);
       }
 
-      // Match rules for a row (given its phone) against a name+church pool:
-      //  - no candidates → new person;
-      //  - the row has a phone → match a candidate with the SAME phone; if none has a
-      //    phone at all, fall back to a lone candidate (re-import that's now adding a
-      //    phone to the single existing record);
-      //  - the row has NO phone → match a lone candidate (re-import omitting phone);
-      //    ambiguous against 2+ candidates → no match (caller treats as new).
       function pickMatch(pool: Person[] | undefined, phone: string): Person | undefined {
         if (!pool || pool.length === 0) return undefined;
         if (phone) {
           const byPhone = pool.find((p) => phoneKey(p.mobile) === phone);
           if (byPhone) return byPhone;
-          // No phone match: only adopt a lone candidate if it has no phone yet.
           if (pool.length === 1 && !phoneKey(pool[0]!.mobile)) return pool[0];
           return undefined;
         }
         return pool.length === 1 ? pool[0] : undefined;
       }
 
-      // People created or updated this import, keyed by id — the batched write set.
+      // Resolve a church name to an id, auto-creating a minimal church on miss.
+      async function resolveChurch(name: string, youthPastor: string, rowNum: number, createdAt: string): Promise<string> {
+        if (!name) return '';
+        const key = name.toLowerCase();
+        const existing = churchIdByName.get(key) ?? newlyCreated.get(key);
+        if (existing) return existing;
+        const id = newId('church');
+        const code = slugCode(name, takenCodes);
+        const church: Church = {
+          id,
+          name,
+          zone: 'Yellow',
+          code,
+          selfRegisterSlug: code.toLowerCase(),
+          expectedCount: 0,
+          ...(youthPastor ? { youthPastorName: youthPastor } : {}),
+          reservations: [],
+          contacts: {
+            male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
+            female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
+          },
+          createdAt,
+          updatedAt: createdAt,
+        };
+        await churchRepo.save(church);
+        newlyCreated.set(key, id);
+        churchesCreated.push(name);
+        warnings.push({ row: rowNum, message: `Church "${name}" not found — created (zone defaulted to Yellow)` });
+        return id;
+      }
+
+      function buildConsents(med: boolean, media: boolean, sup: boolean, ts: string): Person['consents'] {
+        const mk = (granted: boolean): { granted: boolean; timestamp: string | null } => ({
+          granted,
+          timestamp: granted ? ts : null,
+        });
+        return { medical: mk(med), media: mk(media), supervision: mk(sup) } as Record<
+          ConsentType,
+          { granted: boolean; timestamp: string | null }
+        >;
+      }
+
       const touched = new Map<string, Person>();
-      // Ids created during THIS import (so a matched-again row isn't miscounted as an
-      // update, and isn't blocked by updateExisting=false).
       const createdIds = new Set<string>();
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]!;
-        const rowNum = i + 2; // 1-indexed, account for header
+        const rowNum = i + 2;
 
         try {
-          const firstName = (row['firstName'] ?? row['first_name'] ?? row['First Name'] ?? '').trim();
-          const lastName = (row['lastName'] ?? row['last_name'] ?? row['Last Name'] ?? '').trim();
-
+          const firstName = field(row, 'First Name', 'firstName', 'first_name');
+          const lastName = field(row, 'Last Name', 'lastName', 'last_name');
           if (!firstName || !lastName) {
             errors.push({ row: rowNum, message: 'Missing firstName or lastName' });
             skipped++;
             continue;
           }
 
-          const churchIdRaw = (row['churchId'] ?? row['church_id'] ?? opts.churchId ?? '').trim();
-          const churchName = (row['churchName'] ?? row['church_name'] ?? row['Church'] ?? '').trim();
+          const now = nowISO();
 
-          // Resolve churchId from an explicit id, else by church name (indexed).
-          let resolvedChurchId = churchIdRaw;
-          if (!resolvedChurchId && churchName) {
-            resolvedChurchId = churchIdByName.get(churchName.toLowerCase()) ?? '';
+          const churchName = field(row, "Attendee's Church", 'churchName', 'church_name', 'Church');
+          const churchUnlistedNote =
+            field(row, 'If from a church not listed, please specify church name & Youth Pastor') || null;
+          const explicitChurchId = field(row, 'churchId', 'church_id') || opts.churchId || '';
+          const resolvedChurchId = explicitChurchId
+            ? explicitChurchId
+            : await resolveChurch(churchName, churchUnlistedNote ?? '', rowNum, now);
+
+          const gender = parseGender(field(row, 'Gender', 'gender') || 'other');
+          const gradeRaw = field(row, 'School Grade', 'grade', 'Grade');
+          const { kind, grade } = parseGradeOrLeader(gradeRaw);
+          if (gradeRaw && grade === null && kind === 'youth') {
+            warnings.push({ row: rowNum, message: `Unrecognized School Grade "${gradeRaw}" — grade left blank` });
           }
 
-          const zone = (row['zone'] ?? row['Zone'] ?? opts.defaultZone ?? '').trim();
-          const gender = parseGender(row['gender'] ?? row['Gender'] ?? 'other');
-          const grade = parseGrade(row['grade'] ?? row['Grade'] ?? '');
-          const kind = parseKind(row['kind'] ?? row['Kind'] ?? 'youth');
-          const dob = (row['dateOfBirth'] ?? row['dob'] ?? row['DOB'] ?? '').trim() || null;
-          const mobile = (row['mobile'] ?? row['Mobile'] ?? '').trim() || null;
-          const email = (row['email'] ?? row['Email'] ?? '').trim() || null;
-          const medical = (row['medical'] ?? row['Medical'] ?? '').trim();
-          const dietary = (row['dietary'] ?? row['Dietary'] ?? '').trim();
-          const parentName = (row['parentGuardianName'] ?? row['parent_name'] ?? row['Parent'] ?? '').trim() || null;
-          const parentPhone = (row['parentPhone'] ?? row['parent_phone'] ?? '').trim() || null;
+          const dob = normalizeDate(field(row, 'Date of Birth', 'dateOfBirth', 'dob', 'DOB'));
+          const mobile = field(row, 'Mobile Number', 'mobile', 'Mobile') || null;
+          const email = field(row, 'Email Address', 'email', 'Email') || null;
+          const suburb = field(row, 'Suburb', 'suburb') || null;
+          const postcode = field(row, 'Postcode', 'postcode') || null;
+          const state = field(row, 'State', 'state') || null;
+          const medicareNumber = field(row, 'Medicare Number') || null;
+          const medical = cleanCareText(field(row, 'Medical Conditions', 'medical', 'Medical'));
+          const dietary = cleanCareText(field(row, 'Dietary Requirements', 'dietary', 'Dietary'));
+          const otherMedications =
+            cleanCareText(field(row, 'List Other Medical Conditions or Medication Taken')) || null;
+          const blueCardNumber = field(row, 'Blue Card/Working with Children Card Number') || null;
+          const blueCardExpiry = normalizeDate(field(row, 'Blue Card/Working with Children Card Expiry'));
+          const parentName = field(row, 'Parent/Guardian Name', 'parentGuardianName', 'parent_name', 'Parent') || null;
+          const parentRelation = field(row, 'Relation to Child', 'parentRelation') || null;
+          const parentPhone = field(row, 'Parent/Guardian Phone Number', 'parentPhone', 'parent_phone') || null;
+          const zone = field(row, 'zone', 'Zone') || opts.defaultZone || '';
+
+          // Verbatim submission metadata (kept for byte-for-byte export round-trip).
+          const raw = (h: string): string => (row[h] ?? '').trim();
+          const elvantoMeta = {
+            dateSubmitted: raw('Date Submitted'),
+            submissionStatus: raw('Submission Status'),
+            person: raw('Person'),
+            personStatus: raw('Person Status'),
+            todaysDate: raw("Today's Date"),
+          };
+
+          const submitted = normalizeDate(field(row, 'Date Submitted'));
+          const consentTs = submitted ? `${submitted}T00:00:00.000Z` : now;
+          const consents = buildConsents(
+            yesToConsent(field(row, 'I give medical consent for my child as listed above.')),
+            yesToConsent(field(row, 'I give photography and video consent for my child as listed above.')),
+            yesToConsent(field(row, 'I understand and agree to the Supervision policy.')),
+            consentTs,
+          );
 
           const nck = nameChurchKey(resolvedChurchId, firstName, lastName);
           const rowPhone = phoneKey(mobile);
           const pool = poolByNameChurch.get(nck);
           const match = pickMatch(pool, rowPhone);
-          // A match is "existing" (counts as update / governed by updateExisting) only
-          // if it was loaded from the DB this run — i.e. not already created this import.
           const isExisting = match !== undefined && !createdIds.has(match.id);
 
-          const now = nowISO();
-
-          // An existing DB person not flagged for update is left untouched.
           if (match && isExisting && !opts.updateExisting) {
             skipped++;
           } else if (match) {
-            // Update path: existing DB person (updateExisting), or a duplicate row for
-            // a person already created/updated earlier in THIS file. Mutate in place so
-            // the pool keeps exactly one entry per person and the write set dedups.
             const merged: Person = {
               ...match,
               firstName,
@@ -184,15 +227,25 @@ export function makeImportService(
               dateOfBirth: dob,
               mobile,
               email,
+              suburb,
+              postcode,
+              state,
+              medicareNumber,
               zone: zone || match.zone,
               kind,
               medicalConditions: medical ? [medical] : match.medicalConditions,
               dietaryRequirements: dietary ? [dietary] : match.dietaryRequirements,
+              otherMedications: otherMedications ?? match.otherMedications,
+              blueCardNumber: blueCardNumber ?? match.blueCardNumber,
+              blueCardExpiry: blueCardExpiry ?? match.blueCardExpiry,
+              churchUnlistedNote: churchUnlistedNote ?? match.churchUnlistedNote,
+              elvantoMeta,
+              consents,
               parentGuardianName: parentName ?? match.parentGuardianName,
+              parentRelation: parentRelation ?? match.parentRelation,
               parentPhone: parentPhone ?? match.parentPhone,
               updatedAt: now,
             };
-            // Replace the pooled record (same id) and stage the write.
             if (pool) {
               const idx = pool.indexOf(match);
               if (idx >= 0) pool[idx] = merged;
@@ -208,24 +261,27 @@ export function makeImportService(
               gender,
               dateOfBirth: dob,
               grade,
-              school: (row['school'] ?? '').trim() || null,
+              school: field(row, 'school') || null,
               zone,
               groupId: null,
               kind,
               mobile,
               email,
-              suburb: null,
-              postcode: null,
-              state: null,
+              suburb,
+              postcode,
+              state,
               medicalConditions: medical ? [medical] : [],
               dietaryRequirements: dietary ? [dietary] : [],
-              otherMedications: null,
-              consents: defaultConsents(),
+              otherMedications,
+              medicareNumber,
+              churchUnlistedNote,
+              elvantoMeta,
+              consents,
               parentGuardianName: parentName,
               parentPhone,
-              parentRelation: null,
-              blueCardNumber: null,
-              blueCardExpiry: null,
+              parentRelation,
+              blueCardNumber,
+              blueCardExpiry,
               churchId: resolvedChurchId,
               churchName: churchName || resolvedChurchId,
               paymentStatus: 'unpaid',
@@ -240,26 +296,20 @@ export function makeImportService(
             };
             touched.set(person.id, person);
             createdIds.add(person.id);
-            // Add to the pool so a later duplicate row (same name+church, matching
-            // phone when needed) updates THIS new record instead of creating a second.
             const p = poolByNameChurch.get(nck);
             if (p) p.push(person);
             else poolByNameChurch.set(nck, [person]);
             created++;
           }
         } catch (err) {
-          errors.push({
-            row: rowNum,
-            message: err instanceof Error ? err.message : String(err),
-          });
+          errors.push({ row: rowNum, message: err instanceof Error ? err.message : String(err) });
           skipped++;
         }
       }
 
-      // Single batched write for the whole import (was one save per row).
       if (touched.size > 0) await personRepo.saveMany([...touched.values()]);
 
-      return { created, updated, skipped, errors };
+      return { created, updated, skipped, errors, warnings, churchesCreated };
     },
   };
 }

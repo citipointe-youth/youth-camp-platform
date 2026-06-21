@@ -159,3 +159,70 @@ describe('ImportService.importCsv — updateExisting', () => {
     expect(all[0]!.grade).toBe(12);
   });
 });
+
+describe('ImportService.importCsv — Elvanto export shape', () => {
+  const ELVANTO_HEADER =
+    'Date Submitted,Submission Status,Person,Person Status,First Name,Last Name,Gender,Date of Birth,School Grade,Mobile Number,Email Address,Suburb,Postcode,State,Medicare Number,Medical Conditions,Dietary Requirements,List Other Medical Conditions or Medication Taken,Attendee\'s Church,"If from a church not listed, please specify church name & Youth Pastor",Blue Card/Working with Children Card Number,Blue Card/Working with Children Card Expiry,I give medical consent for my child as listed above.,I give photography and video consent for my child as listed above.,I understand and agree to the Supervision policy.,Parent/Guardian Name,Relation to Child,Parent/Guardian Phone Number,Today\'s Date';
+
+  // Liam: youth, grade 11, medical list + dietary sentence, consents all Yes, known church.
+  const LIAM =
+    '21/06/2026,Pending,"Est, Liam",Pending,Liam,Est,Male,30/09/2009,11,0402113441,liam@x.com,Carindale,4152,QLD,4148431533,"Anaphylaxis, Dairy Intolerance, Egg Allergy, Nut Allergy",No dairy no eggs no nuts no fish no sesame,,Victory,,,,Yes,Yes,Yes,Penny Est,Mother,0413510011,21/06/2026';
+  // Alelia: LEADER (18+ Leader), blank Person cell, church NOT in system, blue card, dietary blank.
+  const ALELIA =
+    '21/06/2026,Pending,,Pending,Alelia,Ino,Female,31/12/2006,18+ Leader,0434998611,ale@x.com,Woodhill,4285,QLD,4285242212,"Gluten Intolerance, Lactose Intolerance",,,Kingdom Hope Church,Josh Gazzard,2532285 / 2,30/04/2029,Yes,Yes,Yes,Nyree Ino,Mother,0481092411,21/06/2026';
+  // Cooper: dietary "NA" (junk), multi-line Other meds. Quoted field spans two lines.
+  const COOPER =
+    '21/06/2026,Pending,"Haw, Cooper",Pending,Cooper,Haw,Male,24/03/2010,11,0499 259 222,coop@x.com,Morayfield,4506,Queensland,2582677511,,NA,"Ritalin\nFluexotine",Victory,,,,Yes,Yes,Yes,Tracy-Lee Ba,Mother,0448835711,21/06/2026';
+
+  it('imports a youth with all fields normalized', async () => {
+    const { svc, personRepo } = await build();
+    const res = await svc.importCsv(actor('admin'), { csvData: `${ELVANTO_HEADER}\n${LIAM}` });
+    expect(res.created).toBe(1);
+    const p = (await personRepo.findAll())[0]!;
+    expect(p.kind).toBe('youth');
+    expect(p.grade).toBe(11);
+    expect(p.dateOfBirth).toBe('2009-09-30');
+    expect(p.gender).toBe('male');
+    expect(p.churchId).toBe('c1');
+    expect(p.suburb).toBe('Carindale');
+    expect(p.postcode).toBe('4152');
+    expect(p.state).toBe('QLD');
+    expect(p.medicareNumber).toBe('4148431533');
+    expect(p.medicalConditions).toEqual(['Anaphylaxis, Dairy Intolerance, Egg Allergy, Nut Allergy']);
+    expect(p.dietaryRequirements).toEqual(['No dairy no eggs no nuts no fish no sesame']);
+    expect(p.parentRelation).toBe('Mother');
+    expect(p.parentPhone).toBe('0413510011');
+    expect(p.consents.medical.granted).toBe(true);
+    expect(p.consents.media.granted).toBe(true);
+    expect(p.consents.supervision.granted).toBe(true);
+  });
+
+  it('detects a leader and auto-creates an unknown church', async () => {
+    const { svc, personRepo, churchRepo } = await build();
+    const res = await svc.importCsv(actor('admin'), { csvData: `${ELVANTO_HEADER}\n${ALELIA}` });
+    expect(res.created).toBe(1);
+    expect(res.churchesCreated).toContain('Kingdom Hope Church');
+    expect(res.warnings.length).toBeGreaterThan(0);
+    const p = (await personRepo.findAll())[0]!;
+    expect(p.kind).toBe('leader');
+    expect(p.grade).toBeNull();
+    expect(p.blueCardNumber).toBe('2532285 / 2');
+    expect(p.blueCardExpiry).toBe('2029-04-30');
+    expect(p.churchUnlistedNote).toBe('Josh Gazzard');
+    const created = await churchRepo.findAll();
+    const kh = created.find((c) => c.name === 'Kingdom Hope Church')!;
+    expect(kh).toBeTruthy();
+    expect(p.churchId).toBe(kh.id);
+    expect(kh.youthPastorName).toBe('Josh Gazzard');
+  });
+
+  it('strips junk dietary and preserves multi-line medication text', async () => {
+    const { svc, personRepo } = await build();
+    await svc.importCsv(actor('admin'), { csvData: `${ELVANTO_HEADER}\n${COOPER}` });
+    const p = (await personRepo.findAll())[0]!;
+    expect(p.dietaryRequirements).toEqual([]); // "NA" → empty
+    expect(p.medicalConditions).toEqual([]);   // blank
+    expect(p.otherMedications).toBe('Ritalin\nFluexotine');
+    expect(p.mobile).toBe('0499 259 222');
+  });
+});
