@@ -1460,7 +1460,7 @@ function adminUpload(){
     box.innerHTML=`<b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors`;
     toast('Import complete');
   }catch(e){toast(e.message);}};
-  if(isCsv)reader.readAsText(f);else reader.readAsArrayBuffer(f);
+  reader.readAsText(f); // only .csv reaches here (guarded above) — read as text, not binary
 }
 
 /* ===== ADMIN DEVOTIONALS ===== */
