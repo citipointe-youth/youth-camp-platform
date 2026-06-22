@@ -353,10 +353,10 @@ The app is now deployed and serving real traffic on Supabase:
 - SUPABASE REPO LAYER COMPLETE + APPLIED (resolves R11): src/repositories/supabase/
   is fully written (people, users, churches, accommodation, zones, groups, notes,
   notifications, schedule, settings, faqs, devotionals, defaults) and wired in
-  container.ts behind PERSISTENCE==='supabase'. All 5 migrations (001-005, incl.
-  004_fix_zones_groups_schema + 005_person_extra_fields) applied to project
-  nwfafrgojqkxylbppywo (Sydney); all 16 tables live and round-tripping (verified
-  login + /auth/me + /settings + /home against production).
+  container.ts behind PERSISTENCE==='supabase'. Migrations 001-004 applied to project
+  nwfafrgojqkxylbppywo (Sydney) at deploy; all 16 tables live and round-tripping
+  (verified login + /auth/me + /settings + /home against production). NOTE:
+  005_person_extra_fields was NOT applied at this point — see the CSV-IMPORT fix below.
 - SERVERLESS ENTRY: api/index.ts (Vercel @vercel/node handler caching
   createAppInstance()) + vercel.json (function maxDuration 30s, includeFiles
   public/**, SPA rewrite all routes -> /api/index).
@@ -389,8 +389,22 @@ The app is now deployed and serving real traffic on Supabase:
   Node process. R6's "NOT Vercel" assumption is superseded.
 - RENAMED FOR CONSISTENCY -> `my-youth-camp`: GitHub repo (now
   citipointe-youth/my-youth-camp, auto-deploys from master) + Vercel project +
-  domain. Supabase project label rename (cosmetic; ref nwfafrgojqkxylbppywo and
-  connection strings unchanged) left for the owner in the dashboard.
+  domain + the Supabase project label (ref nwfafrgojqkxylbppywo + connection
+  strings unchanged — the rename is cosmetic). All four now read `my-youth-camp`.
+
+CSV IMPORT — TWO BUGS FOUND VIA THE FIRST REAL UPLOAD (2026-06-22):
+- SPA (commit 9ac2c5b): adminUpload() branched on an UNDEFINED `isCsv`, so the
+  FileReader fell through to readAsArrayBuffer — csvData serialized to {} and the
+  backend rejected it (not a string); the error toast flashed by unseen ("no
+  confirmation, nothing changed"). Fixed: always readAsText (only .csv reaches it).
+- DB (the real one): migration 005 was never applied, so the people insert threw
+  PostgresError "column medicare_number of relation people does not exist" (the repo
+  writes medicare_number / church_unlisted_note / elvanto_meta). In-memory import was
+  fine — Supabase-only. Fixed by APPLYING 005 to nwfafrgojqkxylbppywo. The Elvanto
+  sample (Camp Sample Data.csv) then imported cleanly: 3 people (2 youth + 1 leader,
+  "18+ Leader" -> kind=leader) + 3 auto-created churches, all linked, medical fields
+  stored. (The import is NOT transactional across churches+people — a mid-import
+  failure can leave churches created with no people; re-import is idempotent by name.)
 
 ===============================================================================
 KNOWN RISKS / VERIFY LATER  (the point of this log)

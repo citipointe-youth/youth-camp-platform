@@ -5,9 +5,10 @@
 --                           Submission Status, raw Person cell, Person Status, Today's Date)
 --                           kept so an export reproduces the source CSV byte-for-byte.
 --
--- NOTE: the Supabase repo layer is unverified scaffolding (see
--- src/repositories/supabase/README.md, KNOWN RISK R11); this migration is provided for
--- parity and is NOT applied as part of this change.
+-- APPLIED 2026-06-22 to the production project (nwfafrgojqkxylbppywo). Originally
+-- authored for parity and left unapplied; the live CSV import then failed with
+-- "column medicare_number of relation people does not exist" because the repo
+-- (supabase.people.ts) writes these 3 columns. Applying this migration fixed it.
 alter table if exists people
   add column if not exists medicare_number text,
   add column if not exists church_unlisted_note text,
