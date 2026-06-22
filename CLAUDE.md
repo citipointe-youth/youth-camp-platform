@@ -1,6 +1,6 @@
 # CLAUDE.md — Youth Camp Platform
 
-> **Scope:** the real **camp** app — TS/Express backend (`src/`) + `public/` SPA. The offline demos live in `../youth app demo/CLAUDE.md` (that folder is the Vercel deploy source; `git push` here no longer deploys). Project map: `../CLAUDE.md`. Sibling app: `../youth-allocation-platform/CLAUDE.md`. Change workflow: `../CHANGE-PROMPTS.md`.
+> **Scope:** the real **camp** app — TS/Express backend (`src/`) + `public/` SPA. The offline demos live in `../youth app demo/CLAUDE.md` (that folder is the Vercel deploy source for the **demo** at `yc-camp-demo`). **This repo auto-deploys the real app to https://my-youth-camp.vercel.app on push to `master`.** Project map: `../CLAUDE.md`. Sibling app: `../youth-allocation-platform/CLAUDE.md`. Change workflow: `../CHANGE-PROMPTS.md`.
 
 Guidance for Claude Code when working in this package. Read this before editing.
 
@@ -15,33 +15,35 @@ An admin can switch the entire app between modes via `POST /admin/mode`. All use
 
 The app is **platform-agnostic**: persistence is in-memory (optionally snapshotted to JSON files), with a Supabase backend in progress. Swapping to a real DB touches only `src/container.ts` + new repository implementations.
 
-## ⚠️ Production deployment IN PROGRESS — read this first
+## ✅ DEPLOYED — live on Supabase (2026-06-22)
 
-This package is mid-way through a port from in-memory to a real **Supabase** backend.
-The authoritative trackers are:
+**Production: https://my-youth-camp.vercel.app** (`PERSISTENCE=supabase`). The port from
+in-memory to a real Supabase backend is done and serving traffic.
 
-- **`CHANGELOG.txt`** — every change made, phase by phase, with a **KNOWN RISKS /
-  VERIFY LATER** section (R1–R11) that the next session MUST work through.
-- **`docs/DEPLOYMENT-DESIGN.md`** — the design + phased implementation plan + decisions.
-- **`docs/REMAINING-WORK.md`** — what's left, sequenced, with open questions for the owner.
-- **`docs/verification/`** — Python static/behavioural harness used in place of `tsc`/`vitest`.
-- **`docs/archive/`** — superseded pre-deployment plans/specs (historical only).
+| | |
+|---|---|
+| **GitHub** | `citipointe-youth/my-youth-camp` — **auto-deploys from `master`** |
+| **Vercel** | team `citipointe-youth`, project `my-youth-camp` (serverless via `api/index.ts`) |
+| **Supabase** | ref `nwfafrgojqkxylbppywo` (Sydney); all 16 tables applied; reached via `DATABASE_URL` (transaction pooler) |
+| **Login** | `admin` (username, not email); password set in the DB post-deploy |
 
-**Critical context for anyone editing:**
-- **All deployment work to date was authored WITHOUT a Node toolchain** (no `tsc`/`vitest`/
-  `npm`, no network). It is verified by the Python harness + manual review only — a real
-  `npm install && npm run typecheck && npm run test` has **not** been run yet and is the
-  required gate before trusting any of it (KNOWN RISK R1).
-- **Phase 1 (Person unification) is HALF-DONE BY DESIGN.** The unified `Person` entity,
-  repo and service exist and are tested, but **nothing live uses them yet** — the app still
-  runs on the separate `Registrant`/`Camper` entities/repos/services. The switchover is the
-  deferred "Step 4" (needs the compiler + SPA). Don't assume `Person` is active (R2).
-- **`src/repositories/supabase/` is UNVERIFIED SCAFFOLDING** — see its `README.md`. The
-  schema migrations (`supabase/migrations/`) are written but not applied; most repos aren't
-  written yet (R11).
-- **Fixed defects so far** (all harness-verified): app-won't-start, accommodation availability
-  (B1), reset/new-year semantics (A3/A4), timezone handling (B3), CSV import perf + BOM (C1),
-  remind scoping (C2), stateless auth + security headers + login rate-limit (Phase 4 partial).
+Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolved — see
+"PHASE 6: DEPLOYMENT"), `docs/DEPLOYMENT-DESIGN.md`, `docs/REMAINING-WORK.md`,
+`docs/verification/` (Python harness), `docs/archive/` (historical).
+
+### ⚠️ Two deploy-only gotchas — DON'T regress these (neither is caught by `tsc`/`vitest`)
+1. **`tsconfig` must emit CommonJS** (`module: CommonJS`, `moduleResolution: Node`). Switching
+   back to `ESNext`/`Bundler` makes `@vercel/node` crash on load with *"Cannot use import
+   statement outside a module"* (it runs the traced output as CJS). Mirrors the CMS config.
+2. **`.gitignore` must keep the `/data/` rule anchored** (leading slash). An unanchored
+   `data/` also matches `src/data/`, which silently drops `src/data/seed.ts` from git — CLI
+   deploys still work but the git auto-deploy fails with *"Cannot find module './data/seed'"*.
+
+### Status of the bigger roadmap
+- **Gate 0 passes** — `npm run typecheck` clean, **186 tests pass** (the once-pending compiler gate, R1, is closed).
+- **Supabase repo layer is complete and wired** (`PERSISTENCE==='supabase'` branch in `container.ts`); migrations applied; all repos verified round-tripping in prod (R11 closed).
+- **Phase 1 (Person unification) is still HALF-DONE BY DESIGN.** The unified `Person` entity/repo/service exist, are tested, AND the Supabase layer targets the `people` table — but the live read/write paths still run on the separate `Registrant`/`Camper` services. The "Step 4" switchover (`docs/STEP4-SWITCHOVER.md`) is still pending (R2). Don't assume `Person` is the live path.
+- **Fixed defects** (now compiler-confirmed): app-won't-start, accommodation availability (B1), reset/new-year (A3/A4), timezone (B3), CSV import perf + BOM (C1), remind scoping (C2), stateless auth + security headers + login rate-limit.
 
 ## Commands (run from this folder)
 
@@ -61,7 +63,7 @@ Default port: **4200**. Set `PORT=xxxx` to override.
 |---|---|
 | `memory` (default) | In-memory; demo seed runs on startup |
 | `json` | In-memory + JSON files in `DATA_DIR` |
-| `supabase` | Supabase Postgres (requires `DATABASE_URL`) — **repo layer is unverified scaffolding, see `src/repositories/supabase/README.md`** |
+| `supabase` | Supabase Postgres (requires `DATABASE_URL`) — **the live production backend** (ref `nwfafrgojqkxylbppywo`; use the transaction-pooler URL on port 6543, not the IPv6-only direct host) |
 
 ```
 PORT=4200
@@ -132,7 +134,7 @@ Sessions are derived from schedule items with `isCheckInPoint: true`. There is n
 | `public/index.html` | Implementation-ready SPA — **rebuilt 2026-06-10 from the demo, wired to the real Express backend.** Same UI/RENDER layer as `camp-platform.html`; demo-only layers (MockAPI/`_DB`/seed/localStorage/phone affordances) removed; a real `api()` + role-based auth substituted. |
 | `../youth app demo/camp-platform.html` | Standalone offline demo — all API calls handled by an embedded MockAPI. The **UI source of truth**; the SPA's screens are ported from here. |
 
-> **Demos moved out of this repo.** All demo HTML (landing `index.html`, `camp-platform.html`, the `allocation-*` demos, `exec-presentation.html`, `suite-briefing.html`, `training.html`, `assets/`) now lives in the sibling **`youth app demo/`** folder, which is the Vercel deploy source for `yc-camp-demo`. Deploy with `vercel deploy --prod --yes` **from `youth app demo/`** (CLI; the `.vercel` link lives there). This repo's Git auto-deploy has been disconnected, so **`git push` no longer deploys**. This repo keeps only the real camp backend (`src/`, `public/`, `docs/`).
+> **Demos moved out of this repo.** All demo HTML (landing `index.html`, `camp-platform.html`, the `allocation-*` demos, `exec-presentation.html`, `suite-briefing.html`, `training.html`, `assets/`) now lives in the sibling **`youth app demo/`** folder, which is the Vercel deploy source for `yc-camp-demo`. Deploy the demo with `vercel deploy --prod --yes` **from `youth app demo/`** (CLI; the `.vercel` link lives there). That demo auto-deploy is separate from this repo. **This repo (the real camp app) auto-deploys to `my-youth-camp.vercel.app` on push to `master`**, and keeps only the real camp backend (`src/`, `public/`, `docs/`).
 
 The mode badge in the header shows **PRE-CAMP** (amber) or **AT CAMP** (green). In the demo, clicking the badge switches mode for anyone; in the SPA the badge is display-only (mode switches via the admin console). The **Day 1/Day 2** badge in the SPA is client-side only (the backend has no `campDay` field).
 

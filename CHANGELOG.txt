@@ -7,19 +7,24 @@ docs/DEPLOYMENT-DESIGN.md; the audit findings it acts on are summarised there.
 
 IMPORTANT — VERIFICATION CONTEXT (read before trusting any "DONE" below)
 -----------------------------------------------------------------------
-All work to date was authored in an environment with NO Node/npm/tsc/vitest and
+*** STATUS UPDATE 2026-06-22: THE APP IS NOW DEPLOYED AND LIVE on Supabase at
+    https://my-youth-camp.vercel.app. The authoritative gate below HAS now been
+    run on a real machine — tsc is clean and all 186 tests pass (no fixes were
+    needed). See "PHASE 6: DEPLOYMENT — GONE LIVE" for the deploy + the two
+    deploy-only bugs that tsc/vitest could not catch. The historical caveat below
+    applies to the Phase 0-3 authoring environment only. ***
+
+The Phase 0-3 work was authored in an environment with NO Node/npm/tsc/vitest and
 NO network (cannot install a toolchain). Code was therefore verified with a
 Python static/behavioural harness in docs/verification/ (import-export
 resolution, enum-literal conformance, and simulation of each test file's actual
-assertions) PLUS manual review against the entity interfaces. This is a strong
-but INCOMPLETE substitute. The authoritative gate has NOT yet been run:
+assertions) PLUS manual review against the entity interfaces — a strong but
+INCOMPLETE substitute. That authoritative gate:
 
     npm install && npm run typecheck && npm run test
 
-Until that gate passes on a real machine, treat every "DONE" as "verified by the
-harness, pending compiler confirmation". The KNOWN RISKS section at the bottom
-lists exactly what the harness cannot prove and where a real tsc/vitest is most
-likely to surface something.
+has since PASSED (Phase 6). The KNOWN RISKS section at the bottom still lists what
+the harness could not prove; several are now resolved (annotated inline).
 
 -------------------------------------------------------------------------------
 PHASE 0: MAKE-IT-RUN + SAFETY NET  (2026-06-18)
@@ -335,6 +340,58 @@ PHASE 3: SUPABASE SCHEMA  (2026-06-18, in progress)
   READS/WRITES these tables (src/repositories/supabase/) is NOT yet written — it is
   the next Phase-3 step and needs the `postgres` client + tsc to be done safely.
 
+-------------------------------------------------------------------------------
+PHASE 6: DEPLOYMENT — GONE LIVE  (2026-06-22)
+-------------------------------------------------------------------------------
+The app is now deployed and serving real traffic on Supabase:
+
+    https://my-youth-camp.vercel.app   (PERSISTENCE=supabase)
+
+- GATE 0 RUN AT LAST (resolves R1): `npm install && npm run typecheck && npm run
+  test` all pass on a real machine — tsc --noEmit is clean, 186/186 vitest tests
+  pass. The harness-verified code held up; no compiler fixes were needed.
+- SUPABASE REPO LAYER COMPLETE + APPLIED (resolves R11): src/repositories/supabase/
+  is fully written (people, users, churches, accommodation, zones, groups, notes,
+  notifications, schedule, settings, faqs, devotionals, defaults) and wired in
+  container.ts behind PERSISTENCE==='supabase'. All 5 migrations (001-005, incl.
+  004_fix_zones_groups_schema + 005_person_extra_fields) applied to project
+  nwfafrgojqkxylbppywo (Sydney); all 16 tables live and round-tripping (verified
+  login + /auth/me + /settings + /home against production).
+- SERVERLESS ENTRY: api/index.ts (Vercel @vercel/node handler caching
+  createAppInstance()) + vercel.json (function maxDuration 30s, includeFiles
+  public/**, SPA rewrite all routes -> /api/index).
+
+  >> TWO DEPLOY-ONLY BUGS FOUND AND FIXED (neither is catchable by tsc/vitest;
+     both only bite on Vercel's git-triggered serverless build) <<
+
+  1. ESM/CJS CRASH. tsconfig emitted ESM (module: ESNext, moduleResolution:
+     Bundler) but @vercel/node runs the traced output as CommonJS (no
+     "type":"module"), so the function crashed on load with "Cannot use import
+     statement outside a module". FIX: module: CommonJS / moduleResolution: Node
+     (mirrors the working connection-made-simple config). Commit 0840c5c.
+  2. src/data/ MISSING FROM GIT. The unanchored .gitignore rule `data/` also
+     matched src/data/, so src/data/seed.ts + index.ts were NEVER committed.
+     CLI deploys uploaded the working tree and worked, masking it — but the
+     git-connected auto-deploy from master failed with "Cannot find module
+     './data/seed'". FIX: anchor to /data/ (root runtime dir only) + commit the
+     two files. Commit 59138b0.
+
+- ENV (production, Vercel team citipointe-youth): PERSISTENCE=supabase,
+  DATABASE_URL=<Supavisor transaction pooler, port 6543> (the direct
+  db.<ref>.supabase.co host is IPv6-only and fails on Vercel — see CMS gotcha),
+  SESSION_SECRET set (resolves R5(d)), CORS_ORIGINS=https://my-youth-camp.vercel.app,
+  NODE_ENV=production. The Supabase<->Vercel marketplace integration also injects
+  POSTGRES_*/SUPABASE_* vars, but the app reads DATABASE_URL only.
+- ADMIN PASSWORD SET (closes the 002_seed_admin NULL-hash gap): the seeded `admin`
+  account (username login, id user_seed_admin) now has a real scrypt hash. R9
+  (new-year restores church/zone accounts password-less) still stands for rollover.
+- HOSTING DECIDED = VERCEL (resolves R6): serverless + Supabase, not a long-lived
+  Node process. R6's "NOT Vercel" assumption is superseded.
+- RENAMED FOR CONSISTENCY -> `my-youth-camp`: GitHub repo (now
+  citipointe-youth/my-youth-camp, auto-deploys from master) + Vercel project +
+  domain. Supabase project label rename (cosmetic; ref nwfafrgojqkxylbppywo and
+  connection strings unchanged) left for the owner in the dashboard.
+
 ===============================================================================
 KNOWN RISKS / VERIFY LATER  (the point of this log)
 ===============================================================================
@@ -347,6 +404,8 @@ through these. Ordered by likelihood of biting.
      interface), generic inference in the repo base classes, or
      noUncheckedIndexedAccess corners. Expect the first tsc run to surface a
      small number of these. None should be deep — the logic is simulated-correct.
+     -> RESOLVED 2026-06-22 (Phase 6): gate ran on a real machine — tsc clean,
+        186/186 tests pass, no compiler fixes needed.
 
 [R2] PHASE 1 IS HALF-MIGRATED BY DESIGN. The unified Person model/repo/service
      exist and are tested, but NOTHING LIVE USES THEM YET — the app still runs on
@@ -392,11 +451,17 @@ through these. Ordered by likelihood of biting.
      limiter is in-memory/per-instance — for a hard global limit on multi-instance
      hosting it needs a shared store. (d) MUST set SESSION_SECRET in the deploy env
      (a startup warning fires if unset in production) — add to the operator runbook.
+     -> (d) RESOLVED 2026-06-22 (Phase 6): SESSION_SECRET is set in the production
+        env. (a)/(b)/(c) still stand: RLS is in migration 003 (confirm the
+        superuser DATABASE_URL bypasses it + a leaked anon key is denied); the
+        error-sanitization audit and the per-instance rate-limiter remain open.
 
 [R6] HOSTING UNDECIDED: Supabase chosen; NOT Vercel; target is the org's existing
      domain. Whether that domain can run a long-lived Node process (vs static
      hosting needing a subdomain on a container host) is still open and gates the
      deployment/ops section.
+     -> RESOLVED 2026-06-22 (Phase 6): hosting = VERCEL serverless + Supabase (not a
+        long-lived Node process). This "NOT Vercel" assumption is superseded.
 
 [R7] HARNESS FALSE-POSITIVES are documented in docs/verification/README.md
      (timezone vs zone regex; shorthand-property + nested-object miscounts in the
@@ -419,6 +484,10 @@ through these. Ordered by likelihood of biting.
       repository implementation yet (src/repositories/supabase/ is empty). Writing
       those repos needs the `postgres` client + tsc. 002_seed_admin sets a NULL
       password_hash — set a real one before first login.
+      -> RESOLVED 2026-06-22 (Phase 6): the full Supabase repo layer is written +
+         wired (PERSISTENCE=supabase), all migrations applied to nwfafrgojqkxylbppywo,
+         all 16 tables verified round-tripping in production, and the admin
+         password_hash is set.
 
 [R10] zonedNow() MIDNIGHT EDGE CASE. Some Node/V8 versions emit hour '24' for
       midnight under Intl.DateTimeFormat({hour12:false}); zonedNow maps '24'->'00'.
