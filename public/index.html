@@ -1339,12 +1339,14 @@ async function saveSettings(){
 
 /* ===== ADMIN DATA ===== */
 RENDER.adminData=function(){
-  const uploadSection=CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
+  // CSV student import is available to the admin in BOTH modes (the Admin console is
+  // admin-only); only the at-camp Notifications card stays mode-gated.
+  const uploadSection=`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
     <input type="file" id="fileIn" accept=".csv" class="fld">
     <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
     <p class="note-hint">Matches existing students by name — adds new ones and updates changed fields.</p>
-    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>
-    <div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'';
+    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`
+    +(CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'');
   paint('adminData',`${uploadSection}
     <div class="card"><div class="h3" style="margin-top:0">New year</div>
       <button class="btn" onclick="adminSaveDefaults()">Save baseline (incl. devotionals)</button>
