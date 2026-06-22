@@ -10,3 +10,4 @@ dist/
 .superpowers/
 .vercel/
 .DS_Store
+supabase/.temp/
