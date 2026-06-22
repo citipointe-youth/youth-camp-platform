@@ -3,7 +3,7 @@ node_modules/
 
 # build / runtime
 dist/
-data/
+/data/
 *.log
 
 # tooling / local
