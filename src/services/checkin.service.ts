@@ -3,7 +3,6 @@ import type { ScheduleItem } from '../core/entities/schedule';
 import type { Actor } from '../core/entities/user';
 import { assertCan } from './access-control';
 import { canAccessPerson } from './person.service';
-import { isCamper } from '../core/entities/person';
 import { toRosterEntry, type RosterEntry } from '../api/dto/person.dto';
 import { NotFoundError, BadRequestError } from '../core/errors/app-error';
 import { zonedNow } from '../utils/date';
@@ -78,7 +77,7 @@ export function makeCheckInService(
 
       const session = scheduleItemToSession(item);
       const allPeople = await personRepo.findAll();
-      const scoped = allPeople.filter((p) => isCamper(p) && canAccessPerson(actor, p));
+      const scoped = allPeople.filter((p) => p.atCamp && canAccessPerson(actor, p));
       const roster: RosterEntry[] = scoped.map((p) => toRosterEntry(p, sessionId));
       const checkedInCount = roster.filter((r) => r.checkedIn).length;
 

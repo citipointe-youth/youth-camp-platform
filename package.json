@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "postgres": "^3.4.9",
     "zod": "^3.23.8"

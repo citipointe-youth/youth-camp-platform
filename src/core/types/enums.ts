@@ -8,7 +8,7 @@ export const ZONE_NAMES = ['Yellow', 'Blue', 'Green', 'Red'] as const;
 export type ZoneName = (typeof ZONE_NAMES)[number];
 
 // Combined roles — church is the shared per-church login (covers both pre-camp and at-camp)
-export const USER_ROLES = ['church', 'zoneLeader', 'director', 'admin'] as const;
+export const USER_ROLES = ['church', 'zoneLeader', 'director', 'admin', 'firstAid'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const ACCOMMODATION_KINDS = ['tent', 'classroom'] as const;

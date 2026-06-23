@@ -18,6 +18,8 @@ function toSettings(r: Record<string, unknown>): CampSettings {
     checkInDays: (r['check_in_days'] as string[] | null) ?? [],
     accommodationLocked: r['accommodation_locked'] as boolean,
     campMode: r['camp_mode'] as CampSettings['campMode'],
+    lastTempPasswords: (r['last_temp_passwords'] as CampSettings['lastTempPasswords']) ?? null,
+    lastExportedAt: (r['last_exported_at'] as Date | null)?.toISOString() ?? null,
     createdAt: (r['created_at'] as Date).toISOString(),
     updatedAt: (r['updated_at'] as Date).toISOString(),
   };
@@ -38,6 +40,8 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
     check_in_days: s.checkInDays,
     accommodation_locked: s.accommodationLocked,
     camp_mode: s.campMode,
+    last_temp_passwords: s.lastTempPasswords ?? null,
+    last_exported_at: s.lastExportedAt ?? null,
     created_at: s.createdAt,
     updated_at: s.updatedAt,
   };
@@ -46,7 +50,8 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
 const UPDATE_COLS = [
   'camp_name', 'year', 'start_date', 'end_date', 'timezone',
   'check_in_location', 'check_in_from', 'check_in_banner', 'register_base_url',
-  'check_in_days', 'accommodation_locked', 'camp_mode', 'updated_at',
+  'check_in_days', 'accommodation_locked', 'camp_mode',
+  'last_temp_passwords', 'last_exported_at', 'updated_at',
 ] as const;
 
 export class SupabaseSettingsRepository implements ISettingsRepository {

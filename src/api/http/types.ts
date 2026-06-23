@@ -10,6 +10,7 @@ export interface HttpRequest {
   params: Record<string, string>;
   query: Record<string, string | undefined>;
   body: unknown;
+  ip?: string;
 }
 
 export interface Route {
@@ -17,6 +18,15 @@ export interface Route {
   path: string;
   auth: boolean;
   handler(req: HttpRequest): Promise<unknown>;
+}
+
+export interface BufferRoute {
+  method: 'GET' | 'POST';
+  path: string;
+  auth: boolean;
+  contentType: string;
+  filename: string;
+  bufferHandler(req: HttpRequest): Promise<Buffer>;
 }
 
 export interface ApiErrorBody {

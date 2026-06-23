@@ -101,5 +101,5 @@ export function toCsvRow(values: string[]): string {
 
 export function toCsvString(headers: string[], rows: string[][]): string {
   const lines = [toCsvRow(headers), ...rows.map(toCsvRow)];
-  return lines.join('\n');
+  return '﻿' + lines.join('\n');
 }

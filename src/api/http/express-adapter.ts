@@ -1,6 +1,6 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { env } from '../../config/env';
-import type { Route, HttpRequest } from './types';
+import type { Route, BufferRoute, HttpRequest } from './types';
 import type { AuthService } from '../../services/auth.service';
 import { resolveContext } from '../middleware/auth.middleware';
 import { sendError } from '../middleware/error.middleware';
@@ -13,7 +13,7 @@ const logger = createLogger('http');
 // Login throttle: 10 attempts per IP per 15-minute window (matches CMS).
 const loginLimiter = new RateLimiter(10, 15 * 60 * 1000);
 
-export function createApp(routes: Route[], authService: AuthService): Express {
+export function createApp(routes: (Route | BufferRoute)[], authService: AuthService): Express {
   const app = express();
   app.set('trust proxy', true); // honour X-Forwarded-For behind a reverse proxy
 
@@ -81,8 +81,16 @@ export function createApp(routes: Route[], authService: AuthService): Express {
           params: req.params as Record<string, string>,
           query: req.query as Record<string, string | undefined>,
           body: req.body,
+          ip: req.ip,
         };
 
+        if ('bufferHandler' in route) {
+          const buffer = await route.bufferHandler(httpReq);
+          res.setHeader('Content-Type', route.contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${route.filename}"`);
+          res.send(buffer);
+          return;
+        }
         const result = await route.handler(httpReq);
         res.json(result);
       } catch (err) {

@@ -24,7 +24,7 @@ import type { StudentNote } from '../core/entities/note';
 import type { Devotional } from '../core/entities/devotional';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';
-import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
+import { ForbiddenError, NotFoundError, WipeGuardError, BadRequestError } from '../core/errors/app-error';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
@@ -168,6 +168,8 @@ function settings(over: Partial<CampSettings> = {}): CampSettings {
     checkInDays: [],
     accommodationLocked: false,
     campMode: 'pre-camp',
+    // Default to exported so tests pass the wipe guard without needing force opts.
+    lastExportedAt: NOW,
     createdAt: NOW,
     updatedAt: NOW,
     ...over,
@@ -304,6 +306,29 @@ describe('AdminService.reset', () => {
     expect(s).not.toBeNull();
     expect(s!.year).toBe(2026);
   });
+
+  it('wipe guard: reset throws WipeGuardError when lastExportedAt is null', async () => {
+    // Override settings to have no lastExportedAt
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    const svc = build(repos);
+    await expect(svc.reset(actor('admin'))).rejects.toBeInstanceOf(WipeGuardError);
+  });
+
+  it('wipe guard: reset passes with force + confirmWipe string', async () => {
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    const svc = build(repos);
+    const result = await svc.reset(actor('admin'), {
+      force: true,
+      confirmWipe: 'I understand this cannot be undone',
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('wipe guard: force:true alone (without confirmWipe) throws BadRequestError', async () => {
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    const svc = build(repos);
+    await expect(svc.reset(actor('admin'), { force: true })).rejects.toThrow();
+  });
 });
 
 // =============================================================================
@@ -383,8 +408,12 @@ describe('AdminService.newYear', () => {
   it('throws NotFoundError when settings are not initialised', async () => {
     const fresh = await makeRepos();
     // No settings saved -> settingsService.get() throws NotFoundError.
+    // The wipe guard runs first and would throw WipeGuardError on an un-exported
+    // system, so bypass it with force+confirmWipe to reach the settings check.
     const svc = build(fresh);
-    await expect(svc.newYear(actor('admin'), 2027)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      svc.newYear(actor('admin'), 2027, { force: true, confirmWipe: 'I understand this cannot be undone' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws NotFoundError when no defaults snapshot exists (cannot restore scaffold)', async () => {
@@ -451,6 +480,39 @@ describe('AdminService.newYear', () => {
     // u1 admin kept; live u2 church replaced by the baseline church user.
     expect(users.map((u) => u.id).sort()).toEqual(['baseChurchUser', 'u1'].sort());
     expect(users.find((u) => u.role === 'admin')!.id).toBe('u1');
+  });
+
+  it('newYear returns tempPasswords in the response', async () => {
+    await saveBaseline();
+    const svc = build(repos);
+    const result = await svc.newYear(actor('admin'), 2027);
+    expect(result).toHaveProperty('tempPasswords');
+    expect(Array.isArray(result.tempPasswords)).toBe(true);
+  });
+
+  it('wipe guard: newYear throws WipeGuardError when lastExportedAt is null', async () => {
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    await saveBaseline();
+    const svc = build(repos);
+    await expect(svc.newYear(actor('admin'), 2027)).rejects.toBeInstanceOf(WipeGuardError);
+  });
+
+  it('wipe guard: newYear passes with force + confirmWipe', async () => {
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    await saveBaseline();
+    const svc = build(repos);
+    const result = await svc.newYear(actor('admin'), 2027, {
+      force: true,
+      confirmWipe: 'I understand this cannot be undone',
+    });
+    expect(result.year).toBe(2027);
+  });
+
+  it('wipe guard: bare force:true alone (without confirmWipe) throws BadRequestError for newYear', async () => {
+    await repos.settingsRepo.saveSingleton(settings({ lastExportedAt: null }));
+    await saveBaseline();
+    const svc = build(repos);
+    await expect(svc.newYear(actor('admin'), 2027, { force: true })).rejects.toBeInstanceOf(BadRequestError);
   });
 });
 

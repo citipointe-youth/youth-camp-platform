@@ -46,14 +46,11 @@ export function applySignIn(
   return applyCheckIn(person, 'in');
 }
 
-/** Append a check-in entry and apply the resulting promotion in one immutable step. */
+/** Append a check-in entry only — never mutates lifecycle or atCamp. */
 export function withCheckIn(person: Person, entry: CheckInEntry, now: string): Person {
-  const next = applyCheckIn(person, entry.type);
   return {
     ...person,
     checkInHistory: [...person.checkInHistory, entry],
-    lifecycle: next.lifecycle,
-    atCamp: next.atCamp,
     updatedAt: now,
   };
 }

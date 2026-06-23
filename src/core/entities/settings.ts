@@ -20,6 +20,10 @@ export interface CampSettings {
   accommodationLocked: boolean;
   // Mode switch
   campMode: CampMode;
+  // Temp passwords from the most recent new-year rollover, cleared after export.
+  lastTempPasswords?: Array<{ username: string; tempPassword: string }> | null;
+  // Timestamp of the last successful audit export; wipe guard requires this to be set.
+  lastExportedAt?: string | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

@@ -160,6 +160,41 @@ describe('ImportService.importCsv — updateExisting', () => {
   });
 });
 
+describe('ImportService.importCsv — dryRun', () => {
+  it('dryRun:true returns counts but does NOT persist any persons', async () => {
+    const { svc, personRepo } = await build();
+    const res = await svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,9',
+      dryRun: true,
+    });
+    expect(res.dryRun).toBe(true);
+    expect(res.created).toBe(1);
+    const all = await personRepo.findAll();
+    expect(all).toHaveLength(0); // nothing written
+  });
+
+  it('dryRun:true flags unrecognised church names as phantomChurches with a warning', async () => {
+    const { svc, churchRepo } = await build([]);
+    const res = await svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,New Church,9',
+      dryRun: true,
+    });
+    expect(res.phantomChurches).toContain('New Church');
+    expect(res.warnings.length).toBeGreaterThan(0);
+    const churches = await churchRepo.findAll();
+    expect(churches).toHaveLength(0); // not created in dry-run
+  });
+
+  it('dryRun result has dryRun:true in the returned object', async () => {
+    const { svc } = await build();
+    const res = await svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church\nAda,Lovelace,Victory',
+      dryRun: true,
+    });
+    expect(res.dryRun).toBe(true);
+  });
+});
+
 describe('ImportService.importCsv — Elvanto export shape', () => {
   const ELVANTO_HEADER =
     'Date Submitted,Submission Status,Person,Person Status,First Name,Last Name,Gender,Date of Birth,School Grade,Mobile Number,Email Address,Suburb,Postcode,State,Medicare Number,Medical Conditions,Dietary Requirements,List Other Medical Conditions or Medication Taken,Attendee\'s Church,"If from a church not listed, please specify church name & Youth Pastor",Blue Card/Working with Children Card Number,Blue Card/Working with Children Card Expiry,I give medical consent for my child as listed above.,I give photography and video consent for my child as listed above.,I understand and agree to the Supervision policy.,Parent/Guardian Name,Relation to Child,Parent/Guardian Phone Number,Today\'s Date';

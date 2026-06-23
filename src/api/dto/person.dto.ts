@@ -55,11 +55,17 @@ export interface CamperDto {
   zone: string;
   groupId: string | null;
   mobile: string | null;
+  gender: Person['gender'];
   grade: Person['grade'];
+  dateOfBirth: string | null;
   medicalConditions: string[];
   dietaryRequirements: string[];
+  otherMedications: string | null;
+  medicareNumber: string | null;
   parentGuardianName: string | null;
   parentPhone: string | null;
+  parentRelation: string | null;
+  consentMedical: boolean;
   blueCardNumber: string | null;
   blueCardExpiry: string | null;
   lifecycle: Person['lifecycle'];
@@ -77,6 +83,9 @@ export interface RosterEntry {
   lastName: string;
   church: string;
   zone: string;
+  gender: Person['gender'];
+  grade: Person['grade'];
+  medicalFlag: boolean;
   checkedIn: boolean;
   lastEntry: 'in' | 'out' | null;
 }
@@ -133,11 +142,17 @@ export function toCamperDto(p: Person): CamperDto {
     zone: p.zone,
     groupId: p.groupId ?? null,
     mobile: p.mobile ?? null,
+    gender: p.gender,
     grade: p.grade ?? null,
+    dateOfBirth: p.dateOfBirth ?? null,
     medicalConditions: p.medicalConditions,
     dietaryRequirements: p.dietaryRequirements,
+    otherMedications: p.otherMedications ?? null,
+    medicareNumber: p.medicareNumber ?? null,
     parentGuardianName: p.parentGuardianName ?? null,
     parentPhone: p.parentPhone ?? null,
+    parentRelation: p.parentRelation ?? null,
+    consentMedical: p.consents.medical?.granted ?? false,
     blueCardNumber: p.blueCardNumber ?? null,
     blueCardExpiry: p.blueCardExpiry ?? null,
     lifecycle: p.lifecycle,
@@ -158,6 +173,9 @@ export function toRosterEntry(p: Person, sessionId: string): RosterEntry {
     lastName: p.lastName,
     church: p.churchName,
     zone: p.zone,
+    gender: p.gender,
+    grade: p.grade ?? null,
+    medicalFlag: p.medicalConditions.length > 0 || p.otherMedications != null,
     checkedIn: last?.type === 'in',
     lastEntry: last?.type ?? null,
   };

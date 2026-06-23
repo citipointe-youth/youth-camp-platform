@@ -128,7 +128,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('counts a camper as due when never checked in to the current session', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.personRepo.save(camper({ id: 'x' })); // no check-ins
+    await h.personRepo.save(camper({ id: 'x', atCamp: true })); // no check-ins
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.checkInsDue).toBe(1);
@@ -137,7 +137,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('a camper checked IN to the current session is NOT due', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.personRepo.save(camper({ id: 'x', checkInHistory: [ci('cur', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci('cur', 'in', '2026-07-01T08:00:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.checkInsDue).toBe(0);
@@ -146,7 +146,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   it('a camper who checked in then OUT of the current session IS due again (D3)', async () => {
     const h = await build();
     await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.personRepo.save(camper({ id: 'x', checkInHistory: [
+    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [
       ci('cur', 'in', '2026-07-01T08:00:00Z'),
       ci('cur', 'out', '2026-07-01T09:00:00Z'),
     ] }));
@@ -159,7 +159,7 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
     const h = await build();
     await h.scheduleRepo.save(session('am', '00:00'));
     await h.scheduleRepo.save(session('pm', '00:01')); // current (latest started)
-    await h.personRepo.save(camper({ id: 'x', checkInHistory: [ci('am', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci('am', 'in', '2026-07-01T08:00:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.currentSession?.id).toBe('pm');

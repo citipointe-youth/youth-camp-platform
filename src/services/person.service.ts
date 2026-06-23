@@ -75,6 +75,8 @@ export interface PersonService {
   breakdown(actor: Actor): Promise<RegistrantBreakdown[]>;
   /** Log a reminder send for the given registrant IDs (scoped, skips cancelled). */
   remind(actor: Actor, ids: string[]): Promise<{ sent: number }>;
+  /** All at-camp persons with at least one medical flag, scoped by actor role. */
+  listMedicalWatch(actor: Actor): Promise<Person[]>;
 }
 
 /** True if the actor may access a person, by role + church/zone (mirrors canAccessCamper). */
@@ -82,6 +84,7 @@ export function canAccessPerson(actor: Actor, person: Pick<Person, 'churchId' | 
   switch (actor.role) {
     case 'admin':
     case 'director':
+    case 'firstAid':
       return true;
     case 'zoneLeader':
       return actor.zone != null && person.zone === actor.zone;
@@ -248,13 +251,18 @@ export function makePersonService(repo: IPersonRepository): PersonService {
     async checkIn(actor, personId, entry) {
       assertCan(actor, 'checkin:write');
       const person = await getOwned(actor, personId);
+      if (person.lifecycle === 'cancelled') {
+        throw new BadRequestError('Cannot check in a cancelled person');
+      }
+      if (!person.atCamp) {
+        throw new BadRequestError('Cannot check in a person who is not currently at camp');
+      }
       const full: CheckInEntry = { ...entry, id: newId('ci') };
-      // withCheckIn applies the D2 promotion (registered → arrived on first 'in').
       return repo.save(withCheckIn(person, full, nowISO()));
     },
 
     async signEvent(actor, personId, event) {
-      assertCan(actor, 'checkin:write');
+      assertCan(actor, 'attendance:write');
       const person = await getOwned(actor, personId);
       const full: SignOutEvent = { ...event, id: newId('so') };
       return repo.save(withSignEvent(person, full, nowISO()));
@@ -328,6 +336,16 @@ export function makePersonService(repo: IPersonRepository): PersonService {
         count++;
       }
       return { sent: count };
+    },
+
+    async listMedicalWatch(actor) {
+      assertCan(actor, 'camper:read');
+      const all = await repo.findAll();
+      return all.filter((p) => {
+        if (!isCamper(p) || !p.atCamp) return false;
+        if (!canAccessPerson(actor, p)) return false;
+        return p.medicalConditions.length > 0 || p.otherMedications != null;
+      });
     },
   };
 }

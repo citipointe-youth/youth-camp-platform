@@ -10,6 +10,7 @@ export type Action =
   | 'camper:read:sensitive'
   | 'camper:write'
   | 'checkin:write'
+  | 'attendance:write'
   | 'note:write'
   | 'note:read'
   | 'notification:send:zone'
@@ -26,6 +27,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'camper:read',
     'camper:read:sensitive',
     'checkin:write',
+    'attendance:write',
     'note:write',
   ]),
   zoneLeader: new Set<Action>([
@@ -33,6 +35,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'camper:read',
     'camper:read:sensitive',
     'checkin:write',
+    'attendance:write',
     'note:write',
     'note:read',
     'notification:send:zone',
@@ -45,6 +48,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'camper:read:sensitive',
     'camper:write',
     'checkin:write',
+    'attendance:write',
     'note:write',
     'note:read',
     'notification:send:zone',
@@ -59,12 +63,22 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'camper:read:sensitive',
     'camper:write',
     'checkin:write',
+    'attendance:write',
     'note:write',
     'note:read',
     'notification:send:zone',
     'notification:send:camp',
     'import:run',
     'admin:manage',
+  ]),
+  // firstAid: read-only at-camp access. No registrant:read (pre-camp hub is not accessible).
+  // attendance:write allows attendance sign-in/out only. checkin:write is intentionally withheld
+  // — firstAid must not record daily session entries, only physical presence events.
+  // Cannot send notifications — canSendNotification() returns false via default paths (intentional).
+  firstAid: new Set<Action>([
+    'camper:read',
+    'camper:read:sensitive',
+    'attendance:write',
   ]),
 };
 
@@ -82,12 +96,13 @@ export function assertCan(actor: Actor, action: Action): void {
  * Returns true if the actor can access data for the given church.
  * - church: own church only
  * - zoneLeader: own zone's churches (caller must check zone)
- * - director/admin: all
+ * - director/admin/firstAid: all
  */
 export function canAccessChurch(actor: Actor, churchId: string, churchZone?: string): boolean {
   switch (actor.role) {
     case 'admin':
     case 'director':
+    case 'firstAid':
       return true;
     case 'zoneLeader':
       if (!actor.zone || !churchZone) return false;

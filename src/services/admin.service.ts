@@ -21,14 +21,32 @@ import type { Devotional } from '../core/entities/devotional';
 import type { CampMode } from '../core/types/enums';
 import type { Actor } from '../core/entities/user';
 import { assertCan } from './access-control';
-import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
+import { ForbiddenError, NotFoundError, BadRequestError, WipeGuardError } from '../core/errors/app-error';
 import { nowISO } from '../utils/date';
 import { makeSettingsService } from './settings.service';
+import { generateTempPassword } from '../utils/temp-password';
+import { hashPassword } from '../utils/crypto';
+
+export interface TempPasswordEntry {
+  username: string;
+  tempPassword: string;
+}
+
+export interface NewYearResult extends CampSettings {
+  tempPasswords: TempPasswordEntry[];
+}
+
+export interface WipeOpts {
+  force?: boolean;
+  confirmWipe?: string;
+}
+
+const CONFIRM_WIPE_STRING = 'I understand this cannot be undone';
 
 export interface AdminService {
-  reset(actor: Actor): Promise<{ ok: true }>;
+  reset(actor: Actor, opts?: WipeOpts): Promise<{ ok: true }>;
   saveDefaults(actor: Actor): Promise<{ ok: true }>;
-  newYear(actor: Actor, year: number): Promise<CampSettings>;
+  newYear(actor: Actor, year: number, opts?: WipeOpts): Promise<NewYearResult>;
   clearNotifications(actor: Actor): Promise<{ deleted: number }>;
   setMode(actor: Actor, mode: CampMode): Promise<CampSettings>;
 }
@@ -48,6 +66,17 @@ export function makeAdminService(
 ): AdminService {
   const settingsService = makeSettingsService(settingsRepo);
 
+  async function assertExportedOrForce(opts?: WipeOpts): Promise<void> {
+    if (opts?.force && opts.confirmWipe === CONFIRM_WIPE_STRING) return;
+    if (opts?.force && opts.confirmWipe !== CONFIRM_WIPE_STRING) {
+      throw new BadRequestError(`force requires confirmWipe: "${CONFIRM_WIPE_STRING}"`);
+    }
+    const settings = await settingsRepo.getSingleton();
+    if (!settings?.lastExportedAt) {
+      throw new WipeGuardError();
+    }
+  }
+
   /** Replace a repository's whole contents with the given records (clear then save). */
   async function replaceAll<T extends { id: string }>(
     repo: { deleteAll(): Promise<number>; save(e: T): Promise<T> },
@@ -64,8 +93,9 @@ export function makeAdminService(
     // defaults snapshot (that is newYear's job) — this fixes defect A4, which used to
     // load the snapshot purely as a guard and then never restore from it. Non-admin
     // accounts are deleted; the single admin is preserved.
-    async reset(actor) {
+    async reset(actor, opts) {
       if (actor.role !== 'admin') throw new ForbiddenError('Only admin can reset data');
+      await assertExportedOrForce(opts);
 
       await Promise.all([
         personRepo.deleteAll(),
@@ -118,8 +148,9 @@ export function makeAdminService(
     // and RESTORES the scaffold (churches, accounts, accommodation, FAQ, schedule,
     // devotionals) from the saved defaults snapshot. Keeps the admin account and the
     // camp settings (bumps year, forces pre-camp). Requires a saved snapshot.
-    async newYear(actor, year) {
+    async newYear(actor, year, opts) {
       if (actor.role !== 'admin') throw new ForbiddenError('Only admin can advance the year');
+      await assertExportedOrForce(opts);
       const settings = await settingsService.get();
       const defaults = await snapshotRepo.getDefaults();
       if (!defaults) {
@@ -135,7 +166,7 @@ export function makeAdminService(
 
       // Restore the scaffold from the baseline. Accounts: replace all EXCEPT the
       // admin (the snapshot strips passwordHash, so seeded users would be passwordless
-      // — restore them with a null hash; an operator resets passwords post-rollover).
+      // — restore them with a temp password; an operator shares these at rollover).
       const admins = (await userRepo.findAll()).filter((u) => u.role === 'admin');
       await replaceAll<Church>(churchRepo, defaults.churches as Church[]);
       await replaceAll<AccommodationBlock>(accommodationRepo, defaults.accommodationBlocks as AccommodationBlock[]);
@@ -148,18 +179,24 @@ export function makeAdminService(
       );
       await userRepo.deleteAll();
       for (const a of admins) await userRepo.save(a);
+
+      const tempPasswords: TempPasswordEntry[] = [];
       for (const u of snapshotUsers) {
-        if (u.role === 'admin') continue; // never duplicate the preserved admin
-        await userRepo.save(u);
+        if (u.role === 'admin') continue;
+        const tempPassword = generateTempPassword();
+        const passwordHash = await hashPassword(tempPassword);
+        await userRepo.save({ ...u, passwordHash });
+        if (u.username) tempPasswords.push({ username: u.username, tempPassword });
       }
 
       const updated = await settingsRepo.saveSingleton({
         ...settings,
         year,
         campMode: 'pre-camp',
+        lastTempPasswords: tempPasswords,
         updatedAt: nowISO(),
       });
-      return updated;
+      return { ...updated, tempPasswords };
     },
 
     async clearNotifications(actor) {

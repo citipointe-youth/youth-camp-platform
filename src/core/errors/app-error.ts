@@ -43,3 +43,9 @@ export class UnprocessableEntityError extends AppError {
     super(422, 'VALIDATION_ERROR', m, d);
   }
 }
+
+export class WipeGuardError extends AppError {
+  constructor(m = 'Camp data has not been exported this season. Download the audit export first, or pass force+confirmWipe to override.') {
+    super(409, 'WIPE_GUARD', m);
+  }
+}

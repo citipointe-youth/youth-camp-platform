@@ -11,7 +11,7 @@ A **combined** youth camp management platform that merges two previously separat
 - **Hub** (pre-camp): registrant management, accommodation allocation, blue card & payment tracking, registration codes, FAQ
 - **Portal** (at-camp): daily check-in (twice daily), student notes, zone notifications, schedule, devotionals, contact search, CSV import
 
-An admin can switch the entire app between modes via `POST /admin/mode`. All users see the mode on next login.
+An admin can switch the entire app between modes via `POST /admin/mode`. Other logged-in sessions pick up the mode change automatically on next home-tab navigation (no logout required) — `RENDER.home` re-fetches `/settings` and rebuilds tabs if `campMode` changed.
 
 The app is **platform-agnostic**: persistence is in-memory (optionally snapshotted to JSON files), with a Supabase backend in progress. Swapping to a real DB touches only `src/container.ts` + new repository implementations.
 
@@ -40,10 +40,43 @@ Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolve
    deploys still work but the git auto-deploy fails with *"Cannot find module './data/seed'"*.
 
 ### Status of the bigger roadmap
-- **Gate 0 passes** — `npm run typecheck` clean, **186 tests pass** (the once-pending compiler gate, R1, is closed).
+- **Gate 0 passes** — `npm run typecheck` clean, **186 tests pass** (the once-pending compiler gate, R1, is closed). After the 2026-06-23 audit, test count will be higher (new tests added — see Audit fixes below).
 - **Supabase repo layer is complete and wired** (`PERSISTENCE==='supabase'` branch in `container.ts`); migrations applied; all repos verified round-tripping in prod (R11 closed).
 - **Phase 1 (Person unification) is still HALF-DONE BY DESIGN.** The unified `Person` entity/repo/service exist, are tested, AND the Supabase layer targets the `people` table — but the live read/write paths still run on the separate `Registrant`/`Camper` services. The "Step 4" switchover (`docs/STEP4-SWITCHOVER.md`) is still pending (R2). Don't assume `Person` is the live path.
 - **Fixed defects** (now compiler-confirmed): app-won't-start, accommodation availability (B1), reset/new-year (A3/A4), timezone (B3), CSV import perf + BOM (C1), remind scoping (C2), stateless auth + security headers + login rate-limit.
+
+### Audit fixes applied (2026-06-23)
+A deep audit across three areas was completed and all bugs addressed. Key changes:
+
+**Permissions & RBAC:**
+- `attendance:write` is now a separate permission from `checkin:write`. `firstAid` gets `attendance:write` (sign-in/out only); all other roles get both. `PersonService.signEvent` asserts `attendance:write`; `checkIn` still asserts `checkin:write`. firstAid is now blocked from daily session check-ins at the API level, not just the UI.
+
+**Mode switching:**
+- `RENDER.home` re-fetches `/settings` on every home-tab navigation and silently updates `CAMP_MODE` + rebuilds tabs if the admin switched mode on another device. No logout required.
+
+**SPA bug fixes:**
+- **BUG-04**: `chevron` and `clock` added to `ICONS` — firstAid rows, wizard, and schedule tab no longer show blank SVGs.
+- **BUG-05**: `TAB_OF.schedule` corrected from `'home'` to `'schedule'` — firstAid Schedule tab now highlights correctly.
+- **BUG-06**: Dead `api('/campers')` call removed from `renderOversightPulse` — no more double fetch on every at-camp home load.
+- **BUG-07**: Leader phone numbers in search results now use `telLink()` — tappable on mobile.
+- **BUG-03**: `revealMedicare` no longer re-fetches `/campers/:id`; uses `_currentCasualtyCard` set by `openCasualtyCard` — audit POST still fires.
+- **BUG-09**: Director gets a wide-nav sidebar (`Home, Check-in, Search, Notes, Import, Records & Export`) instead of a blank nav. Records & Export tile already shown for director on the admin console.
+- **BUG-16**: `doNewYear()` year is now `SETTINGS.year + 1` (not `new Date().getFullYear() + 1`).
+
+**Wipe guard (BUG-01, BUG-02, BUG-19):**
+- `adminNewYear()` (Admin → Data path) now redirects to the guided close-out flow instead of calling the backend without `force`/`confirmWipe`. The "Purge & start new year" button is replaced with a link to Records & Export.
+- `adminReset()` now requires typing the confirmation string AND sends `force:true` + `confirmWipe` to the backend. 409 responses show a modal pointing to Records & Export.
+- Admin → Data no longer has two competing new-year paths (BUG-19 resolved).
+
+**Backend:**
+- **BUG-08**: Audit controller reads settings *after* the service call so `lastExportedAt` stamp never races with `lastTempPasswords` clearing.
+- Import service preserves existing `elvantoMeta` on update if the CSV row has no `dateSubmitted`.
+
+**New tests:**
+- `access-control.test.ts`: 6 firstAid permission + `canAccessPerson`/`canAccessChurch` cases (BUG-11).
+- `import.service.test.ts`: 3 dry-run cases — no-persist, phantom-church, `dryRun:true` in result (BUG-10).
+- `person.service.test.ts`: 4 `listMedicalWatch` cases — atCamp filter, departed excluded, church scoping, firstAid access (BUG-12).
+- `admin.characterisation.test.ts`: `BadRequestError` import added; `force:true` alone throws `BadRequestError` for `newYear` (BUG-13).
 
 ## Commands (run from this folder)
 
@@ -98,6 +131,7 @@ api (Express) → controllers → services → repositories (interfaces) → cor
 | `zoneLeader` | Own zone | All of above (zone-scoped), read notes, send zone notices, read registrants in zone |
 | `director` | All | All of above (camp-wide), import, camp-wide notices |
 | `admin` | All + back office | Everything + admin:manage (settings, accounts, accommodation, FAQ, schedule, devotionals, mode switch) |
+| `firstAid` | All (read-only) | `camper:read`, `camper:read:sensitive`, `checkin:write` (attendance only). No notes, no admin, no pre-camp data. |
 
 There is always exactly one `admin` account. It cannot be deleted or deactivated.
 
@@ -109,6 +143,17 @@ There is always exactly one `admin` account. It cannot be deleted or deactivated
 - Switched via `POST /admin/mode { campMode }`.
 - Admin console is **identical in both modes** — admins can configure at-camp content (devotionals, schedule) while still in pre-camp mode.
 
+## At-camp preview (client-side only)
+
+Users in pre-camp mode can tap **"👁 Preview at-camp view"** on the pre-camp home screen to enter a read-only preview of the at-camp UI. This is **entirely client-side** — no backend change, no mode switch.
+
+- **State:** `PREVIEW_MODE: boolean` (in-memory only, never persisted).
+- **Entry:** `enterPreview()` — sets `PREVIEW_MODE=true`, flips `CAMP_MODE` to `'at-camp'` locally, shows amber `#previewBanner` strip, rebuilds tabs, navigates home.
+- **Exit:** `exitPreview()` — restores `CAMP_MODE` from `SETTINGS.campMode`, removes banner, rebuilds tabs.
+- **Write blocking:** the `api()` function short-circuits any non-GET request while `PREVIEW_MODE` is true — shows a toast and throws. Covers every write in the app without per-screen changes.
+- **Logout safety:** `logout()` clears `PREVIEW_MODE=false` before POSTing to `/auth/logout` so the write guard never blocks logout itself.
+- All roles can enter preview. Preview uses real live data (campers, schedule, devotionals already imported).
+
 ## Daily check-in (twice daily)
 
 Sessions are derived from schedule items with `isCheckInPoint: true`. There is no hardcoded AM/PM — admins define as many check-in points per day as needed via the Schedule admin screen.
@@ -117,6 +162,18 @@ Sessions are derived from schedule items with `isCheckInPoint: true`. There is n
 - Check-in state is stored per-session in `Camper.checkInHistory[]`.
 - `getCurrentSession()` picks the most recently started check-in point for today.
 - The frontend shows compact session labels (`Wed AM`, `Wed PM`) derived from day + startTime.
+- **Optimistic check-in queue** (`CHECKIN_QUEUE`): taps flip local state immediately and drain to the server in order. Retries with exponential backoff on network failure; hard-drops on 4xx. Undo toast gives 4-second reversal window.
+
+## Presence model (P0 — critical invariant)
+
+`atCamp` and `lifecycle` are **orthogonal**:
+
+- `atCamp` — is the person **physically on site right now?** Only written by `withSignEvent` (attendance sign-in/sign-out path).
+- `lifecycle` — registration state machine: `registered → arrived → checked_out → departed | cancelled`. Only `withSignEvent` advances this beyond `registered`.
+- `withCheckIn` (daily session log) **never** touches `atCamp` or `lifecycle`. It appends to `checkInHistory` only.
+- `checkIn()` in `person.service.ts` guards: throws `BadRequestError` for `lifecycle === 'cancelled'` OR `atCamp === false`. Day-1 first-arrival must go through `signEvent` (attendance sign-in), not the daily check-in path.
+- The check-in roster in `getSessionStatus` filters on `p.atCamp === true`, not `isCamper(p)` — departed campers (`atCamp:false`) never appear on the daily roster.
+- `checkInsDue` on the at-camp dashboard is scoped to `atCampNow` (persons with `atCamp===true`), not all `isCamper()` persons. This prevents departed campers inflating the "still to check in" count.
 
 ## Key design rules
 
@@ -131,12 +188,34 @@ Sessions are derived from schedule items with `isCheckInPoint: true`. There is n
 
 | File | Purpose |
 |------|---------|
-| `public/index.html` | Implementation-ready SPA — **rebuilt 2026-06-10 from the demo, wired to the real Express backend.** Same UI/RENDER layer as `camp-platform.html`; demo-only layers (MockAPI/`_DB`/seed/localStorage/phone affordances) removed; a real `api()` + role-based auth substituted. |
-| `../youth app demo/camp-platform.html` | Standalone offline demo — all API calls handled by an embedded MockAPI. The **UI source of truth**; the SPA's screens are ported from here. |
+| `public/index.html` | Production SPA — rebuilt 2026-06-10 from the demo. UI redesigned 2026-06-23 (indigo/purple palette, Plus Jakarta Sans). |
+| `ui-mocks.html` | Static HTML mock renders of all key screens — shows the redesigned UI and P0–P4 feature updates. Open in a browser. |
+| `../youth app demo/camp-platform.html` | Standalone offline demo — all API calls handled by an embedded MockAPI. The **original UI source of truth**. |
 
-> **Demos moved out of this repo.** All demo HTML (landing `index.html`, `camp-platform.html`, the `allocation-*` demos, `exec-presentation.html`, `suite-briefing.html`, `training.html`, `assets/`) now lives in the sibling **`youth app demo/`** folder, which is the Vercel deploy source for `yc-camp-demo`. Deploy the demo with `vercel deploy --prod --yes` **from `youth app demo/`** (CLI; the `.vercel` link lives there). That demo auto-deploy is separate from this repo. **This repo (the real camp app) auto-deploys to `my-youth-camp.vercel.app` on push to `master`**, and keeps only the real camp backend (`src/`, `public/`, `docs/`).
+## Design system (updated 2026-06-23)
 
-The mode badge in the header shows **PRE-CAMP** (amber) or **AT CAMP** (green). In the demo, clicking the badge switches mode for anyone; in the SPA the badge is display-only (mode switches via the admin console). The **Day 1/Day 2** badge in the SPA is client-side only (the backend has no `campDay` field).
+All tokens live in `:root` in `public/index.html`. Do not use hardcoded hex values for these colours anywhere — use the CSS variables.
+
+| Token | Value | Usage |
+|---|---|---|
+| `--navy` | `#1e1b4b` | App background, header gradient end |
+| `--blue` | `#4f46e5` | Primary buttons, active state, links |
+| `--blue2` | `#818cf8` | Progress bar fills, secondary highlights |
+| `--purple` | `#9333ea` | Tile icons, hero gradient start, pre-camp badge |
+| `--violet` | `#7c3aed` | Button gradient start, header gradient start |
+| `--teal` | `#06b6d4` | Devotional hero card |
+| `--paper` | `#f5f4ff` | App background (light purple tint) |
+| `--line` | `#e4e2f5` | Borders |
+
+**Font:** Plus Jakarta Sans (Google Fonts, loaded in `<head>`). System font stack is the fallback.
+
+**Header bar:** `linear-gradient(135deg, var(--violet), var(--navy))`.
+
+**Hero cards:** `radial-gradient(130% 130% at 0% 0%, #9333ea, #1e1b4b 72%)` with two decorative pseudo-element circles.
+
+**Tab bar active state:** pill background `#ede9fe` with `color: var(--blue)`. No underline indicator.
+
+**Buttons:** `linear-gradient(135deg, var(--violet), var(--blue))`. `.btn.ghost` uses `#f1f0ff` background with `#3730a3` text.
 
 ## SPA ↔ backend contract (rebuild notes)
 
@@ -144,14 +223,22 @@ The SPA was forked from an earlier demo and had drifted onto the demo's **MockAP
 
 - **No envelope.** The backend returns results *bare* (`res.json(result)`); errors are an HTTP error status + `{code,message}`. `api()` returns the bare result and throws on non-2xx. (The demo's MockAPI used `{ok,data}` and `d.actor`; real login returns `{token,user}` and the SPA builds `ACTOR` + a client-side `displayName`.)
 - **`/campers` returns a bare array**, not `{items}`. Camper `kind` is `'student'|'leader'`.
-- **Check-in status** = `{session, roster:[{camperId,firstName,lastName,church,zone,checkedIn}], checkedInCount, totalCount}` — roster has no gender/grade, so the SPA enriches from `/campers`.
+- **Check-in status** = `{session, roster:[{camperId,firstName,lastName,church,zone,gender,grade,medicalFlag,checkedIn,lastEntry}], checkedInCount, totalCount}` — roster now includes gender/grade/medicalFlag directly (no second `/campers` fetch needed).
 - **Attendance** is `POST /attendance/sign-in|sign-out` with a `camperId` body (not `/campers/:id/sign-*`). Notes for a camper = `GET /notes/camper/:id`. Search reveal = `GET /search/contact/:camperId/:role` (role like `male-primary`).
 - **`/home`** DTO differs by mode: pre-camp has `totalCampers/totalLeaders/noBlueCardCount/accommodationSummary[]/perChurchBreakdown[]` (no gender split, no church `code`, no `expected`); the by-ministry M/F table and church code are derived client-side from `/registrants` and `/accounts/churches`.
 - **Accommodation** = blocks (`/accommodation/blocks`, with `price`) + per-church reservations (`POST /accommodation/reservations`) + `/accommodation/held/:churchId`. There is **no rooms/allocations model** — the demo's room-by-room placement was reworked to the per-church spot model. **Budget prices come from blocks** (settings has no price fields); there is no fee-tier.
 - **Notes** require a `camperId`; a **testimony** is a note with `category:'testimony'` (so the testimonies screen picks a student). `/notes/recent` has no camper details (joined from `/campers`); `/notes/export` returns a **CSV string** (downloaded directly) with a Category column.
 - **Admin paths**: `/accounts/users`, `/accounts/churches`, `/admin/defaults`, `DELETE /admin/notifications`, `/import/csv` (body `{csvData}`, CSV only), `/devotional/:day` (path param). Passwords are **min 8**. Church create needs `code`+`selfRegisterSlug`+`account*` fields.
+- **`CamperDto`** includes `dateOfBirth` (added 2026-06-23) — available on all at-camp screens without a separate fetch.
 
 **Backend additions made for the rebuild** (see git history): optional `StudentNote.category` (+ create-schema + enriched CSV export), `DELETE /notifications/:id`, and `contacts` added to `UpdateChurchSchema` (so the ministry-contacts editor can persist). The check-in screen handles an empty session list gracefully (note: `POST /admin/reset` re-seeds without schedule items, so no sessions exist until the schedule is configured).
+
+## Known SPA efficiency rules (do not regress)
+
+- `/registrants` is fetched **once** in `RENDER.home()` before the `isWide` branch — not once per branch.
+- `renderOversightPulse()` does **not** fetch `/campers` — roster data (`gender`, `grade`, `medicalFlag`) comes directly from the `/checkin/sessions/:id/status` DTO.
+- `renderHomeAtCamp()` fetches `/notifications` once in the initial `Promise.all`. The urgent-notice popup uses `_checkUrgentNoticesFromFeed(feed)` with the pre-fetched feed — never a second `/notifications` call.
+- `renderOversightPulse()` is called without `await` from `renderHomeAtCamp()` — the home screen paints immediately and the pulse bars inject asynchronously into `#homePulse`.
 
 ## Seed demo accounts (password: `demo1234`)
 

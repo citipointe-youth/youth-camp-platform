@@ -5,6 +5,7 @@ import {
   canAccessChurch,
   canSendNotification,
 } from './access-control';
+import { canAccessPerson } from './person.service';
 import type { Actor } from '../core/entities/user';
 import { ForbiddenError } from '../core/errors/app-error';
 
@@ -67,6 +68,42 @@ describe('access-control: canAccessChurch()', () => {
   it('director and admin see every church', () => {
     expect(canAccessChurch(actor('director'), 'cX')).toBe(true);
     expect(canAccessChurch(actor('admin'), 'cX')).toBe(true);
+  });
+});
+
+describe('access-control: firstAid role', () => {
+  it('firstAid can read campers + sensitive data', () => {
+    expect(can(actor('firstAid'), 'camper:read')).toBe(true);
+    expect(can(actor('firstAid'), 'camper:read:sensitive')).toBe(true);
+  });
+
+  it('firstAid has attendance:write but NOT checkin:write (session check-in blocked at API level)', () => {
+    expect(can(actor('firstAid'), 'attendance:write')).toBe(true);
+    expect(can(actor('firstAid'), 'checkin:write')).toBe(false);
+  });
+
+  it('firstAid cannot read registrants, write notes, or manage admin', () => {
+    expect(can(actor('firstAid'), 'registrant:read')).toBe(false);
+    expect(can(actor('firstAid'), 'note:write')).toBe(false);
+    expect(can(actor('firstAid'), 'admin:manage')).toBe(false);
+  });
+
+  it('canAccessPerson: firstAid can access any person regardless of church/zone', () => {
+    const fa = actor('firstAid');
+    expect(canAccessPerson(fa, { churchId: 'any-church', zone: 'Yellow' })).toBe(true);
+    expect(canAccessPerson(fa, { churchId: 'other-church', zone: 'Blue' })).toBe(true);
+  });
+
+  it('canAccessChurch: firstAid can access any church', () => {
+    expect(canAccessChurch(actor('firstAid'), 'any-church')).toBe(true);
+    expect(canAccessChurch(actor('firstAid'), 'other-church', 'Red')).toBe(true);
+  });
+
+  it('firstAid cannot send any notification scope', () => {
+    const fa = actor('firstAid');
+    expect(canSendNotification(fa, 'camp')).toBe(false);
+    expect(canSendNotification(fa, 'zone', 'Yellow')).toBe(false);
+    expect(canSendNotification(fa, 'church')).toBe(false);
   });
 });
 

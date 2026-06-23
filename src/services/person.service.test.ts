@@ -166,22 +166,33 @@ describe('PersonService write surface (Step 4)', () => {
     })).rejects.toThrow();
   });
 
-  it('checkIn promotes a registered person to arrived (Day-1 sign-in, D2)', async () => {
+  it('signEvent (in) promotes a registered person to arrived (Day-1 sign-in, D2)', async () => {
+    // P0 presence model: arrival is owned by the attendance sign-in path (signEvent),
+    // not the daily check-in path. signEvent('in') is the sole writer of atCamp/lifecycle.
     const svc = makePersonService(repo);
-    const updated = await svc.checkIn(actor('admin'), 'r1', {
-      sessionId: 's1', sessionLabel: 'Wed AM', type: 'in', leaderId: 'u', timestamp: '2026-07-01T08:00:00Z',
+    const updated = await svc.signEvent(actor('admin'), 'r1', {
+      type: 'in', leaderName: 'Leader', authorId: 'u', timestamp: '2026-07-01T08:00:00Z',
     });
     expect(updated.lifecycle).toBe('arrived');
     expect(updated.atCamp).toBe(true);
-    expect(updated.checkInHistory).toHaveLength(1);
+    expect(updated.signOutHistory).toHaveLength(1);
+    expect(updated.checkInHistory).toHaveLength(0); // daily check-in untouched by sign-in
     // It now shows up in the at-camp view, not the pre-camp view.
     expect((await svc.listCampers(actor('admin'))).some((x) => x.id === 'r1')).toBe(true);
     expect((await svc.listRegistrants(actor('admin'))).some((x) => x.id === 'r1')).toBe(false);
   });
 
+  it('checkIn is blocked for a person who has not signed in (atCamp false)', async () => {
+    // P0 guard: the daily check-in path refuses anyone not physically at camp.
+    const svc = makePersonService(repo);
+    await expect(svc.checkIn(actor('admin'), 'r1', {
+      sessionId: 's1', sessionLabel: 'Wed AM', type: 'in', leaderId: 'u', timestamp: '2026-07-01T08:00:00Z',
+    })).rejects.toThrow();
+  });
+
   it('signEvent (out) moves an arrived person to checked_out', async () => {
     const svc = makePersonService(repo);
-    await svc.checkIn(actor('admin'), 'r1', { sessionId: 's1', sessionLabel: 'AM', type: 'in', leaderId: 'u', timestamp: 't1' });
+    await svc.signEvent(actor('admin'), 'r1', { type: 'in', leaderName: 'Leader', authorId: 'u', timestamp: 't1' });
     const out = await svc.signEvent(actor('admin'), 'r1', { type: 'out', leaderName: 'Leader', authorId: 'u', timestamp: 't2' });
     expect(out.lifecycle).toBe('checked_out');
     expect(out.atCamp).toBe(false);
@@ -199,5 +210,47 @@ describe('PersonService write surface (Step 4)', () => {
     const svc = makePersonService(repo);
     await svc.remove(actor('admin'), 'r1');
     expect(await repo.findById('r1')).toBeNull();
+  });
+});
+
+describe('PersonService.listMedicalWatch', () => {
+  async function medRepo() {
+    const repo = new InMemoryPersonRepository();
+    await repo.init();
+    // At camp, has medical conditions — should appear
+    await repo.save(person({ id: 'med1', churchId: 'c1', zone: 'Yellow', lifecycle: 'arrived', atCamp: true, medicalConditions: ['Asthma'] }));
+    // At camp, has otherMedications — should appear
+    await repo.save(person({ id: 'med2', churchId: 'c2', zone: 'Blue', lifecycle: 'arrived', atCamp: true, medicalConditions: [], otherMedications: 'Ritalin' }));
+    // At camp, no flags — should NOT appear
+    await repo.save(person({ id: 'med3', churchId: 'c1', zone: 'Yellow', lifecycle: 'arrived', atCamp: true }));
+    // Not at camp, has flags — should NOT appear (departed)
+    await repo.save(person({ id: 'med4', churchId: 'c1', zone: 'Yellow', lifecycle: 'departed', atCamp: false, medicalConditions: ['Diabetes'] }));
+    // Registrant (pre-camp), has flags — should NOT appear
+    await repo.save(person({ id: 'med5', churchId: 'c1', zone: 'Yellow', lifecycle: 'registered', atCamp: false, medicalConditions: ['Peanut allergy'] }));
+    return repo;
+  }
+
+  it('returns only atCamp+flagged campers for admin', async () => {
+    const svc = makePersonService(await medRepo());
+    const watch = await svc.listMedicalWatch(actor('admin'));
+    const ids = watch.map((p) => p.id).sort();
+    expect(ids).toEqual(['med1', 'med2']);
+  });
+
+  it('excludes atCamp:false persons even if they have medical flags', async () => {
+    const svc = makePersonService(await medRepo());
+    const watch = await svc.listMedicalWatch(actor('admin'));
+    expect(watch.every((p) => p.atCamp)).toBe(true);
+  });
+
+  it('is scoped by actor role — church sees only its own church', async () => {
+    const svc = makePersonService(await medRepo());
+    const watch = await svc.listMedicalWatch(actor('church', { churchId: 'c2' }));
+    expect(watch.map((p) => p.id)).toEqual(['med2']);
+  });
+
+  it('firstAid can access listMedicalWatch (camper:read is in their permissions)', async () => {
+    const svc = makePersonService(await medRepo());
+    await expect(svc.listMedicalWatch(actor('firstAid'))).resolves.toHaveLength(2);
   });
 });

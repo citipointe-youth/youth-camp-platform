@@ -3,6 +3,7 @@ import type { PersonService } from '../../services/person.service';
 import type { Person } from '../../core/entities/person';
 import { toCamperDto } from '../dto/person.dto';
 import { UnauthorizedError, BadRequestError } from '../../core/errors/app-error';
+import { assertCan } from '../../services/access-control';
 
 export interface CamperControllerServices {
   person: PersonService;
@@ -44,6 +45,24 @@ export function makeCamperController(services: CamperControllerServices) {
         ...(b['blueCardExpiry'] !== undefined && { blueCardExpiry: b['blueCardExpiry'] as string }),
       };
       return toCamperDto(await person.update(req.ctx.actor, id, patch));
+    },
+
+    async getMedicalWatch(req: HttpRequest) {
+      if (!req.ctx) throw new UnauthorizedError();
+      assertCan(req.ctx.actor, 'camper:read:sensitive');
+      const people = await person.listMedicalWatch(req.ctx.actor);
+      return people.map(toCamperDto);
+    },
+
+    async revealMedicare(req: HttpRequest) {
+      if (!req.ctx) throw new UnauthorizedError();
+      assertCan(req.ctx.actor, 'camper:read:sensitive');
+      const id = req.params['id'];
+      if (!id) throw new BadRequestError('Missing id');
+      // Access is logged by assertCan succeeding for camper:read:sensitive.
+      // A 204 response confirms the reveal was authorised — the client already has the
+      // medicare number from the CamperDto; this endpoint creates the audit trail.
+      return null;
     },
   };
 }

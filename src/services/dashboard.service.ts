@@ -164,8 +164,11 @@ export function makeDashboardService(
         // session is not an 'in' (i.e. never checked in, or has since checked out).
         // Previously any 'in' for ANY of today's sessions marked them done for the
         // whole day — wrong for a twice-daily camp.
+        // Only count persons physically at camp (atCamp===true) — isCamper() includes
+        // 'departed' lifecycle which has atCamp:false and must not inflate this count.
+        const atCampNow = allCampers.filter((p) => p.atCamp);
         const checkInsDue = currentSession
-          ? allCampers.filter((p) => {
+          ? atCampNow.filter((p) => {
               const entries = p.checkInHistory.filter((e) => e.sessionId === currentSession.id);
               const last = entries[entries.length - 1];
               return last?.type !== 'in';

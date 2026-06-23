@@ -97,7 +97,7 @@ function basePerson(over: Partial<Person> = {}): Person {
   };
 }
 
-describe('withCheckIn — immutable append + promotion', () => {
+describe('withCheckIn — immutable append only (never touches lifecycle or atCamp)', () => {
   const entry: CheckInEntry = {
     id: 'ci1',
     sessionId: 's1',
@@ -106,9 +106,17 @@ describe('withCheckIn — immutable append + promotion', () => {
     leaderId: 'u1',
     timestamp: '2026-07-01T08:00:00.000Z',
   };
+  const outEntry: CheckInEntry = {
+    id: 'ci2',
+    sessionId: 's1',
+    sessionLabel: 'Wed AM',
+    type: 'out',
+    leaderId: 'u1',
+    timestamp: '2026-07-01T20:00:00.000Z',
+  };
 
-  it('appends the entry, promotes registered -> arrived, and stamps updatedAt', () => {
-    const p = basePerson();
+  it('appends the entry and stamps updatedAt, does NOT change lifecycle or atCamp', () => {
+    const p = basePerson({ lifecycle: 'arrived', atCamp: true });
     const next = withCheckIn(p, entry, '2026-07-01T08:00:01.000Z');
     expect(next.checkInHistory).toHaveLength(1);
     expect(next.checkInHistory[0]).toBe(entry);
@@ -117,31 +125,57 @@ describe('withCheckIn — immutable append + promotion', () => {
     expect(next.updatedAt).toBe('2026-07-01T08:00:01.000Z');
   });
 
+  it('a session check-OUT does NOT set atCamp=false (only attendance sign-out does)', () => {
+    const p = basePerson({ lifecycle: 'arrived', atCamp: true });
+    const next = withCheckIn(p, outEntry, '2026-07-01T20:00:01.000Z');
+    expect(next.atCamp).toBe(true);
+    expect(next.lifecycle).toBe('arrived');
+    expect(next.checkInHistory).toHaveLength(1);
+  });
+
   it('does not mutate the input person', () => {
-    const p = basePerson();
+    const p = basePerson({ lifecycle: 'arrived', atCamp: true });
     withCheckIn(p, entry, '2026-07-01T08:00:01.000Z');
     expect(p.checkInHistory).toHaveLength(0);
-    expect(p.lifecycle).toBe('registered');
-    expect(p.atCamp).toBe(false);
+    expect(p.lifecycle).toBe('arrived');
+    expect(p.atCamp).toBe(true);
+  });
+
+  it('accumulates multiple entries across sessions', () => {
+    const p = basePerson({ lifecycle: 'arrived', atCamp: true });
+    const p2 = withCheckIn(p, entry, 't1');
+    const entry2: CheckInEntry = { ...entry, id: 'ci3', sessionId: 's2', sessionLabel: 'Thu AM' };
+    const p3 = withCheckIn(p2, entry2, 't2');
+    expect(p3.checkInHistory).toHaveLength(2);
+    expect(p3.atCamp).toBe(true);
   });
 });
 
-describe('withSignEvent — immutable append + transition', () => {
-  it('a sign-OUT event moves arrived -> checked_out and appends history', () => {
+describe('withSignEvent — immutable append + lifecycle/atCamp transition', () => {
+  it('a sign-OUT event moves arrived -> checked_out, sets atCamp=false, appends history', () => {
     const p = basePerson({ lifecycle: 'arrived', atCamp: true });
     const ev: SignOutEvent = { id: 'so1', type: 'out', leaderName: 'Leader', authorId: 'u1', timestamp: 't' };
     const next = withSignEvent(p, ev, 'now');
     expect(next.signOutHistory).toHaveLength(1);
     expect(next.lifecycle).toBe('checked_out');
     expect(next.atCamp).toBe(false);
-    expect(p.signOutHistory).toHaveLength(0); // input untouched
+    expect(p.signOutHistory).toHaveLength(0);
   });
 
-  it('a sign-IN event promotes registered -> arrived', () => {
-    const p = basePerson();
+  it('a sign-IN event (return to camp) promotes checked_out -> arrived, sets atCamp=true', () => {
+    const p = basePerson({ lifecycle: 'checked_out', atCamp: false });
     const ev: SignOutEvent = { id: 'si1', type: 'in', leaderName: 'Leader', authorId: 'u1', timestamp: 't' };
     const next = withSignEvent(p, ev, 'now');
     expect(next.lifecycle).toBe('arrived');
     expect(next.atCamp).toBe(true);
+    expect(next.signOutHistory).toHaveLength(1);
+  });
+
+  it('sign-OUT on a checked_out person is idempotent (stays checked_out)', () => {
+    const p = basePerson({ lifecycle: 'checked_out', atCamp: false });
+    const ev: SignOutEvent = { id: 'so2', type: 'out', leaderName: 'Leader', authorId: 'u1', timestamp: 't' };
+    const next = withSignEvent(p, ev, 'now');
+    expect(next.lifecycle).toBe('checked_out');
+    expect(next.atCamp).toBe(false);
   });
 });

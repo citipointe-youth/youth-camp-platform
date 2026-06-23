@@ -58,6 +58,7 @@ describe('toCsvRow / toCsvString', () => {
     expect(toCsvRow(['a', 'b,c', 'd"e'])).toBe('a,"b,c","d""e"');
   });
   it('builds a full CSV string from headers + rows', () => {
-    expect(toCsvString(['x', 'y'], [['1', '2'], ['3', '4']])).toBe('x,y\n1,2\n3,4');
+    // toCsvString prepends a UTF-8 BOM so Excel opens exports with correct encoding.
+    expect(toCsvString(['x', 'y'], [['1', '2'], ['3', '4']])).toBe('﻿x,y\n1,2\n3,4');
   });
 });

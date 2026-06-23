@@ -18,15 +18,18 @@ const ImportOptionsSchema = z.object({
   churchId: z.string().optional(),
   defaultZone: z.string().optional(),
   updateExisting: z.boolean().optional().default(false),
+  dryRun: z.boolean().optional().default(false),
 });
 
 export interface ImportResult {
   created: number;
   updated: number;
   skipped: number;
+  dryRun: boolean;
   errors: Array<{ row: number; message: string }>;
   warnings: Array<{ row: number; message: string }>;
   churchesCreated: string[];
+  phantomChurches: string[];
 }
 
 export interface ImportService {
@@ -66,6 +69,7 @@ export function makeImportService(
       const errors: ImportResult['errors'] = [];
       const warnings: ImportResult['warnings'] = [];
       const churchesCreated: string[] = [];
+      const phantomChurches: string[] = [];
 
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
@@ -97,12 +101,19 @@ export function makeImportService(
         return pool.length === 1 ? pool[0] : undefined;
       }
 
-      // Resolve a church name to an id, auto-creating a minimal church on miss.
+      // Resolve a church name to an id. In live mode, auto-creates a minimal church on miss
+      // (phantom). In dry-run mode, records the unmatched name for operator review instead.
       async function resolveChurch(name: string, youthPastor: string, rowNum: number, createdAt: string): Promise<string> {
         if (!name) return '';
         const key = name.toLowerCase();
         const existing = churchIdByName.get(key) ?? newlyCreated.get(key);
         if (existing) return existing;
+        if (opts.dryRun) {
+          // Dry-run: flag for operator confirmation, return a sentinel
+          if (!phantomChurches.includes(name)) phantomChurches.push(name);
+          warnings.push({ row: rowNum, message: `Church "${name}" not found — would be created (dry-run)` });
+          return `__phantom__${key}`;
+        }
         const id = newId('church');
         const code = slugCode(name, takenCodes);
         const church: Church = {
@@ -239,7 +250,7 @@ export function makeImportService(
               blueCardNumber: blueCardNumber ?? match.blueCardNumber,
               blueCardExpiry: blueCardExpiry ?? match.blueCardExpiry,
               churchUnlistedNote: churchUnlistedNote ?? match.churchUnlistedNote,
-              elvantoMeta,
+              elvantoMeta: elvantoMeta.dateSubmitted ? elvantoMeta : match.elvantoMeta,
               consents,
               parentGuardianName: parentName ?? match.parentGuardianName,
               parentRelation: parentRelation ?? match.parentRelation,
@@ -307,9 +318,11 @@ export function makeImportService(
         }
       }
 
-      if (touched.size > 0) await personRepo.saveMany([...touched.values()]);
+      if (!opts.dryRun && touched.size > 0) {
+        await personRepo.saveMany([...touched.values()]);
+      }
 
-      return { created, updated, skipped, errors, warnings, churchesCreated };
+      return { created, updated, skipped, dryRun: opts.dryRun, errors, warnings, churchesCreated, phantomChurches };
     },
   };
 }

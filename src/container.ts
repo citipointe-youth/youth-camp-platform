@@ -78,6 +78,8 @@ import { makeAccountService, type AccountService } from './services/account.serv
 import { makeDashboardService, type DashboardService } from './services/dashboard.service';
 import { makeAdminService, type AdminService } from './services/admin.service';
 import { makePersonService, type PersonService } from './services/person.service';
+import { makeChurchImportService, type ChurchImportService } from './services/church-import.service';
+import { makeAuditExportService, type AuditExportService } from './services/audit-export.service';
 
 export interface Repositories {
   users: IUserRepository;
@@ -108,11 +110,14 @@ export interface Services {
   content: ContentService;
   importService: ImportService;
   exportService: ExportService;
+  churchImport: ChurchImportService;
+  auditExport: AuditExportService;
   account: AccountService;
   dashboard: DashboardService;
   admin: AdminService;
-  // Expose raw user repo for auth/me lookup
+  // Expose raw user repo for auth/me lookup and audit controller
   users: IUserRepository;
+  settingsRepo: ISettingsRepository;
 }
 
 export interface Container {
@@ -168,6 +173,8 @@ export async function buildContainer(): Promise<Container> {
     const content = makeContentService(faqs, devotionals);
     const importSvc = makeImportService(people, churches);
     const exportSvc = makeExportService(people, churches);
+    const churchImportSvc = makeChurchImportService(users, churches);
+    const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
     const account = makeAccountService(users, churches);
     const dashboard = makeDashboardService(people, accommodationRepo, notifications, scheduleRepo, churches);
     const admin = makeAdminService(
@@ -178,7 +185,9 @@ export async function buildContainer(): Promise<Container> {
     const services: Services = {
       auth, settings, person: personSvc, accommodation: accommodationSvc,
       checkIn, notification, search, note, schedule, content,
-      importService: importSvc, exportService: exportSvc, account, dashboard, admin, users,
+      importService: importSvc, exportService: exportSvc, churchImport: churchImportSvc,
+      auditExport: auditExportSvc,
+      account, dashboard, admin, users, settingsRepo,
     };
 
     return { repos, services };
@@ -272,6 +281,8 @@ export async function buildContainer(): Promise<Container> {
   const content = makeContentService(faqs, devotionals);
   const importSvc = makeImportService(people, churches);
   const exportSvc = makeExportService(people, churches);
+  const churchImportSvc = makeChurchImportService(users, churches);
+  const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
   const account = makeAccountService(users, churches);
   const dashboard = makeDashboardService(
     people,
@@ -307,10 +318,13 @@ export async function buildContainer(): Promise<Container> {
     content,
     importService: importSvc,
     exportService: exportSvc,
+    churchImport: churchImportSvc,
+    auditExport: auditExportSvc,
     account,
     dashboard,
     admin,
     users,
+    settingsRepo,
   };
 
   return { repos, services };

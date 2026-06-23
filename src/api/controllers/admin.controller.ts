@@ -11,7 +11,8 @@ export function makeAdminController(services: AdminControllerServices) {
   return {
     async reset(req: HttpRequest) {
       if (!req.ctx) throw new UnauthorizedError();
-      return services.admin.reset(req.ctx.actor);
+      const body = req.body as { force?: boolean; confirmWipe?: string } | undefined;
+      return services.admin.reset(req.ctx.actor, { force: body?.force, confirmWipe: body?.confirmWipe });
     },
 
     async saveDefaults(req: HttpRequest) {
@@ -21,9 +22,9 @@ export function makeAdminController(services: AdminControllerServices) {
 
     async newYear(req: HttpRequest) {
       if (!req.ctx) throw new UnauthorizedError();
-      const body = req.body as { year?: number };
+      const body = req.body as { year?: number; force?: boolean; confirmWipe?: string };
       if (!body.year) throw new BadRequestError('Missing year');
-      return services.admin.newYear(req.ctx.actor, body.year);
+      return services.admin.newYear(req.ctx.actor, body.year, { force: body.force, confirmWipe: body.confirmWipe });
     },
 
     async clearNotifications(req: HttpRequest) {

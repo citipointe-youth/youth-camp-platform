@@ -1,4 +1,4 @@
-import type { Route } from './types';
+import type { Route, BufferRoute } from './types';
 import type { Services } from '../../container';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../core/errors/app-error';
 import { hashPassword } from '../../utils/crypto';
@@ -15,12 +15,14 @@ import { makeNoteController } from '../controllers/note.controller';
 import { makeAttendanceController } from '../controllers/attendance.controller';
 import { makeContentController } from '../controllers/content.controller';
 import { makeImportController } from '../controllers/import.controller';
+import { makeChurchImportController } from '../controllers/church-import.controller';
+import { makeAuditController } from '../controllers/audit.controller';
 import { makeExportController } from '../controllers/export.controller';
 import { makeAccountController } from '../controllers/account.controller';
 import { makeSettingsController } from '../controllers/settings.controller';
 import { makeAdminController } from '../controllers/admin.controller';
 
-export function buildRoutes(services: Services): Route[] {
+export function buildRoutes(services: Services): (Route | BufferRoute)[] {
   const auth = makeAuthController({ auth: services.auth, users: services.users });
   const dashboard = makeDashboardController({ dashboard: services.dashboard, settings: services.settings });
   const registrant = makeRegistrantController({ person: services.person });
@@ -34,6 +36,8 @@ export function buildRoutes(services: Services): Route[] {
   const attendance = makeAttendanceController({ person: services.person });
   const content = makeContentController({ content: services.content });
   const importCtrl = makeImportController({ importService: services.importService });
+  const churchImportCtrl = makeChurchImportController({ churchImport: services.churchImport });
+  const auditCtrl = makeAuditController({ auditExport: services.auditExport, settingsRepo: services.settingsRepo });
   const exportCtrl = makeExportController({ exportService: services.exportService });
   const account = makeAccountController({ account: services.account });
   const settingsCtrl = makeSettingsController({ settings: services.settings });
@@ -93,7 +97,10 @@ export function buildRoutes(services: Services): Route[] {
     { method: 'POST', path: '/accommodation/reservations', auth: true, handler: (r) => accommodation.setReservations(r) },
 
     // ----- Campers (at-camp / Portal) -----
+    // NOTE: literal routes (/campers/medical) must be declared BEFORE parameterised (/campers/:id)
     { method: 'GET', path: '/campers', auth: true, handler: (r) => camper.list(r) },
+    { method: 'GET', path: '/campers/medical', auth: true, handler: (r) => camper.getMedicalWatch(r) },
+    { method: 'POST', path: '/campers/:id/reveal-medicare', auth: true, handler: (r) => camper.revealMedicare(r) },
     { method: 'GET', path: '/campers/:id', auth: true, handler: (r) => camper.get(r) },
     { method: 'PATCH', path: '/campers/:id', auth: true, handler: (r) => camper.update(r) },
 
@@ -139,7 +146,22 @@ export function buildRoutes(services: Services): Route[] {
 
     // ----- Import -----
     { method: 'POST', path: '/import/csv', auth: true, handler: (r) => importCtrl.run(r) },
+    { method: 'POST', path: '/import/churches', auth: true, handler: (r) => churchImportCtrl.run(r) },
     { method: 'GET', path: '/export/registrants', auth: true, handler: (r) => exportCtrl.registrants(r) },
+
+    // ----- Audit export (BufferRoute — xlsx and CSV downloads) -----
+    {
+      method: 'GET', path: '/export/audit', auth: true,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      filename: 'camp-audit-export.xlsx',
+      bufferHandler: (r) => auditCtrl.exportWorkbook(r),
+    },
+    {
+      method: 'GET', path: '/export/signin-out', auth: true,
+      contentType: 'text/csv; charset=utf-8',
+      filename: 'sign-in-out-log.csv',
+      bufferHandler: (r) => auditCtrl.exportSignInOutCsv(r),
+    },
 
     // ----- Account management -----
     { method: 'GET', path: '/accounts/users', auth: true, handler: (r) => account.list(r) },
