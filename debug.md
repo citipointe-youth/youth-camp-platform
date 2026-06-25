@@ -10,7 +10,7 @@
 1. Read `CLAUDE.md` + this file. **Don't read anything else yet.**
 2. From the **symptom router** below, jump to the one function/file that owns it.
 3. **Confirm line numbers by Grep on the symbol name** — line numbers here are approximate
-   (snapshot 2026-06-25) and drift as the file changes. The *names* are stable; grep them.
+   (snapshot 2026-06-26) and drift as the file changes. The *names* are stable; grep them.
 4. Read only that function's range. Most SPA bugs are one function in `public/index.html`.
 
 > **Don't re-grep the whole map on reload** — line numbers only drift when `index.html` is
@@ -33,101 +33,107 @@ check "expected vs actual" before touching code.
 
 ---
 
-## Frontend — `public/index.html` (single 2,128-line SPA)
+## Frontend — `public/index.html` (single ~2,260-line SPA)
 
-This one file is the only real navigation cost in the repo. Map below; **grep the name to
-confirm the line**.
+This one file is the only real navigation cost in the repo. Map below (line numbers are a
+2026-06-26 snapshot); **grep the name to confirm the line** — they drift on every edit.
 
-### Global state (line ~315)
+### Global state (line ~381)
 `TOKEN, ACTOR, SETTINGS, CAMP_MODE('pre-camp'), STACK, PREVIEW_MODE` — one declaration line.
-Also: `ALLREG/CHURCHES` (~759), `_navToken` (~461), `SCHED_DAY` (~1450), `DEVO_DAY` (~1465),
-`_pendingImportCsv` (~1945).
+Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (~530),
+`SCHED_DAY` (~1519), `DEVO_DAY` (~1533), `_pendingChurchCsv` (~2100).
 
 ### Infrastructure / plumbing
 | Symbol | ~Line | Owns |
 |---|---|---|
-| `_doFetch` / `api` | 284 / 303 | All HTTP. Bare results, throws on non-2xx. **Preview write-guard** lives in `api()`. Request timeout + GET coalescing. |
-| `sessionExpired` | 359 | 401 handling |
-| `ICONS` / `ic` | 328 / 344 | SVG icon set + renderer. **Blank icon = missing key here.** |
-| `toast / modal / closeModal` | 352–354 | Transient UI |
-| `dayLong / timeFmt / dtFmt` | 355–357 | Date formatting (UTC-anchored) |
-| `_initDemoLogin / quick` | 373 / 380 | Demo quick-login (localhost only) |
-| `doLogin / logout` | 381 / 395 | Auth. `logout` clears PREVIEW_MODE first. |
+| `_doFetch` / `api` | 338 / 357 | All HTTP. Bare results, throws on non-2xx. **Preview write-guard** lives in `api()`. Timeout + GET coalescing + **30s result cache**; non-GET writes call `_invalidate`. |
+| `Cache` / `_allCached` / `_invalidate` / `_prefetch` | 313 / 322 / 325 / 375 | **Perf layer (ported from CMS).** Cache = 30s TTL Map; `_prefetch` warms endpoints after login; `_invalidate` maps a write path → stale keys. **Stale data after a write = `_invalidate` mapping.** |
+| `sessionExpired` | 429 | 401 handling (clears Cache) |
+| `ICONS` / `ic` | 394 / 414 | SVG icon set + renderer (incl. `edit/at/key/trash` for account rows). **Blank icon = missing key here.** |
+| `toast / modal / closeModal` | 422–424 | Transient UI |
+| `dayLong / timeFmt / dtFmt` | 425 | Date formatting (UTC-anchored). `_addDays / _datesBetween` near `adminSettings` derive check-in days. |
+| `_initDemoLogin / quick` | 444 / 451 | Demo quick-login (localhost only) |
+| `doLogin / logout` | 452 / 467 | Auth. `doLogin` clears Cache + calls `_prefetch`; `logout` clears PREVIEW_MODE first. |
 
 ### Navigation / shell
 | Symbol | ~Line | Owns |
 |---|---|---|
-| `updateModeUI` | 401 | Preview banner + mode chrome |
-| `enterPreview / exitPreview` | 414 / 422 | Client-only at-camp preview (no backend) |
-| `TAB_OF` | 436 | Tab-id → highlighted-tab map. **Wrong tab highlighted = here.** |
-| `_showScreen / _paint / _navTo / go / gotoTab / back` | 444–480 | Router |
-| `_renderWideNav` | 493 | Desktop sidebar items (**admin & director only**) |
-| `buildTabs` | 531 | Bottom-nav tabs per role × mode. **Missing/extra tab = here.** |
+| `updateModeUI` | 473 | Preview banner + mode chrome |
+| `enterPreview / exitPreview` | 483 / 491 | Client-only at-camp preview (no backend) |
+| `TAB_OF` | 505 | Tab-id → highlighted-tab map. **Wrong tab highlighted = here.** |
+| `_showScreen / _paint / _navTo / go / gotoTab / back` | 513–554 | Router. `_navTo` is **stale-while-revalidate**: shows the previous render (no spinner) on revisits. |
+| `_renderWideNav` | 567 | Desktop sidebar items (**admin & director only**) |
+| `buildTabs` | 605 | Bottom-nav tabs per role × mode. **Missing/extra tab = here.** |
 
-### Home (dispatch at `RENDER.home`, line 555)
-`RENDER.home` → firstAid? `renderHomeFirstAid` (1043). Else re-fetches `/settings` (picks up
-admin mode switch live), then pre-camp home (inline) vs `renderHomeAtCamp` (633).
-- `renderHomeAtCamp` 633, `noticeCard` 677, urgent-notice popup `_checkUrgentNoticesFromFeed` 703,
-  `renderMyDay` 723, `renderOversightPulse` 731 (async, no `/campers` fetch — uses session DTO).
+### Home (dispatch at `RENDER.home`, line 629)
+`RENDER.home` → firstAid? `renderHomeFirstAid` (1112). Else re-fetches `/settings` **only when
+not in PREVIEW_MODE** (picks up admin mode switch live; the guard fixed "preview won't load"),
+then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (inline) vs
+`renderHomeAtCamp` (713).
+- `renderHomeAtCamp` 713, `renderOversightPulse` 811 (async, no `/campers` fetch — uses session DTO).
 
 ### Pre-camp screens
 | Screen / fn | ~Line |
 |---|---|
-| `RENDER.people` (My Youth) | 761 |
-| `scopeRegs / drawPeople / personRow` | 798 / 799 / 812 |
-| `openPerson / markReg` | 826 / 845 |
-| `RENDER.codes` (reg codes) | 848 |
-| `RENDER.help` | 860 |
-| `RENDER.budget / RENDER.accom` | 1166 / 1199 |
-| `RENDER.data` (director/admin data view) | 1848 |
+| `RENDER.people` (My Youth) | 841 |
+| `scopeRegs / drawPeople / personRow` | 878 / 879 / 892 |
+| `openPerson / markReg` | 906 / 925 |
+| `RENDER.help` | 929 |
+| `RENDER.budget / RENDER.accom` | 1235 / 1268 |
+| `RENDER.data` (director/admin data view) | 1958 |
+
+> **`RENDER.codes` (registration code / self-register) was DELETED** — self-registration is gone
+> (all registrants arrive via CSV). No reg-code screen, home card, or `/r/:slug` link.
 
 ### At-camp screens
 | Screen / fn | ~Line | Notes |
 |---|---|---|
-| `RENDER.checkin` | 912 | Daily session check-in. `_ciLabel` 867, `CHECKIN_QUEUE` 877, `drainQueue` 887, `_optimisticState` 906, `rowHtml` 944 |
-| `_performCheck / confirmCheckOut / doCheck` | 983 / 993 / 1017 | Optimistic flip + undo (`_showUndoToast` 999, `undoCheck` 1006) |
-| `notePrompt / reviewNote / confirmNote` | 1018 / 1026 / 1037 | Check-in notes |
-| `renderHomeFirstAid` | 1043 | firstAid home |
-| `loadMedicalWatch` | 1060 | Medical-watch list |
-| `renderSearchFirstAid` | 1071 | |
-| `openCasualtyCard / revealMedicare` | 1087 / 1114 | `revealMedicare` uses `_currentCasualtyCard` (no re-fetch) |
-| `RENDER.search / runSearch / reveal` | 1124 / 1129 / 1146 | Contact search + reveal |
-| `RENDER.notifs / deleteNotice` | 1149 / 1161 | Notices |
-| `RENDER.compose / sendNotif` | 1233 / 1248 | Send notice (zoneLeader/director/admin) |
-| `RENDER.firstday` | 1259 | Day-1 arrivals (sign-in) |
-| `RENDER.myyouth` | 1336 | Leader's youth roster |
-| `openCamper` | 1380 | Camper detail |
-| `signOutPrompt/Review/Confirm`, `signInPrompt/Confirm` | 1416–1446 | **Attendance** (writes atCamp/lifecycle) |
-| `RENDER.schedule` | 1451 | `selSchedDay` 1462 |
-| `RENDER.devotional` | 1466 | `selDevoDay` 1479 |
-| `RENDER.faq` | 1482 | |
-| `RENDER.testimonies / submitTestimony` | 1488 / 1500 | |
-| `RENDER.notes / drawNotes / exportNotes` | 1504 / 1519 / 1533 | |
+| `RENDER.checkin` | 981 | Daily session check-in. `_ciLabel` 936, `CHECKIN_QUEUE` 946, `drainQueue` 956, `_optimisticState` 975, `rowHtml` 1013. **Sessions = `settings.checkInDays`×AM/PM** (id `${day}~am`), NOT schedule — see backend `checkin-sessions.ts`. The status path `encodeURIComponent`s the id (the `~` delimiter replaced `#`, which broke the URL → "Endpoint not found"). |
+| `_performCheck / confirmCheckOut / doCheck` | 1052 / 1062 / 1086 | Optimistic flip + undo (`undoCheck` 1075) |
+| `notePrompt` | 1087 | Check-in notes |
+| `renderHomeFirstAid` | 1112 | firstAid home |
+| `loadMedicalWatch` | 1129 | Medical-watch list |
+| `renderSearchFirstAid` | 1140 | |
+| `openCasualtyCard / revealMedicare` | 1156 / 1183 | `revealMedicare` uses `_currentCasualtyCard` (no re-fetch) |
+| `RENDER.search / runSearch / reveal` | 1193 / 1198 / 1215 | Contact search + reveal |
+| `RENDER.notifs / deleteNotice` | 1218 / 1230 | Notices |
+| `RENDER.compose / sendNotif` | 1302 / 1317 | Send notice (zoneLeader/director/admin) |
+| `RENDER.firstday` | 1328 | Day-1 arrivals (sign-in) |
+| `RENDER.myyouth` | 1405 | Leader's youth roster |
+| `openCamper` | 1449 | Camper detail |
+| `signOutPrompt/Confirm`, `signInPrompt/Confirm` | 1485 / 1509 | **Attendance** (writes atCamp/lifecycle) |
+| `RENDER.schedule` | 1520 | Pure plan view (no location, no check-in pill). `selSchedDay` 1530 |
+| `RENDER.devotional` | 1534 | `selDevoDay` 1547 |
+| `RENDER.faq` | 1550 | |
+| `RENDER.testimonies / submitTestimony` | 1556 / 1569 | **Student is optional** — defaults to "No specific student identified" (general testimony). |
+| `RENDER.notes / drawNotes / exportNotes` | 1574 / 1589 / 1603 | Camper-less notes show as "No specific student". |
 
 ### Admin screens (admin role; identical in both modes)
 | Screen / fn | ~Line |
 |---|---|
-| `RENDER.admin` (console) | 1541 |
-| `switchMode` | 1561 |
-| `RENDER.adminAccounts` (+ add/edit/save/del acct, churches) | 1579–1655 |
-| `RENDER.adminAccom` (+ block CRUD) | 1655–1677 |
-| `RENDER.adminFaq / adminFaqEdit` | 1680 / 1693 |
-| `RENDER.adminRecords` (+ `downloadAuditExport`, `downloadCsvExport`) | 1707–1734 |
-| `RENDER.adminCloseOut` (+ `doNewYear`) | 1745 / 1769 |
-| `RENDER.adminSettings / saveSettings` | 1790 / 1806 |
-| `RENDER.adminData` (+ `adminNewYear`, `adminReset`, `adminClear`) | 1816–1943 |
-| `RENDER.import / adminUpload / _confirmImport` | 1837 / 1946 / 1968 |
-| `RENDER.adminChurchImport` (+ upload/confirm) | 1981–2009 |
-| `RENDER.adminWizard` | 2028 |
-| `RENDER.adminDevos / saveDevo` | 2043 / 2058 |
-| `RENDER.adminSchedEdit` (+ add/edit/save/del sched) | 2061–2090 |
-| `RENDER.adminContacts / saveContacts` | 2093 / 2106 |
+| `RENDER.admin` (console) | 1611 |
+| `switchMode` | 1631 |
+| `RENDER.adminAccounts` — **rewritten**: one row per login (leadership + churches) with icon actions | 1649 |
+| ⮑ `aRoleChange` 1698, `addAcct` 1702, `editLeaderName/saveLeaderName` 1708/1715, `editChurchName/saveChurchName` 1719/1726, `editUsername/saveUsername` 1728/1733, `changePassword/savePassword` 1735/1741, `delAcct/delChurch` 1743/1745, `addChurch` 1747 | — |
+| `RENDER.adminAccom` (+ saveBlock/delBlock/addBlock) | 1753 / 1773–1775 |
+| `RENDER.adminFaq / adminFaqEdit` | 1778 / 1791 |
+| `RENDER.adminRecords` | 1805 |
+| `RENDER.adminCloseOut` (+ `doNewYear`) | 1843 / 1867 |
+| `RENDER.adminSettings / saveSettings` | 1891 / 1916 |
+| ⮑ **Timezone hardcoded** to Australia/Brisbane (field removed); check-in days **auto-derived** from start/end via `_datesBetween`; `renderCheckinDaysPreview`/`onStartDateChange` (start pre-fills end +3 days). | — |
+| `RENDER.adminData` (+ `adminReset` 2038, `adminClear` 2053) | 1926 |
+| `RENDER.import / adminUpload / _confirmImport` | 1947 / ~2030 / 2078 |
+| `RENDER.adminChurchImport` (+ `_renderChurchImportPreview`/`_confirmChurchImport`) | 2091 / 2101 / 2119 |
+| `RENDER.adminWizard` | 2138 |
+| `RENDER.adminDevos / saveDevo` | 2153 / 2168 |
+| `RENDER.adminSchedEdit` — **per-day table** (`_schedRow` 2172, `addSchedRow` 2193, `saveSchedDay` 2197 = source-of-truth replace). No location, no `isCheckInPoint`. | 2176 |
+| `RENDER.adminContacts / saveContacts` (+ `toggleContactCard` 2235; header shows `n/4 Contacts`) | 2210 / 2236 |
 
 ---
 
 ## Role × mode → what should appear (check expected vs actual first)
 
-**Bottom-nav tabs** (`buildTabs`, line 531):
+**Bottom-nav tabs** (`buildTabs`, line ~605):
 
 | Role | pre-camp | at-camp |
 |---|---|---|
@@ -137,7 +143,7 @@ admin mode switch live), then pre-camp home (inline) vs `renderHomeAtCamp` (633)
 | `admin` | Home · My Youth · **Data** · Notices · **Admin** | Home · Check-in · Search · **Admin** |
 | `firstAid` | Home · Search · Schedule (**same in both modes**) | Home · Search · Schedule |
 
-**Desktop wide sidebar** (`_renderWideNav`, line 493) — only **admin** and **director** get items
+**Desktop wide sidebar** (`_renderWideNav`, line ~567) — only **admin** and **director** get items
 (`zoneLeader` gets wide layout but empty sidebar):
 - **admin:** Home, Check-in, Search, Notes, Accounts, Settings, Accommodation, Schedule, Data & Reset, Church Import, Records & Export, Setup Wizard
 - **director:** Home, Check-in, Search, Notes, Import Students, Records & Export
@@ -158,8 +164,10 @@ service. **Bugs are almost always in a service.**
 | **RBAC** (all role checks) | `src/services/access-control.ts` | any 403 / "should/shouldn't be allowed" |
 | Persistence wiring | `src/container.ts` | "works on memory, not supabase" (or vice-versa) |
 | Person logic + **presence invariants** | `src/services/person.service.ts` | check-in/sign-in/out, atCamp, lifecycle, medical-watch |
-| Dashboard / session status / roster counts | `src/services/dashboard.service.ts` | wrong "checked-in"/"still due" counts, roster contents |
-| CSV import | `src/services/import.service.ts`, `church-import.service.ts` | import dropping/duplicating rows, dry-run |
+| Daily check-in **sessions** | `src/services/checkin.service.ts` + `checkin-sessions.ts` (pure) | "no check-in sessions", wrong current session, **session-id 404**. Sessions = `settings.checkInDays` × AM/PM (id `${day}~am`/`~pm`), **NOT the schedule** (de-linked 2026-06-25). |
+| Dashboard / roster counts | `src/services/dashboard.service.ts` | wrong "checked-in"/"still due" counts, roster contents. Uses `buildSessions(settings.checkInDays)` for today's sessions. |
+| Notes / testimonies | `src/services/note.service.ts` | testimony won't save / camper-less note. `camperId` is **optional** (general testimony); `notes.camper_id` is nullable. |
+| CSV import | `src/services/import.service.ts`, `church-import.service.ts` | import dropping/duplicating rows, dry-run. Churches match/create by **name** (no `code`). |
 | Reset / new-year / defaults / **mode** | `src/services/admin.service.ts` | wipe behaviour, snapshot restore, mode switch |
 | Accounts / churches | `src/services/account.service.ts` | login, account CRUD, sole-admin guard |
 | Accommodation | `src/services/accommodation*.ts` | blocks/reservations/held, lock |
@@ -168,9 +176,10 @@ service. **Bugs are almost always in a service.**
 | Supabase repos | `src/repositories/supabase/*` | prod-only data round-trip issues |
 | Types / Zod schemas / errors | `src/core/*` | validation rejects valid input |
 
-Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 186+ pass). Note the two
+Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 219+ pass). Note the two
 deploy-only gotchas in CLAUDE.md (CommonJS tsconfig; anchored `/data/` gitignore) — neither is
-caught by tsc/vitest.
+caught by tsc/vitest. Schema migrations `008`–`010` (field removals + nullable note camper) are
+applied to prod; `src/repositories/supabase/*` must not reference the dropped columns.
 
 ---
 
@@ -178,20 +187,27 @@ caught by tsc/vitest.
 
 | Symptom | Go to |
 |---|---|
-| Blank / wrong icon | SPA `ICONS` (328) |
-| Wrong tab highlighted | SPA `TAB_OF` (436) |
-| Tab missing/extra for a role or mode | SPA `buildTabs` (531) / `_renderWideNav` (493) — check grid above |
-| Write silently blocked, "preview" toast | SPA `api()` preview guard (303) + `enterPreview` (414) |
-| Mode change didn't reach a logged-in user | SPA `RENDER.home` `/settings` re-fetch (555); backend `admin.service` |
-| Check-in count / roster wrong | SPA `RENDER.checkin` (912) + `_optimisticState` (906); backend `dashboard.service` / `person.service` (atCamp scoping) |
-| Check-in tap doesn't stick / undo broken | SPA `CHECKIN_QUEUE` (877) `drainQueue` (887) `_performCheck` (983) `undoCheck` (1006) |
-| Sign-in/out wrong (atCamp/lifecycle) | SPA `signIn/OutConfirm` (1438–1446); backend `person.service.signEvent` + presence invariants in CLAUDE.md |
-| Search / reveal contact | SPA `runSearch` (1129) `reveal` (1146); backend `search.service` |
-| First-aid medical watch / casualty card | SPA `loadMedicalWatch` (1060) `openCasualtyCard` (1087) `revealMedicare` (1114); backend `person.service.listMedicalWatch` |
-| Notices not showing / urgent popup | SPA `RENDER.notifs` (1149) `_checkUrgentNoticesFromFeed` (703) |
-| Accommodation / budget numbers | SPA `RENDER.accom` (1199) `RENDER.budget` (1166); backend `accommodation*` |
-| Pre-camp registrant edits / scoping | SPA `RENDER.people` (761) `scopeRegs` (798) `markReg` (845) |
-| Import CSV issues | SPA `_confirmImport` (1968) / church import (1981+); backend `import.service` |
-| New-year / reset / wipe guard | SPA `adminCloseOut`/`doNewYear` (1745/1769), `adminReset` (1928); backend `admin.service` |
+| Blank / wrong icon | SPA `ICONS` (394) |
+| Wrong tab highlighted | SPA `TAB_OF` (505) |
+| Tab missing/extra for a role or mode | SPA `buildTabs` (605) / `_renderWideNav` (567) — check grid above |
+| **Stale data after a write / screen won't refresh** | SPA `Cache` (313) + `_invalidate` (325) — the write's path must map to the right stale keys. `{noCache:true}` forces fresh. |
+| Slow home / spinner flash on revisit | SPA `_prefetch` (375), `_navTo` stale-while-revalidate (537), parallel loads in `RENDER.home` (629) |
+| Write silently blocked, "preview" toast | SPA `api()` preview guard (357) + `enterPreview` (483) |
+| **Preview at-camp view won't load** | SPA `RENDER.home` `/settings` re-fetch is guarded by `if(!PREVIEW_MODE)` (~636); `enterPreview` (483) |
+| Mode change didn't reach a logged-in user | SPA `RENDER.home` `/settings` re-fetch (~636, skipped in preview); backend `admin.service` |
+| **Check-in "Endpoint not found" / session 404** | SPA `RENDER.checkin` (981) — status path must `encodeURIComponent` the id; session-id delimiter is `~` (NOT `#`). Backend `checkin-sessions.ts` `parseSessionId`. |
+| "No check-in sessions configured" | backend `checkin-sessions.ts` `buildSessions` — driven by `settings.checkInDays` (set via admin Settings dates), NOT the schedule |
+| Check-in count / roster wrong | SPA `RENDER.checkin` (981) + `_optimisticState` (975); backend `checkin.service` / `dashboard.service` / `person.service` (atCamp scoping) |
+| Check-in tap doesn't stick / undo broken | SPA `CHECKIN_QUEUE` (946) `drainQueue` (956) `_performCheck` (1052) `undoCheck` (1075) |
+| Sign-in/out wrong (atCamp/lifecycle) | SPA `signOut/InConfirm` (1485/1509); backend `person.service.signEvent` + presence invariants in CLAUDE.md |
+| Search / reveal contact | SPA `runSearch` (1198) `reveal` (1215); backend `search.service` |
+| First-aid medical watch / casualty card | SPA `loadMedicalWatch` (1129) `openCasualtyCard` (1156) `revealMedicare` (1183); backend `person.service.listMedicalWatch` |
+| Notices not showing / urgent popup | SPA `RENDER.notifs` (1218); `renderHomeAtCamp` (713) |
+| Accommodation / budget numbers | SPA `RENDER.accom` (1268) `RENDER.budget` (1235); backend `accommodation*` |
+| Pre-camp registrant edits / scoping | SPA `RENDER.people` (841) `scopeRegs` (878) `markReg` (925) |
+| Testimony won't save / "no specific student" | SPA `RENDER.testimonies` (1556); backend `note.service` (`camperId` optional) + `notes.camper_id` nullable |
+| Account: can't rename / change password | SPA `RENDER.adminAccounts` (1649) row actions; backend `POST /accounts/users/password` + `account.service` |
+| Import CSV issues | SPA `_confirmImport` (2078) / church import (2091+); backend `import.service` (church match by **name**) |
+| New-year / reset / wipe guard | SPA `adminCloseOut`/`doNewYear` (1843/1867), `adminReset` (2038); backend `admin.service` |
 | 403 / permission denied | backend `access-control.ts` (one file) |
-| 401 / kicked to login | SPA `sessionExpired` (359) `api()` (303); check `SESSION_SECRET` env |
+| 401 / kicked to login | SPA `sessionExpired` (429) `api()` (357); check `SESSION_SECRET` env |
