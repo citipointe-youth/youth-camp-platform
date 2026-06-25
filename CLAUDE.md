@@ -156,12 +156,20 @@ Users in pre-camp mode can tap **"👁 Preview at-camp view"** on the pre-camp h
 
 ## Daily check-in (twice daily)
 
-Sessions are derived from schedule items with `isCheckInPoint: true`. There is no hardcoded AM/PM — admins define as many check-in points per day as needed via the Schedule admin screen.
+**De-linked from the schedule (2026-06-25).** Check-in sessions are now derived purely from
+`CampSettings.checkInDays` — **two synthetic sessions per camp day** (Morning 08:00 / Afternoon
+13:00), generated in `src/services/checkin-sessions.ts`. The schedule is unrelated to check-in
+(it is pure plan communication); `ScheduleItem.isCheckInPoint` and `getCheckInPoints` no longer
+exist.
 
-- Each session has its own ID (the schedule item's ID).
-- Check-in state is stored per-session in `Camper.checkInHistory[]`.
-- `getCurrentSession()` picks the most recently started check-in point for today.
-- The frontend shows compact session labels (`Wed AM`, `Wed PM`) derived from day + startTime.
+- Session id = **`${day}#am` / `${day}#pm`** (e.g. `2026-09-28#pm`); this is the key in
+  `Camper.checkInHistory[].sessionId`.
+- `getCurrentSession()` picks today's AM before midday / PM after (camp tz); falls back to the
+  most recent past session. Both `checkin.service` and `dashboard.service` use the shared pure
+  helper (`buildSessions` / `currentSession`).
+- `checkInDays` is auto-generated from start/end dates in the admin Settings screen (each date
+  inclusive); setting the start date pre-fills the end date to the 4th day.
+- The frontend shows compact session labels (`Mon AM`, `Mon PM`).
 - **Optimistic check-in queue** (`CHECKIN_QUEUE`): taps flip local state immediately and drain to the server in order. Retries with exponential backoff on network failure; hard-drops on 4xx. Undo toast gives 4-second reversal window.
 
 ## Presence model (P0 — critical invariant)
@@ -228,7 +236,19 @@ The SPA was forked from an earlier demo and had drifted onto the demo's **MockAP
 - **`/home`** DTO differs by mode: pre-camp has `totalCampers/totalLeaders/noBlueCardCount/accommodationSummary[]/perChurchBreakdown[]` (no gender split, no church `code`, no `expected`); the by-ministry M/F table and church code are derived client-side from `/registrants` and `/accounts/churches`.
 - **Accommodation** = blocks (`/accommodation/blocks`, with `price`) + per-church reservations (`POST /accommodation/reservations`) + `/accommodation/held/:churchId`. There is **no rooms/allocations model** — the demo's room-by-room placement was reworked to the per-church spot model. **Budget prices come from blocks** (settings has no price fields); there is no fee-tier.
 - **Notes** require a `camperId`; a **testimony** is a note with `category:'testimony'` (so the testimonies screen picks a student). `/notes/recent` has no camper details (joined from `/campers`); `/notes/export` returns a **CSV string** (downloaded directly) with a Category column.
-- **Admin paths**: `/accounts/users`, `/accounts/churches`, `/admin/defaults`, `DELETE /admin/notifications`, `/import/csv` (body `{csvData}`, CSV only), `/devotional/:day` (path param). Passwords are **min 8**. Church create needs `code`+`selfRegisterSlug`+`account*` fields.
+- **Admin paths**: `/accounts/users`, `/accounts/churches`, `/admin/defaults`, `DELETE /admin/notifications`, `/import/csv` (body `{csvData}`, CSV only), `/devotional/:day` (path param). Passwords are **min 8**. Church create needs `churchName`+`zone`+`account*` fields only. (Password edits use `POST /accounts/users/password` `{userId,password}`.)
+
+> **Field removal (2026-06-25):** self-registration was dropped (all registrants arrive via CSV).
+> Removed from `Church`: `code`, `selfRegisterSlug`, `expectedCount`, `youthPastorName`,
+> `contactEmail` (church name + a **separate** login username are the identity; matching/import is
+> by **name**). Removed from `CampSettings`: `checkInLocation`, `checkInFrom`, `registerBaseUrl`.
+> Migrations `008`/`009` dropped the columns in prod. The SPA Accounts screen is now one row per
+> login (leadership + churches) with rename/username/password/delete icon actions + a legend.
+
+> **SPA perf (2026-06-25):** a 30s client `Cache` wraps GET in `api()` (invalidated on writes via
+> `_invalidate`), `_prefetch()` warms common endpoints after login, and `_navTo` is
+> stale-while-revalidate (shows the previous render instead of a spinner on revisits). The shell
+> (header/tab bar) was already persistent. `sw.js` cache bumped to `camp-v2`.
 - **`CamperDto`** includes `dateOfBirth` (added 2026-06-23) — available on all at-camp screens without a separate fetch.
 
 **Backend additions made for the rebuild** (see git history): optional `StudentNote.category` (+ create-schema + enriched CSV export), `DELETE /notifications/:id`, and `contacts` added to `UpdateChurchSchema` (so the ministry-contacts editor can persist). The check-in screen handles an empty session list gracefully (note: `POST /admin/reset` re-seeds without schedule items, so no sessions exist until the schedule is configured).
