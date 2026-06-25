@@ -27,14 +27,11 @@ export async function seedAll(container: Container): Promise<void> {
   const pw = await hashPassword('demo1234');
 
   // ----- Churches (one per church account) -----
-  function makeChurch(name: string, zone: ZoneName, code: string, slug: string): Church {
+  function makeChurch(name: string, zone: ZoneName): Church {
     return {
       id: newId('church'),
       name,
       zone,
-      code,
-      selfRegisterSlug: slug,
-      expectedCount: 0,
       reservations: [],
       contacts: {
         male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -45,9 +42,9 @@ export async function seedAll(container: Container): Promise<void> {
     };
   }
 
-  const victory = makeChurch('Victory Church', 'Yellow', 'VIC', 'victory');
-  const gracepoint = makeChurch('Grace Point Church', 'Blue', 'GRC', 'gracepoint');
-  const riverbend = makeChurch('Riverbend Community', 'Green', 'RIV', 'riverbend');
+  const victory = makeChurch('Victory Church', 'Yellow');
+  const gracepoint = makeChurch('Grace Point Church', 'Blue');
+  const riverbend = makeChurch('Riverbend Community', 'Green');
 
   for (const c of [victory, gracepoint, riverbend]) {
     await repos.churches.save(c);
@@ -135,11 +132,9 @@ export async function seedAll(container: Container): Promise<void> {
     startDate: '2026-07-01',
     endDate: '2026-07-04',
     timezone: 'Australia/Brisbane',
-    checkInLocation: 'Main Hall',
-    checkInFrom: '08:00',
     checkInBanner: null,
-    registerBaseUrl: 'http://localhost:4200/register',
-    checkInDays: [],
+    // Check-in days = each date of the camp (drives the auto AM/PM check-in sessions).
+    checkInDays: ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04'],
     accommodationLocked: false,
     campMode: 'pre-camp',
     createdAt: now,
@@ -174,29 +169,25 @@ export async function seedAll(container: Container): Promise<void> {
     await repos.accommodation.save(b);
   }
 
-  // ----- Schedule (with two check-in points so daily check-in works) -----
+  // ----- Schedule (pure plan communication; unrelated to daily check-in) -----
   const schedule: ScheduleItem[] = [
     {
       id: newId('sched'),
-      day: 'Wed',
-      startTime: '08:00',
-      endTime: '08:30',
-      title: 'Morning Check-In',
-      location: 'Main Hall',
+      day: '2026-07-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      title: 'Welcome & Orientation',
       type: 'logistics',
-      isCheckInPoint: true,
       createdAt: now,
       updatedAt: now,
     },
     {
       id: newId('sched'),
-      day: 'Wed',
+      day: '2026-07-01',
       startTime: '19:00',
-      endTime: '19:30',
-      title: 'Evening Check-In',
-      location: 'Main Hall',
-      type: 'logistics',
-      isCheckInPoint: true,
+      endTime: '20:30',
+      title: 'Evening Session',
+      type: 'activity',
       createdAt: now,
       updatedAt: now,
     },

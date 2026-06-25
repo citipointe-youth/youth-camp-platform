@@ -11,10 +11,7 @@ function toSettings(r: Record<string, unknown>): CampSettings {
     startDate: r['start_date'] as string,
     endDate: r['end_date'] as string,
     timezone: r['timezone'] as string,
-    checkInLocation: r['check_in_location'] as string,
-    checkInFrom: r['check_in_from'] as string,
     checkInBanner: (r['check_in_banner'] as string | null) ?? undefined,
-    registerBaseUrl: r['register_base_url'] as string,
     checkInDays: (r['check_in_days'] as string[] | null) ?? [],
     accommodationLocked: r['accommodation_locked'] as boolean,
     campMode: r['camp_mode'] as CampSettings['campMode'],
@@ -33,10 +30,7 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
     start_date: s.startDate,
     end_date: s.endDate,
     timezone: s.timezone,
-    check_in_location: s.checkInLocation,
-    check_in_from: s.checkInFrom,
     check_in_banner: s.checkInBanner ?? null,
-    register_base_url: s.registerBaseUrl,
     check_in_days: s.checkInDays,
     accommodation_locked: s.accommodationLocked,
     camp_mode: s.campMode,
@@ -49,8 +43,7 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
 
 const UPDATE_COLS = [
   'camp_name', 'year', 'start_date', 'end_date', 'timezone',
-  'check_in_location', 'check_in_from', 'check_in_banner', 'register_base_url',
-  'check_in_days', 'accommodation_locked', 'camp_mode',
+  'check_in_banner', 'check_in_days', 'accommodation_locked', 'camp_mode',
   'last_temp_passwords', 'last_exported_at', 'updated_at',
 ] as const;
 

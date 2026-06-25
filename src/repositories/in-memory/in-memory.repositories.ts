@@ -76,24 +76,10 @@ export class InMemoryChurchRepository
     super(persistence);
   }
 
-  async findByCode(code: string): Promise<Church | null> {
-    for (const church of this.store.values()) {
-      if (church.code === code) return this.clone(church);
-    }
-    return null;
-  }
-
   async findByZone(zone: string): Promise<Church[]> {
     return Array.from(this.store.values())
       .filter((c) => c.zone === zone)
       .map((c) => this.clone(c));
-  }
-
-  async findBySlug(slug: string): Promise<Church | null> {
-    for (const church of this.store.values()) {
-      if (church.selfRegisterSlug === slug) return this.clone(church);
-    }
-    return null;
   }
 }
 
@@ -331,16 +317,6 @@ export class InMemoryScheduleRepository
     return Array.from(this.store.values())
       .filter((s) => s.day === day)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .map((s) => this.clone(s));
-  }
-
-  async getCheckInPoints(): Promise<ScheduleItem[]> {
-    return Array.from(this.store.values())
-      .filter((s) => s.isCheckInPoint)
-      .sort((a, b) => {
-        const dayCompare = a.day.localeCompare(b.day);
-        return dayCompare !== 0 ? dayCompare : a.startTime.localeCompare(b.startTime);
-      })
       .map((s) => this.clone(s));
   }
 }

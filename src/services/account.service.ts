@@ -118,12 +118,6 @@ export function makeAccountService(
       assertCan(actor, 'admin:manage');
       const data = CreateChurchWithAccountSchema.parse(input);
 
-      const existingByCode = await churchRepo.findByCode(data.code);
-      if (existingByCode) throw new BadRequestError('Church code already in use');
-
-      const existingBySlug = await churchRepo.findBySlug(data.selfRegisterSlug);
-      if (existingBySlug) throw new BadRequestError('Self-register slug already in use');
-
       const existingUser = await userRepo.findByUsername(data.accountUsername);
       if (existingUser) throw new BadRequestError('Username already in use');
 
@@ -134,11 +128,6 @@ export function makeAccountService(
         id: churchId,
         name: data.churchName,
         zone: data.zone,
-        code: data.code,
-        selfRegisterSlug: data.selfRegisterSlug,
-        expectedCount: data.expectedCount ?? 0,
-        youthPastorName: data.youthPastorName,
-        contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         reservations: [],
         contacts: {

@@ -45,11 +45,6 @@ export type SetPasswordInput = z.infer<typeof SetPasswordSchema>;
 export const CreateChurchWithAccountSchema = z.object({
   churchName: z.string().min(1),
   zone: z.enum(ZONE_NAMES),
-  code: z.string().min(2).max(10),
-  selfRegisterSlug: z.string().min(2).max(40),
-  expectedCount: z.number().int().min(0).optional().default(0),
-  youthPastorName: z.string().optional(),
-  contactEmail: z.string().email().optional(),
   contactPhone: z.string().optional(),
   // Account for the church's user
   accountFirstName: z.string().min(1),
@@ -73,11 +68,6 @@ const ChurchContactsSchema = z.object({
 export const UpdateChurchSchema = z.object({
   name: z.string().min(1).optional(),
   zone: z.enum(ZONE_NAMES).optional(),
-  code: z.string().min(2).max(10).optional(),
-  selfRegisterSlug: z.string().min(2).max(40).optional(),
-  expectedCount: z.number().int().min(0).optional(),
-  youthPastorName: z.string().optional(),
-  contactEmail: z.string().email().optional(),
   contactPhone: z.string().optional(),
   contacts: ChurchContactsSchema.optional(),
 });

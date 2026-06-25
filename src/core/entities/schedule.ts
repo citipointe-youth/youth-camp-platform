@@ -9,7 +9,6 @@ export interface ScheduleItem {
   title: string;
   location?: string | null;
   type: ScheduleItemType;
-  isCheckInPoint: boolean;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

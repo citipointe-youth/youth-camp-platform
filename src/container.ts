@@ -165,7 +165,7 @@ export async function buildContainer(): Promise<Container> {
     const settings = makeSettingsService(settingsRepo);
     const personSvc = makePersonService(people);
     const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
-    const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
+    const checkIn = makeCheckInService(people, settingsRepo);
     const notification = makeNotificationService(notifications, people, churches);
     const search = makeSearchService(people, churches);
     const note = makeNoteService(notes, people);
@@ -176,7 +176,7 @@ export async function buildContainer(): Promise<Container> {
     const churchImportSvc = makeChurchImportService(users, churches);
     const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
     const account = makeAccountService(users, churches);
-    const dashboard = makeDashboardService(people, accommodationRepo, notifications, scheduleRepo, churches);
+    const dashboard = makeDashboardService(people, accommodationRepo, notifications, churches);
     const admin = makeAdminService(
       users, churches, people, accommodationRepo, faqs, scheduleRepo,
       notifications, notes, devotionals, settingsRepo, snapshots,
@@ -273,7 +273,7 @@ export async function buildContainer(): Promise<Container> {
   const settings = makeSettingsService(settingsRepo);
   const personSvc = makePersonService(people);
   const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
-  const checkIn = makeCheckInService(scheduleRepo, people, settingsRepo);
+  const checkIn = makeCheckInService(people, settingsRepo);
   const notification = makeNotificationService(notifications, people, churches);
   const search = makeSearchService(people, churches);
   const note = makeNoteService(notes, people);
@@ -288,7 +288,6 @@ export async function buildContainer(): Promise<Container> {
     people,
     accommodationRepo,
     notifications,
-    scheduleRepo,
     churches,
   );
   const admin = makeAdminService(

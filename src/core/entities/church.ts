@@ -17,11 +17,6 @@ export interface Church {
   id: ID;
   name: string;
   zone: ZoneName;
-  code: string;
-  selfRegisterSlug: string;
-  expectedCount: number;
-  youthPastorName?: string;
-  contactEmail?: string;
   contactPhone?: string;
   reservations: AccommodationReservation[];
   contacts: {

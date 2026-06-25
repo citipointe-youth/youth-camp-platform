@@ -11,10 +11,7 @@ export interface CampSettings {
   endDate: string;
   timezone: string;
   // Pre-camp
-  checkInLocation: string;
-  checkInFrom: string;
   checkInBanner?: string | null;
-  registerBaseUrl: string;
   // At-camp
   checkInDays: string[];
   accommodationLocked: boolean;

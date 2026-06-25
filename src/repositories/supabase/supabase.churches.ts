@@ -8,11 +8,6 @@ function toChurch(row: Record<string, unknown>, reservations: Church['reservatio
     id: row['id'] as string,
     name: row['name'] as string,
     zone: row['zone'] as Church['zone'],
-    code: row['code'] as string,
-    selfRegisterSlug: row['self_register_slug'] as string,
-    expectedCount: row['expected_count'] as number,
-    youthPastorName: (row['youth_pastor_name'] as string | null) ?? undefined,
-    contactEmail: (row['contact_email'] as string | null) ?? undefined,
     contactPhone: (row['contact_phone'] as string | null) ?? undefined,
     contacts: (row['contacts'] as Church['contacts']) ?? {
       male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -29,11 +24,6 @@ function churchColumns(c: Church): Record<string, unknown> {
     id: c.id,
     name: c.name,
     zone: c.zone,
-    code: c.code,
-    self_register_slug: c.selfRegisterSlug,
-    expected_count: c.expectedCount,
-    youth_pastor_name: c.youthPastorName ?? null,
-    contact_email: c.contactEmail ?? null,
     contact_phone: c.contactPhone ?? null,
     contacts: c.contacts,
     created_at: c.createdAt,
@@ -42,8 +32,7 @@ function churchColumns(c: Church): Record<string, unknown> {
 }
 
 const UPDATE_COLS = [
-  'name', 'zone', 'code', 'self_register_slug', 'expected_count',
-  'youth_pastor_name', 'contact_email', 'contact_phone', 'contacts', 'updated_at',
+  'name', 'zone', 'contact_phone', 'contacts', 'updated_at',
 ] as const;
 
 export class SupabaseChurchRepository implements IChurchRepository {
@@ -83,18 +72,8 @@ export class SupabaseChurchRepository implements IChurchRepository {
     return rows[0] ? (await this.hydrate(rows))[0] ?? null : null;
   }
 
-  async findByCode(code: string): Promise<Church | null> {
-    const rows = await this.sql`select * from churches where code = ${code}`;
-    return rows[0] ? (await this.hydrate(rows))[0] ?? null : null;
-  }
-
   async findByZone(zone: string): Promise<Church[]> {
     return this.hydrate(await this.sql`select * from churches where zone = ${zone} order by name`);
-  }
-
-  async findBySlug(slug: string): Promise<Church | null> {
-    const rows = await this.sql`select * from churches where self_register_slug = ${slug}`;
-    return rows[0] ? (await this.hydrate(rows))[0] ?? null : null;
   }
 
   async save(church: Church): Promise<Church> {

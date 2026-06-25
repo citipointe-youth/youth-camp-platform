@@ -34,7 +34,6 @@ export const CreateScheduleItemSchema = z.object({
   title: z.string().min(1),
   location: z.string().nullable().optional(),
   type: z.enum(SCHEDULE_ITEM_TYPES),
-  isCheckInPoint: z.boolean().optional().default(false),
 });
 
 export type CreateScheduleItemInput = z.infer<typeof CreateScheduleItemSchema>;
@@ -46,7 +45,6 @@ export const UpdateScheduleItemSchema = z.object({
   title: z.string().min(1).optional(),
   location: z.string().nullable().optional(),
   type: z.enum(SCHEDULE_ITEM_TYPES).optional(),
-  isCheckInPoint: z.boolean().optional(),
 });
 
 export type UpdateScheduleItemInput = z.infer<typeof UpdateScheduleItemSchema>;
@@ -63,10 +61,7 @@ export const UpdateSettingsSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   timezone: z.string().optional(),
-  checkInLocation: z.string().optional(),
-  checkInFrom: z.string().optional(),
   checkInBanner: z.string().nullable().optional(),
-  registerBaseUrl: z.string().optional(),
   checkInDays: z.array(z.string()).optional(),
   accommodationLocked: z.boolean().optional(),
   campMode: z.enum(CAMP_MODES).optional(),

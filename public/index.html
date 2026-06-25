@@ -2081,7 +2081,7 @@ function _clearImport(){_pendingImportCsv=null;const b=document.getElementById('
 RENDER.adminChurchImport=function(){
   paint('adminChurchImport',`<div class="card">
     <div class="lbl" style="margin-top:0">Bulk church import (CSV)</div>
-    <p class="note-hint" style="text-align:left;margin-bottom:10px">CSV columns: <b>Church Name, Zone, Code, Username, Password</b> (optional: Youth Pastor, Expected)</p>
+    <p class="note-hint" style="text-align:left;margin-bottom:10px">CSV columns: <b>Church Name, Zone, Username, Password</b></p>
     <input type="file" id="ciFileIn" accept=".csv" class="fld">
     <button class="btn" onclick="churchImportUpload()">Preview import</button>
     <div id="ciResult" style="display:none;margin-top:10px"></div>

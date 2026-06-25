@@ -1,15 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { makeDashboardService } from './dashboard.service';
 import {
   InMemoryPersonRepository,
   InMemoryAccommodationRepository,
   InMemoryNotificationRepository,
-  InMemoryScheduleRepository,
   InMemoryChurchRepository,
 } from '../repositories/in-memory';
 import type { Person } from '../core/entities/person';
 import type { CheckInEntry } from '../core/entities/person';
-import type { ScheduleItem } from '../core/entities/schedule';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
@@ -19,11 +17,22 @@ import type { Actor } from '../core/entities/user';
 //  D1 — currentSession = LATEST started session today (not earliest)
 //  D2 — totalAtCamp / totalExpected / checkInsDue scoped to the actor
 //  D3 — checkInsDue measured against the CURRENT session, respecting check-out
-// Camp timezone is pinned to UTC so "today"/"now" are deterministic.
+// Check-in sessions are now derived from settings.checkInDays (AM 08:00 / PM 13:00),
+// so the clock is pinned with vi.setSystemTime to make "current session" deterministic.
+// Camp timezone is pinned to UTC.
 // ---------------------------------------------------------------------------
 
-const NOW = new Date();
-const TODAY = NOW.toISOString().slice(0, 10);
+const DATE = '2026-07-01';
+const AM = `${DATE}#am`;
+const PM = `${DATE}#pm`;
+
+// Pin "now" so a chosen session is current. 15:00 → PM current (both started);
+// 10:00 → AM current, PM next.
+function pinClock(iso: string): void {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(iso));
+}
+afterEach(() => vi.useRealTimers());
 
 function actor(role: Actor['role'], over: Partial<Actor> = {}): Actor {
   return { id: 'u', role, churchId: null, churchName: null, zone: null, displayName: 'Test User', ...over };
@@ -46,16 +55,11 @@ function camper(over: Partial<Person> = {}): Person {
   };
 }
 
-function session(id: string, startTime: string): ScheduleItem {
-  const now = '2026-01-01T00:00:00.000Z';
-  return { id, day: TODAY, startTime, endTime: null, title: id, location: null, type: 'logistics', isCheckInPoint: true, createdAt: now, updatedAt: now };
-}
-
 function settings(): CampSettings {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-07-01', endDate: '2026-07-05',
-    timezone: 'UTC', checkInLocation: '', checkInFrom: '', registerBaseUrl: '', checkInDays: [],
+    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: DATE, endDate: '2026-07-05',
+    timezone: 'UTC', checkInDays: [DATE],
     accommodationLocked: false, campMode: 'at-camp', createdAt: now, updatedAt: now,
   };
 }
@@ -64,36 +68,34 @@ async function build() {
   const personRepo = new InMemoryPersonRepository();
   const accommodationRepo = new InMemoryAccommodationRepository();
   const notifRepo = new InMemoryNotificationRepository();
-  const scheduleRepo = new InMemoryScheduleRepository();
   const churchRepo = new InMemoryChurchRepository();
-  for (const r of [personRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo]) await r.init();
-  const svc = makeDashboardService(personRepo, accommodationRepo, notifRepo, scheduleRepo, churchRepo);
-  return { svc, personRepo, scheduleRepo };
+  for (const r of [personRepo, accommodationRepo, notifRepo, churchRepo]) await r.init();
+  const svc = makeDashboardService(personRepo, accommodationRepo, notifRepo, churchRepo);
+  return { svc, personRepo };
 }
 
 describe('at-camp dashboard — D1 current session = latest started', () => {
   it('returns the PM session as current when both AM and PM have started', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
-    await h.scheduleRepo.save(session('am', '00:00')); // long since started (UTC)
-    await h.scheduleRepo.save(session('pm', '00:01')); // also started, later
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
-    // Both started; current must be the LATER one ('pm'), not 'am'.
-    expect(res.currentSession?.id).toBe('pm');
+    expect(res.currentSession?.id).toBe(PM);
   });
 
   it('nextSession is the earliest not-yet-started session', async () => {
+    pinClock('2026-07-01T10:00:00Z'); // AM started, PM not yet
     const h = await build();
-    await h.scheduleRepo.save(session('past', '00:00'));
-    await h.scheduleRepo.save(session('future', '23:59'));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
-    expect(res.nextSession?.id).toBe('future');
+    expect(res.currentSession?.id).toBe(AM);
+    expect(res.nextSession?.id).toBe(PM);
   });
 });
 
 describe('at-camp dashboard — D2 scoping', () => {
   it('a church login sees only its own church in totals', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
     await h.personRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
     await h.personRepo.save(camper({ id: 'c1b', churchId: 'c1', atCamp: false }));
@@ -105,6 +107,7 @@ describe('at-camp dashboard — D2 scoping', () => {
   });
 
   it('admin sees the whole camp', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
     await h.personRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
     await h.personRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
@@ -115,6 +118,7 @@ describe('at-camp dashboard — D2 scoping', () => {
   });
 
   it('excludes cancelled campers from totalExpected', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
     await h.personRepo.save(camper({ id: 'live', lifecycle: 'arrived' }));
     await h.personRepo.save(camper({ id: 'gone', lifecycle: 'cancelled' })); // not a camper
@@ -126,8 +130,8 @@ describe('at-camp dashboard — D2 scoping', () => {
 
 describe('at-camp dashboard — D3 checkInsDue (current session, respects check-out)', () => {
   it('counts a camper as due when never checked in to the current session', async () => {
+    pinClock('2026-07-01T15:00:00Z'); // PM current
     const h = await build();
-    await h.scheduleRepo.save(session('cur', '00:00'));
     await h.personRepo.save(camper({ id: 'x', atCamp: true })); // no check-ins
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
@@ -135,20 +139,20 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   });
 
   it('a camper checked IN to the current session is NOT due', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
-    await h.scheduleRepo.save(session('cur', '00:00'));
-    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci('cur', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci(PM, 'in', '2026-07-01T13:30:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.checkInsDue).toBe(0);
   });
 
   it('a camper who checked in then OUT of the current session IS due again (D3)', async () => {
+    pinClock('2026-07-01T15:00:00Z');
     const h = await build();
-    await h.scheduleRepo.save(session('cur', '00:00'));
     await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [
-      ci('cur', 'in', '2026-07-01T08:00:00Z'),
-      ci('cur', 'out', '2026-07-01T09:00:00Z'),
+      ci(PM, 'in', '2026-07-01T13:30:00Z'),
+      ci(PM, 'out', '2026-07-01T14:00:00Z'),
     ] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
@@ -156,13 +160,12 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
   });
 
   it('a check-in to a DIFFERENT (earlier) session does not satisfy the current one (D3)', async () => {
+    pinClock('2026-07-01T15:00:00Z'); // PM current
     const h = await build();
-    await h.scheduleRepo.save(session('am', '00:00'));
-    await h.scheduleRepo.save(session('pm', '00:01')); // current (latest started)
-    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci('am', 'in', '2026-07-01T08:00:00Z')] }));
+    await h.personRepo.save(camper({ id: 'x', atCamp: true, checkInHistory: [ci(AM, 'in', '2026-07-01T08:30:00Z')] }));
     const res = await h.svc.home(actor('admin'), settings());
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
-    expect(res.currentSession?.id).toBe('pm');
+    expect(res.currentSession?.id).toBe(PM);
     expect(res.checkInsDue).toBe(1); // checked into AM, but PM is current -> still due
   });
 });

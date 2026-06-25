@@ -4,7 +4,6 @@ import type { Actor } from '../core/entities/user';
 import { assertCan } from './access-control';
 import { NotFoundError } from '../core/errors/app-error';
 import { CreateScheduleItemSchema, UpdateScheduleItemSchema } from '../core/validation/content.schema';
-import type { CheckInSession } from './checkin.service';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
 
@@ -14,7 +13,6 @@ export interface ScheduleService {
   create(actor: Actor, input: unknown): Promise<ScheduleItem>;
   update(actor: Actor, id: string, input: unknown): Promise<ScheduleItem>;
   remove(actor: Actor, id: string): Promise<void>;
-  deriveCheckInSessions(): Promise<CheckInSession[]>;
 }
 
 export function makeScheduleService(repo: IScheduleRepository): ScheduleService {
@@ -41,7 +39,6 @@ export function makeScheduleService(repo: IScheduleRepository): ScheduleService 
         ...data,
         endTime: data.endTime ?? null,
         location: data.location ?? null,
-        isCheckInPoint: data.isCheckInPoint ?? false,
         createdAt: now,
         updatedAt: now,
       };
@@ -60,17 +57,6 @@ export function makeScheduleService(repo: IScheduleRepository): ScheduleService 
       assertCan(actor, 'admin:manage');
       const ok = await repo.delete(id);
       if (!ok) throw new NotFoundError('Schedule item not found');
-    },
-
-    async deriveCheckInSessions() {
-      const items = await repo.getCheckInPoints();
-      return items.map((i) => ({
-        id: i.id,
-        label: i.title,
-        day: i.day,
-        startTime: i.startTime,
-        location: i.location ?? null,
-      }));
     },
   };
 }

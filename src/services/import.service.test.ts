@@ -17,8 +17,7 @@ function actor(role: Actor['role'], over: Partial<Actor> = {}): Actor {
 function church(over: Partial<Church>): Church {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: 'c1', name: 'Victory', zone: 'Yellow', code: 'VIC', selfRegisterSlug: 'victory',
-    expectedCount: 0, reservations: [],
+    id: 'c1', name: 'Victory', zone: 'Yellow', reservations: [],
     contacts: { male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } }, female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } } },
     createdAt: now, updatedAt: now, ...over,
   };
@@ -248,7 +247,8 @@ describe('ImportService.importCsv — Elvanto export shape', () => {
     const kh = created.find((c) => c.name === 'Kingdom Hope Church')!;
     expect(kh).toBeTruthy();
     expect(p.churchId).toBe(kh.id);
-    expect(kh.youthPastorName).toBe('Josh Gazzard');
+    // The "unlisted church / youth pastor" free-text note is preserved on the PERSON
+    // (asserted above); the auto-created church no longer stores a youth-pastor field.
   });
 
   it('strips junk dietary and preserves multi-line medication text', async () => {

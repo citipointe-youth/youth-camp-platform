@@ -43,15 +43,6 @@ function parseGender(val: string): Person['gender'] {
   return 'other';
 }
 
-function slugCode(name: string, taken: Set<string>): string {
-  const base = name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8) || 'CHURCH';
-  let code = base;
-  let n = 1;
-  while (taken.has(code)) code = `${base}${n++}`.slice(0, 10);
-  taken.add(code);
-  return code;
-}
-
 export function makeImportService(
   personRepo: IPersonRepository,
   churchRepo: IChurchRepository,
@@ -74,7 +65,6 @@ export function makeImportService(
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
       for (const c of churches) churchIdByName.set(c.name.toLowerCase(), c.id);
-      const takenCodes = new Set<string>(churches.map((c) => c.code));
       const newlyCreated = new Map<string, string>(); // lowercased name -> id
 
       const allPersons = await personRepo.findAll();
@@ -103,7 +93,7 @@ export function makeImportService(
 
       // Resolve a church name to an id. In live mode, auto-creates a minimal church on miss
       // (phantom). In dry-run mode, records the unmatched name for operator review instead.
-      async function resolveChurch(name: string, youthPastor: string, rowNum: number, createdAt: string): Promise<string> {
+      async function resolveChurch(name: string, rowNum: number, createdAt: string): Promise<string> {
         if (!name) return '';
         const key = name.toLowerCase();
         const existing = churchIdByName.get(key) ?? newlyCreated.get(key);
@@ -115,15 +105,10 @@ export function makeImportService(
           return `__phantom__${key}`;
         }
         const id = newId('church');
-        const code = slugCode(name, takenCodes);
         const church: Church = {
           id,
           name,
           zone: 'Yellow',
-          code,
-          selfRegisterSlug: code.toLowerCase(),
-          expectedCount: 0,
-          ...(youthPastor ? { youthPastorName: youthPastor } : {}),
           reservations: [],
           contacts: {
             male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -174,7 +159,7 @@ export function makeImportService(
           const explicitChurchId = field(row, 'churchId', 'church_id') || opts.churchId || '';
           const resolvedChurchId = explicitChurchId
             ? explicitChurchId
-            : await resolveChurch(churchName, churchUnlistedNote ?? '', rowNum, now);
+            : await resolveChurch(churchName, rowNum, now);
 
           const gender = parseGender(field(row, 'Gender', 'gender') || 'other');
           const gradeRaw = field(row, 'School Grade', 'grade', 'Grade');

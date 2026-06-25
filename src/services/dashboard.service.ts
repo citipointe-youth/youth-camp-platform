@@ -2,12 +2,12 @@ import type {
   IPersonRepository,
   IAccommodationRepository,
   INotificationRepository,
-  IScheduleRepository,
   IChurchRepository,
 } from '../repositories/interfaces/entity-repositories';
 import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
 import { daysUntil, zonedNow } from '../utils/date';
+import { buildSessions } from './checkin-sessions';
 import { computeLiveTaken } from './accommodation-occupancy';
 import { isRegistrant, isCamper } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
@@ -63,7 +63,6 @@ export function makeDashboardService(
   personRepo: IPersonRepository,
   accommodationRepo: IAccommodationRepository,
   notifRepo: INotificationRepository,
-  scheduleRepo: IScheduleRepository,
   churchRepo: IChurchRepository,
 ): DashboardService {
   return {
@@ -139,14 +138,12 @@ export function makeDashboardService(
         const totalAtCamp = allCampers.filter((p) => p.atCamp).length;
         const totalExpected = allCampers.length; // isCamper already excludes cancelled
 
-        // Get check-in sessions for today. B3 FIX: today + now from the camp timezone.
+        // Check-in sessions are derived from the camp's check-in days (settings), not
+        // the schedule — two per day (AM/PM). B3 FIX: today + now from the camp tz.
         const { date: todayStr, time: nowTime } = zonedNow(settings.timezone || 'Australia/Brisbane');
-        const checkInItems = await scheduleRepo.getCheckInPoints();
-        const todaySessions = checkInItems.filter((i) => i.day === todayStr);
-        // D1 FIX: the current session is the LAST session today that has already
-        // started, not the first. todaySessions is ascending by startTime, so
-        // .find() returned the earliest started one (e.g. AM at 8pm) — wrong, and it
-        // disagreed with checkin.service. Walk from the end instead.
+        const todaySessions = buildSessions(settings.checkInDays ?? []).filter((s) => s.day === todayStr);
+        // Current session = the LAST session today that has already started (matches
+        // checkin.service). Null before the morning session begins.
         const currentSession = [...todaySessions].reverse().find((s) => s.startTime <= nowTime) ?? null;
         const nextSession = todaySessions.find((s) => s.startTime > nowTime) ?? null;
 
@@ -183,10 +180,10 @@ export function makeDashboardService(
           totalExpected,
           checkInsDue,
           currentSession: currentSession
-            ? { id: currentSession.id, label: currentSession.title, day: currentSession.day, startTime: currentSession.startTime }
+            ? { id: currentSession.id, label: currentSession.label, day: currentSession.day, startTime: currentSession.startTime }
             : null,
           nextSession: nextSession
-            ? { id: nextSession.id, label: nextSession.title, day: nextSession.day, startTime: nextSession.startTime }
+            ? { id: nextSession.id, label: nextSession.label, day: nextSession.day, startTime: nextSession.startTime }
             : null,
           latestNotification: latestNotif
             ? { title: latestNotif.title, body: latestNotif.body, priority: latestNotif.priority, createdAt: latestNotif.createdAt }

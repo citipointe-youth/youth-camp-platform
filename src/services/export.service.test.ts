@@ -12,8 +12,7 @@ function actor(role: Actor['role']): Actor {
 function church(over: Partial<Church>): Church {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: 'c1', name: 'Victory', zone: 'Yellow', code: 'VIC', selfRegisterSlug: 'victory',
-    expectedCount: 0, reservations: [],
+    id: 'c1', name: 'Victory', zone: 'Yellow', reservations: [],
     contacts: { male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } }, female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } } },
     createdAt: now, updatedAt: now, ...over,
   };

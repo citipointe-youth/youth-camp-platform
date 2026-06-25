@@ -19,11 +19,8 @@ const ChurchImportOptionsSchema = z.object({
 export interface ChurchImportRow {
   name: string;
   zone: string;
-  code: string;
   username: string;
   password: string;
-  youthPastorName?: string;
-  expectedCount?: number;
 }
 
 export interface ChurchImportResult {
@@ -52,7 +49,7 @@ export function makeChurchImportService(
 
       const existingChurches = await churchRepo.findAll();
       const existingUsers = await userRepo.findAll();
-      const churchByCode = new Map(existingChurches.map((c) => [c.code.toUpperCase(), c]));
+      const churchByName = new Map(existingChurches.map((c) => [c.name.toLowerCase(), c]));
       const userByUsername = new Map(existingUsers.map((u) => [u.username?.toLowerCase() ?? '', u]));
 
       let created = 0;
@@ -68,27 +65,23 @@ export function makeChurchImportService(
         const name = (row['Church Name'] ?? row['name'] ?? '').trim();
         const zoneRaw = (row['Zone'] ?? row['zone'] ?? 'Yellow').trim();
         const zone = ZONE_NAMES.find((z) => z.toLowerCase() === zoneRaw.toLowerCase());
-        const code = (row['Code'] ?? row['code'] ?? '').toUpperCase().trim();
         const username = (row['Username'] ?? row['username'] ?? '').toLowerCase().trim();
         const password = (row['Password'] ?? row['password'] ?? '').trim();
-        const youthPastorName = (row['Youth Pastor'] ?? row['youthPastorName'] ?? '').trim() || undefined;
-        const expectedCount = parseInt(row['Expected'] ?? row['expectedCount'] ?? '0', 10) || 0;
 
         if (!name) { errors.push({ row: rowNum, message: 'Missing Church Name' }); skipped++; continue; }
-        if (!code) { errors.push({ row: rowNum, message: 'Missing Code' }); skipped++; continue; }
         if (!username) { errors.push({ row: rowNum, message: 'Missing Username' }); skipped++; continue; }
         if (!password && !opts.dryRun) { errors.push({ row: rowNum, message: 'Missing Password' }); skipped++; continue; }
         if (!zone) { errors.push({ row: rowNum, message: `Invalid Zone "${zoneRaw}" (must be one of ${ZONE_NAMES.join(', ')})` }); skipped++; continue; }
 
-        const rowData: ChurchImportRow = { name, zone, code, username, password, youthPastorName, expectedCount };
+        const rowData: ChurchImportRow = { name, zone, username, password };
         preview.push(rowData);
 
-        // Idempotency: skip if code + username already exist
-        const codeExists = churchByCode.has(code);
+        // Idempotency: skip if church name + username already exist
+        const nameExists = churchByName.has(name.toLowerCase());
         const userExists = userByUsername.has(username);
 
-        if (codeExists || userExists) {
-          const reasons = [codeExists && `code "${code}" exists`, userExists && `username "${username}" exists`].filter(Boolean);
+        if (nameExists || userExists) {
+          const reasons = [nameExists && `church "${name}" exists`, userExists && `username "${username}" exists`].filter(Boolean);
           warnings.push({ row: rowNum, message: `Skipped: ${reasons.join(', ')}` });
           skipped++;
           continue;
@@ -101,10 +94,6 @@ export function makeChurchImportService(
             id: churchId,
             name,
             zone,
-            code,
-            selfRegisterSlug: code.toLowerCase(),
-            expectedCount,
-            ...(youthPastorName ? { youthPastorName } : {}),
             reservations: [],
             contacts: {
               male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -114,15 +103,14 @@ export function makeChurchImportService(
             updatedAt: now,
           };
           await churchRepo.save(church);
-          churchByCode.set(code, church);
+          churchByName.set(name.toLowerCase(), church);
 
           const passwordHash = await hashPassword(password);
-          const nameWords = youthPastorName ? youthPastorName.trim().split(/\s+/) : [name];
           const user: User = {
             id: newId('user'),
             username,
-            firstName: nameWords[0] ?? name,
-            lastName: nameWords.slice(1).join(' ') || 'Team',
+            firstName: name,
+            lastName: 'Team',
             role: 'church',
             churchId,
             churchName: name,
