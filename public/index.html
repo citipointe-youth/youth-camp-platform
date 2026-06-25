@@ -24,8 +24,12 @@
 --shadow-sm:0 4px 12px rgba(30,27,75,.07);--shadow:0 10px 24px rgba(30,27,75,.10);
 --ok:#16a34a;--warn:#b45309;--danger:#b91c1c;--info:#4f46e5;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;}
-body{font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;}
+html,body{height:100%;height:100dvh;}
+body{font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;height:100dvh;overflow:hidden;}
+/* height:100dvh on body+app (not 100% of the layout viewport): on mobile the layout
+   viewport can be shorter than the visual viewport when the URL bar is hidden, which
+   left a strip of dark body background BELOW the bottom nav ("nav not at the bottom").
+   Anchoring both to the dynamic viewport makes #tabs sit flush at the bottom. */
 .app{width:100%;max-width:460px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5);}
 .bar{background:linear-gradient(135deg,var(--violet),var(--navy));color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 12px;display:flex;align-items:center;gap:7px;flex:none;z-index:20;}
 .bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;}
@@ -83,6 +87,17 @@ h3.sec{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppe
 .notice .nico .ic-svg{width:18px;height:18px;}
 .search .ic-svg{width:18px;height:18px;color:var(--blue);}
 .btn .ic-svg{width:15px;height:15px;margin-right:3px;}
+/* Account rows (admin → Accounts): one line per login with icon actions */
+.acct-row{display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid var(--line);}
+.acct-row:first-child{border-top:none;}
+.acct-actions{display:flex;gap:5px;flex:none;}
+.iconbtn{background:#f1f0ff;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;color:var(--blue);padding:0;}
+.iconbtn .ic-svg{width:17px;height:17px;}
+.iconbtn:active{background:#e0ddff;}
+.iconbtn.danger{color:var(--danger);background:#fef2f2;border-color:#fecaca;}
+.acct-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.72rem;color:var(--muted);background:#f5f3ff;border-radius:10px;padding:9px 11px;margin-bottom:10px;}
+.acct-legend span{display:inline-flex;align-items:center;gap:5px;}
+.acct-legend .ic-svg{width:15px;height:15px;}
 .tile .b{position:absolute;top:7px;right:8px;background:var(--rose);color:#fff;font-size:.58rem;font-weight:800;border-radius:999px;padding:2px 6px;}
 .row{display:flex;align-items:center;gap:11px;padding:11px 13px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:background .12s;}
 .row:active{background:#f5f3ff;}
@@ -173,9 +188,13 @@ textarea{min-height:84px;resize:vertical;}
 .quick button:active{background:rgba(255,255,255,.22);}
 /* ── At-camp preview banner ── */
 #previewBanner{display:none;background:linear-gradient(90deg,#92400e,#b45309);color:#fff;
-  padding:8px 14px;font-size:.78rem;font-weight:700;
+  padding:max(8px,env(safe-area-inset-top)) 14px 8px;font-size:.78rem;font-weight:700;
   flex:none;z-index:19;align-items:center;gap:10px;}
 #previewBanner.show{display:flex;}
+/* When the preview banner is showing it becomes the topmost element and owns the
+   safe-area inset, so the header below it must NOT also reserve the notch space
+   (that double-padding pushed the banner content down over the Dynamic Island). */
+#previewBanner.show + .bar{padding-top:14px;}
 #previewBanner .pb-label{flex:1;letter-spacing:.03em;}
 #previewBanner .pb-exit{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
   color:#fff;border-radius:999px;padding:4px 12px;font-size:.74rem;font-weight:800;
@@ -210,7 +229,6 @@ textarea{min-height:84px;resize:vertical;}
     <div class="mode-badge" id="modeBadge"></div>
     <div class="mode-badge" id="dayBadge" onclick="switchDay()" style="cursor:pointer;display:none" title="Tap to switch camp day"></div>
     <div class="role-badge" id="roleBadge"></div>
-    <button id="barSearch" onclick="gotoTab('search')" style="display:none;background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--muted);font-size:1.1rem" title="Search">🔍</button>
     <div class="sign-out" onclick="logout()">Sign out</div>
   </header>
   <div class="stage" id="stage" style="display:none">
@@ -218,7 +236,6 @@ textarea{min-height:84px;resize:vertical;}
     <section class="screen" id="people"></section>
     <section class="screen" id="help"></section>
     <section class="screen" id="student"></section>
-    <section class="screen" id="codes"></section>
     <section class="screen" id="checkin"></section>
     <section class="screen" id="search"></section>
     <section class="screen" id="notifs"></section>
@@ -281,6 +298,34 @@ textarea{min-height:84px;resize:vertical;}
    double-fire. */
 const API_TIMEOUT_MS=20000, API_IMPORT_TIMEOUT_MS=90000;
 const _inflight=new Map(); // path -> Promise (GET coalescing)
+/* ===== DATA CACHE (30s TTL — makes back-navigation instant; ported from
+   connection-made-simple). GET results are cached; every write invalidates the
+   affected resource prefixes. Pass {noCache:true} to force a fresh read. ===== */
+const Cache=(()=>{const store=new Map();const TTL=30000;
+  const matches=(sk,k)=>sk===k||sk.startsWith(k+'/')||sk.startsWith(k+'?');
+  return{
+    get(k){const e=store.get(k);return(e&&Date.now()-e.ts<TTL)?e.data:null;},
+    getStale(k){const e=store.get(k);return e?e.data:null;},
+    set(k,d){store.set(k,{data:d,ts:Date.now()});},
+    del(...keys){for(const k of keys){for(const sk of[...store.keys()]){if(matches(sk,k))store.delete(sk);}}},
+    clear(){store.clear();}
+  };})();
+function _allCached(...paths){return paths.every(p=>Cache.get(p)!==null);}
+// Map a write path to the cached resources it makes stale. /home aggregates almost
+// everything, so any write drops it.
+function _invalidate(path){
+  if(path.startsWith('/import')){Cache.clear();return;}
+  Cache.del('/home');
+  if(path.startsWith('/accounts'))Cache.del('/accounts','/registrants');
+  else if(path.startsWith('/settings'))Cache.del('/settings','/schedule','/checkin');
+  else if(path.startsWith('/schedule'))Cache.del('/schedule','/checkin');
+  else if(path.startsWith('/attendance')||path.startsWith('/checkin'))Cache.del('/checkin');
+  else if(path.startsWith('/notifications'))Cache.del('/notifications');
+  else if(path.startsWith('/notes'))Cache.del('/notes');
+  else if(path.startsWith('/registrants'))Cache.del('/registrants');
+  else if(path.startsWith('/accommodation'))Cache.del('/accommodation');
+  else Cache.del(path);
+}
 async function _doFetch(path,opt){
   const isImport=path.indexOf('/import')===0||path.indexOf('/import')===path.length-7;
   const ctrl=new AbortController();
@@ -304,12 +349,24 @@ async function api(path,opt={}){
   const method=(opt.method||'GET').toUpperCase();
   if(method!=='GET'){
     if(PREVIEW_MODE){toast('Preview mode — sign-in actions are disabled');throw new Error('Preview mode — read only');}
-    return _doFetch(path,opt); // only GETs are safe to coalesce
+    const r=await _doFetch(path,opt);
+    _invalidate(path); // a write invalidates the resources it touched
+    return r;
   }
+  if(!opt.noCache){const cached=Cache.get(path);if(cached!==null)return cached;}
   if(_inflight.has(path))return _inflight.get(path);
-  const p=_doFetch(path,opt).finally(()=>_inflight.delete(path));
+  const p=_doFetch(path,opt)
+    .then(d=>{if(!opt.noCache&&d!==null)Cache.set(path,d);return d;})
+    .finally(()=>_inflight.delete(path));
   _inflight.set(path,p);
   return p;
+}
+/* After login, warm the endpoints the first few screens need so navigation is
+   instant. Fire-and-forget; failures are ignored (the screen will retry). */
+function _prefetch(){
+  const common=['/settings','/home','/notifications'];
+  const byMode=CAMP_MODE==='at-camp'?['/checkin/sessions']:['/registrants'];
+  [...common,...byMode].forEach(p=>api(p).catch(()=>{}));
 }
 /* ===== STATE ===== */
 let TOKEN=null,ACTOR=null,SETTINGS=null,CAMP_MODE='pre-camp',STACK=['home'],PREVIEW_MODE=false;
@@ -339,7 +396,11 @@ book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M19 17H6"/>'
 help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4 1.4c0 1.6-2 2-2 3.6M12 17h.01"/>',
 gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4L4.6 11a7.9 7.9 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4Z"/>',
 chevron:'<path d="m9 18 6-6-6-6"/>',
-clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'
+clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+at:'<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 9-9 3 3"/><path d="m15.5 7.5 2 2"/>',
+trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>'
 };
 function ic(n,cls){return `<svg class="ic-svg${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
 const canReadNotes=()=>ACTOR&&['zoneLeader','director','admin'].includes(ACTOR.role);
@@ -357,6 +418,7 @@ function timeFmt(iso){try{return new Date(iso).toLocaleTimeString([],{hour:'nume
 function dtFmt(iso){try{return new Date(iso).toLocaleString();}catch{return iso;}}
 
 function sessionExpired(){
+  Cache.clear();
   TOKEN=null;ACTOR=null;SESSIONS=[];SEL_SESSION=null;SETTINGS=null;STACK=['home'];
   document.getElementById('bar').style.display='none';
   document.getElementById('stage').style.display='none';
@@ -381,6 +443,7 @@ function quick(u){document.getElementById('username').value=u;document.getElemen
 async function doLogin(){
   const err=document.getElementById('loginErr');if(err)err.style.display='none';
   try{
+    Cache.clear(); // never carry one user's cached data into another's session
     const d=await api('/auth/login',{method:'POST',body:{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value}});
     TOKEN=d.token;ACTOR={...d.user,displayName:((d.user.firstName||'')+' '+(d.user.lastName||'')).trim()};
     SETTINGS=await api('/settings');
@@ -389,7 +452,7 @@ async function doLogin(){
     document.getElementById('bar').style.display='flex';
     document.getElementById('stage').style.display='block';
     document.getElementById('tabs').style.display='flex';
-    updateModeUI();buildTabs();STACK=['home'];await gotoTab('home');
+    updateModeUI();buildTabs();_prefetch();STACK=['home'];await gotoTab('home');
   }catch(e){if(err){err.textContent=e.message;err.style.display='block';}else toast(e.message);}
 }
 function logout(){
@@ -406,9 +469,6 @@ function updateModeUI(){
   if(r&&ACTOR)r.textContent=ACTOR.role==='admin'?'Admin':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?'Zone·'+ACTOR.zone:'Church';
   const db=document.getElementById('dayBadge');
   if(db){if(CAMP_MODE==='at-camp'){db.style.display='';const day=(SETTINGS&&SETTINGS.campDay)||1;db.innerHTML='DAY '+day+' <span style="opacity:.75">⇄</span>';db.style.background='#4f46e5';db.style.color='#fff';}else db.style.display='none';}
-  // Global search icon in header: show in at-camp/preview mode for all roles (except firstAid who have their own search)
-  const bs=document.getElementById('barSearch');
-  if(bs)bs.style.display=(CAMP_MODE==='at-camp'&&ACTOR&&ACTOR.role!=='firstAid')?'':'none';
 }
 /* ===== AT-CAMP PREVIEW ===== */
 function enterPreview(){
@@ -433,7 +493,7 @@ function switchDay(){const cur=(SETTINGS&&SETTINGS.campDay)||1;const next=cur===
   toast(next===1?'Day 1 — First Day Sign In':'Day '+next+' — testimonies open');STACK=['home'];RENDER.home();}
 
 /* ===== ROUTER ===== */
-const TAB_OF={home:'home',codes:'home',people:'people',student:'people',help:'help',
+const TAB_OF={home:'home',people:'people',student:'people',help:'help',
   admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
   adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
   adminChurchImport:'admin',adminRecords:'admin',adminCloseOut:'admin',adminWizard:'admin',
@@ -467,9 +527,14 @@ function _spinner(id,label){
 }
 async function _navTo(id,arg){
   const tok=++_navToken; _navId=id;
-  _spinner(id);
+  // Stale-while-revalidate: if this screen already holds its previous render, show it
+  // instantly and let RENDER repaint when (cached, usually instant) data arrives —
+  // no spinner flash on revisits. Only first visits (empty screen) get a spinner.
+  const el=document.getElementById(id);
+  const hasContent=el&&el.innerHTML.trim()!==''&&!el.querySelector('.loading');
+  if(hasContent)_showScreen(id);else _spinner(id);
   try{ if(RENDER[id]) await RENDER[id](arg,tok); }
-  catch(e){ if(!_stale(tok)) { const el=document.getElementById(id); if(el)el.innerHTML='<p class="note-hint">'+esc(e.message||'Something went wrong')+'</p>'; } }
+  catch(e){ if(!_stale(tok)) { const el2=document.getElementById(id); if(el2)el2.innerHTML='<p class="note-hint">'+esc(e.message||'Something went wrong')+'</p>'; } }
 }
 async function go(id,arg){STACK.push(id);await _navTo(id,arg);}
 async function gotoTab(id){
@@ -556,16 +621,26 @@ RENDER.home=async function renderHome(){
   if(ACTOR&&ACTOR.role==='firstAid'){await renderHomeFirstAid();return;}
   // Re-check mode on every home visit so mode switches by admin propagate to
   // already-logged-in sessions without requiring a logout/login cycle.
-  try{
-    const fresh=await api('/settings');
-    if(fresh&&fresh.campMode&&fresh.campMode!==CAMP_MODE){
-      CAMP_MODE=fresh.campMode;
-      if(SETTINGS)SETTINGS.campMode=fresh.campMode;
-      updateModeUI();buildTabs();
-    }
-  }catch(e){}
+  // NEVER while previewing: preview locally forces CAMP_MODE='at-camp' even though
+  // the server is still 'pre-camp', so re-syncing here would instantly drop the user
+  // back out of the preview (bug: "preview at-camp view doesn't load").
+  if(!PREVIEW_MODE){
+    try{
+      const fresh=await api('/settings');
+      if(fresh&&fresh.campMode&&fresh.campMode!==CAMP_MODE){
+        CAMP_MODE=fresh.campMode;
+        if(SETTINGS)SETTINGS.campMode=fresh.campMode;
+        updateModeUI();buildTabs();
+      }
+    }catch(e){}
+  }
   if(CAMP_MODE==='at-camp'){await renderHomeAtCamp();return;}
-  const h=await api('/home');
+  // Parallel-load the three independent home datasets (was three sequential awaits).
+  const [h,regs,feed]=await Promise.all([
+    api('/home'),
+    api('/registrants').catch(()=>[]),
+    api('/notifications').catch(()=>[]),
+  ]);
   const s=SETTINGS,isWide=['director','admin'].includes(ACTOR.role);
   let body=`<div class="hero"><div class="k">${esc((s&&s.campName)||h.campName)}</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
     <div class="cd"><div class="big">${h.daysToGo??'—'}</div><div class="meta">days to go<br>${esc(h.startDate||'')}${s&&s.endDate?' – '+esc(s.endDate):''}</div></div></div>`;
@@ -578,8 +653,7 @@ RENDER.home=async function renderHome(){
   if(isWide)body+=`<div class="card tap" onclick="go('accom')"><div class="rowsb"><div><div style="font-weight:600">Accommodation allocations</div><div class="sub">Spaces &amp; per-church spot allocation</div></div><span class="pill info">View ›</span></div></div>`;
   body+=`<div class="card"><div class="rowsb"><div class="lbl" style="margin:0">${isWide?'Camp registrations':'Your registrations'}</div><b>${h.totalRegistrants||0}</b></div>
     <div class="rowsb" style="margin-top:6px"><span class="sub" style="font-size:.74rem">${h.totalCampers||0} campers · ${h.totalLeaders||0} leaders</span>${h.unpaidCount?`<span class="pill amb">${h.unpaidCount} unpaid</span>`:'<span class="pill ok">All paid</span>'}</div></div>`;
-  // Fetch registrants once — used by both the wide by-ministry table and the church accommodation summary.
-  const regs=await api('/registrants').catch(()=>[]);
+  // `regs` (/registrants) loaded in parallel above — used by both the wide by-ministry table and the church accommodation summary.
   if(isWide){
     // By-ministry M/F split — aggregate from /registrants (the /home + /breakdown DTOs carry no gender split)
     const by={};(regs||[]).forEach(r=>{const c=by[r.churchId]||(by[r.churchId]={name:r.churchName,maleStudents:0,femaleStudents:0,maleLeaders:0,femaleLeaders:0,total:0});c.total++;
@@ -604,8 +678,6 @@ RENDER.home=async function renderHome(){
     body+=`<div class="card"><div class="rowsb"><b>△ Tent</b><span class="pill info">${tent} registered</span></div>
       <div class="rowsb" style="margin-top:8px"><b>⌂ Classroom</b><span class="pill info">${cls} registered</span></div>
       <div class="sub" style="font-size:.74rem;margin-top:8px">Your group's tent vs classroom split. Specific locations are assigned by the camp office.</div></div>`;
-    if(ACTOR.role==='church'){let code='—';try{const chs=await api('/accounts/churches');const mc=(chs||[]).find(c=>c.id===ACTOR.churchId);if(mc)code=mc.code||'—';}catch(e){}
-      body+=`<div class="card tap" onclick="go('codes')"><div class="rowsb"><div><div style="font-weight:600"># Registration code</div><div class="sub">Share with your families</div></div><span class="pill info">${esc(code)} ›</span></div></div>`;}
   }
   // At-camp preview entry card — shown in pre-camp to all roles
   body+=`<div class="card tap" style="margin-top:18px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:1.5px solid #fcd34d" onclick="enterPreview()">
@@ -617,12 +689,11 @@ RENDER.home=async function renderHome(){
       <span style="font-size:1.2rem;color:#d97706">›</span>
     </div>
   </div>`;
-  // Notices — latest 3 (backend has no scheduled-for-later; expiry handled server-side)
-  try{const feed=await api('/notifications');
-    const notices=(feed||[]).slice(0,3);
+  // Notices — latest 3 (feed already loaded in parallel above; expiry handled server-side)
+  {const notices=(feed||[]).slice(0,3);
     body+=`<div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3><span class="sub" style="font-size:.72rem">Latest 3 · tap to open</span></div>
     <div id="homeNotices" style="margin-top:10px">${notices.length?notices.map(noticeCard).join(''):'<p class="note-hint">All caught up — no notices right now.</p>'}</div>`;
-  }catch(e){}
+  }
   paint('home',body,'My Church Hub',isWide?'All churches':(ACTOR.churchName?esc(ACTOR.churchName):esc(ACTOR.displayName)));
 };
 
@@ -845,17 +916,6 @@ async function openPerson(id){
 async function markReg(id,patch){try{await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated ✓');await openPerson(id);}catch(e){toast(e.message);}}
 
 /* CODES */
-RENDER.codes=async function(){
-  const s=SETTINGS;let code='—';
-  try{const chs=await api('/accounts/churches');const mc=(chs||[]).find(c=>c.id===ACTOR.churchId);if(mc)code=mc.code||'—';}catch(e){}
-  paint('codes',`<div class="card" style="text-align:center"><div class="lbl">Your church code</div>
-    <div style="font-size:2rem;font-weight:800;letter-spacing:.1em;color:var(--navy)">${esc(code)}</div>
-    <p class="note-hint" style="margin-top:6px">Families enter this at ${esc(s?.registerBaseUrl||'')}.</p></div>
-    <div class="card"><div class="lbl">Family self-register link</div>
-    <div style="background:#f5f3ff;border-radius:10px;padding:10px;font-size:.82rem;color:#5b21b6;word-break:break-all">${esc(s?.registerBaseUrl||'')+'/r/'+esc((ACTOR.displayName||'church').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}</div>
-    <button class="btn" onclick="toast('Link copied ✓')">Copy link</button></div>`,'Registration code','Share with your families');
-};
-
 /* HELP / FAQ pre-camp */
 RENDER.help=async function(){
   const faqs=await api('/faq');
@@ -1456,8 +1516,7 @@ RENDER.schedule=async function(){
   const daySeg=days.length>1?`<div class="seg">${days.map(d=>`<button class="${d===SCHED_DAY?'on':''}" onclick="selSchedDay('${d}')">${new Date(d+'T12:00:00Z').toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'})}</button>`).join('')}</div>`:'';
   paint('schedule',daySeg+`<div class="card">${items.length?items.map(i=>`<div style="display:flex;gap:11px;margin-bottom:9px">
     <div style="font-weight:800;color:var(--blue);width:56px;flex:none">${esc(i.startTime)}</div>
-    <div><div class="nm">${esc(i.title)}${i.isCheckInPoint?' <span class="pill ok" style="font-size:.55rem">check-in</span>':''}</div>
-    <div class="sub">${esc(i.location||'')}</div></div></div>`).join(''):'<p class="sub">No items for this day.</p>'}</div>`,'Schedule',dayLong(SCHED_DAY));
+    <div><div class="nm">${esc(i.title)}</div></div></div>`).join(''):'<p class="sub">No items for this day.</p>'}</div>`,'Schedule',dayLong(SCHED_DAY));
 };
 function selSchedDay(d){SCHED_DAY=d;RENDER.schedule();}
 
@@ -1578,78 +1637,106 @@ const ZONE_OPTS=['Yellow','Blue','Green','Red'];
 const zoneSel=(id,s)=>`<select id="${id}">${ZONE_OPTS.map(z=>`<option${z===s?' selected':''}>${z}</option>`).join('')}</select>`;
 RENDER.adminAccounts=async function(){
   const [users,churches]=await Promise.all([api('/accounts/users'),api('/accounts/churches')]);
+  window._allUsers=users;window._allChurches=churches; // referenced by row action handlers
   const leaderRoles=['zoneLeader','director','firstAid'];
   const leaders=users.filter(u=>leaderRoles.includes(u.role));
-  const lr=leaders.map(u=>`<div class="row" style="cursor:default"><div style="flex:1;min-width:0">
-    <div class="nm">${esc(u.firstName+' '+u.lastName)} <span style="color:var(--muted)">· ${u.role}</span></div>
-    <div class="sub">${esc(u.username||'')}${u.zone?' · '+u.zone:u.churchName?' · '+u.churchName:''}${u.status==='inactive'?' · inactive':''}</div></div>
-    <button class="btn ghost sm" onclick='editAcct(${JSON.stringify(u).replace(/\'/g,"&#39;")})'>Edit</button><button class="btn red sm" style="margin-left:6px" onclick="delAcct('${u.id}')">Delete</button></div>`).join('')||'<p class="note-hint">No leadership accounts yet.</p>';
-  const chOpts=churches.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  const cr=churches.map(c=>`<div class="card" style="background:#fafbff"><div style="font-weight:700;margin-bottom:4px">${esc(c.name)} <span class="pill info">${esc(c.code||'')}</span></div>
-    <label>Zone</label>${zoneSel('cz_'+c.id,c.zone)}
-    <label>Contact email</label><input class="fld" id="ce_${c.id}" type="email" inputmode="email" value="${esc(c.contactEmail||'')}">
-    ${CAMP_MODE==='pre-camp'?`<label>Expected registrations</label><input class="fld" id="cx_${c.id}" value="${esc(c.expectedCount||0)}">`:'' }
-    <div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveChurch('${c.id}')">Save</button><button class="btn red sm" style="flex:1" onclick="delChurch('${c.id}')">Delete church</button></div></div>`).join('');
+  const roleLabel=r=>r==='zoneLeader'?'Zone leader':r==='firstAid'?'First aid':r==='director'?'Director':r;
+  const legend=`<div class="acct-legend"><span>${ic('edit')} Rename</span><span>${ic('at')} Username</span><span>${ic('key')} Password</span><span>${ic('trash')} Delete</span></div>`;
+  const row=o=>`<div class="acct-row"><div style="flex:1;min-width:0">
+      <div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.title}</div>
+      <div class="sub" style="font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.sub}</div></div>
+    <div class="acct-actions">
+      <button class="iconbtn" title="Rename" onclick="${o.onName}">${ic('edit')}</button>
+      <button class="iconbtn" title="Change username" onclick="${o.onUser}">${ic('at')}</button>
+      <button class="iconbtn" title="Change password" onclick="${o.onPass}">${ic('key')}</button>
+      <button class="iconbtn danger" title="Delete" onclick="${o.onDel}">${ic('trash')}</button></div></div>`;
+  const lr=leaders.map(u=>row({
+    title:esc(u.firstName+' '+u.lastName)+' <span style="color:var(--muted);font-weight:600">· '+roleLabel(u.role)+'</span>',
+    sub:'@'+esc(u.username||'')+(u.zone?' · '+esc(u.zone):'')+(u.status==='inactive'?' · inactive':''),
+    onName:`editLeaderName('${u.id}')`,onUser:`editUsername('${u.id}')`,onPass:`changePassword('${u.id}')`,onDel:`delAcct('${u.id}')`
+  })).join('')||'<p class="note-hint">No leadership accounts yet.</p>';
+  const cr=churches.map(c=>{const cu=users.find(u=>u.role==='church'&&u.churchId===c.id)||{};
+    return row({
+      title:esc(c.name)+' <span style="color:var(--muted);font-weight:600">· Church</span>',
+      sub:(cu.username?'@'+esc(cu.username):'<span style="color:var(--danger)">no login</span>')+' · '+esc(c.zone||'—'),
+      onName:`editChurchName('${c.id}')`,
+      onUser:cu.id?`editUsername('${cu.id}')`:`toast('No login account for this church')`,
+      onPass:cu.id?`changePassword('${cu.id}')`:`toast('No login account for this church')`,
+      onDel:`delChurch('${c.id}')`
+    });}).join('')||'<p class="note-hint">No churches yet.</p>';
   const roleOpts=`<option value="director">Director</option><option value="zoneLeader">Zone leader</option><option value="firstAid">First aid</option>`;
   paint('adminAccounts',`
-    <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>
-      ${lr}<div id="acctEdit"></div>
-      <div class="h3">Add account</div>
+    ${legend}
+    <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>${lr}</div>
+    <div class="card"><div class="lbl" style="margin-top:0">Churches</div>${cr}</div>
+    <div class="card"><div class="lbl" style="margin-top:0">Add leadership account</div>
       <div style="display:flex;gap:6px"><input class="fld" id="aF" placeholder="First name"><input class="fld" id="aL" placeholder="Last name"></div>
       <label>Username</label><input class="fld" id="aE" placeholder="e.g. yr10leaders" autocapitalize="none" autocorrect="off" spellcheck="false">
       <label>Password</label><input class="fld" id="aP" placeholder="min 6 characters">
       <label>Role</label><select id="aR" onchange="aRoleChange()">${roleOpts}</select>
-      <div id="aChurchWrap"><label>Church</label><select id="aC">${chOpts}</select></div>
       <div id="aZoneWrap" style="display:none"><label>Zone</label>${zoneSel('aZ')}</div>
       <button class="btn" onclick="addAcct()">Create account</button></div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
-      <div class="warnbox">⚠ Church name must match registration form exactly — registrations are matched by name.</div>
+      <div class="warnbox">⚠ Church name must match the registration export exactly — registrations are matched by name.</div>
       <label>Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside">
-      <label>Registration code</label><input class="fld" id="ncCode" placeholder="auto from name if blank, e.g. NORTH">
       <label>Zone</label>${zoneSel('ncZone')}
-      <label>Youth pastor name</label><input class="fld" id="ncYp" placeholder="e.g. Ps Sam">
       <label>Login username</label><input class="fld" id="ncEmail" placeholder="e.g. northside" autocapitalize="none" autocorrect="off" spellcheck="false">
       <label>Password</label><input class="fld" id="ncPass" placeholder="min 6 characters">
-      ${CAMP_MODE==='pre-camp'?`<label>Expected registrations</label><input class="fld" id="ncExp" type="number" inputmode="numeric" min="0" value="0">`:''}
-      <button class="btn" onclick="addChurch()">Create church + account</button></div>
-    <div class="card"><div class="lbl" style="margin-top:0">Churches — zone &amp; contact</div>${cr||'<p class="note-hint">No churches yet.</p>'}</div>`,'Accounts &amp; churches','Admin');
+      <button class="btn" onclick="addChurch()">Create church + account</button></div>`,'Accounts &amp; churches','Admin');
 };
 function aRoleChange(){
   const r=document.getElementById('aR').value;
-  document.getElementById('aChurchWrap').style.display='none';
-  document.getElementById('aZoneWrap').style.display=r==='zoneLeader'?'block':'none';
-  // firstAid is camp-wide — no church or zone scoping needed
+  const zw=document.getElementById('aZoneWrap');if(zw)zw.style.display=r==='zoneLeader'?'block':'none';
 }
 async function addAcct(){const role=sel('aR');const body={firstName:val('aF'),lastName:val('aL'),username:val('aE'),password:val('aP'),role};
   if(role==='zoneLeader')body.zone=sel('aZ');
   if(!body.firstName||!body.lastName||!body.username){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
   try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
-function editAcct(u){document.getElementById('acctEdit').innerHTML=`<div class="card" style="background:#fafbff">
-  <div class="lbl" style="margin-top:0">Edit ${esc(u.firstName+' '+u.lastName)}</div>
-  <div style="display:flex;gap:6px"><input class="fld" id="eF" value="${esc(u.firstName)}"><input class="fld" id="eL" value="${esc(u.lastName)}"></div>
-  <label>Username</label><input class="fld" id="eE" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
-  ${u.role==='zoneLeader'?'<label>Zone</label>'+zoneSel('eZ',u.zone):''}
-  <label>Status</label><select id="eS"><option value="active"${u.status!=='inactive'?' selected':''}>Active</option><option value="inactive"${u.status==='inactive'?' selected':''}>Inactive</option></select>
-  <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveAcct('${u.id}','${u.role}')">Save</button>
-  <button class="btn ghost sm" style="flex:1" onclick="document.getElementById('acctEdit').innerHTML=''">Cancel</button></div></div>`;}
-async function saveAcct(id,role){const body={firstName:val('eF'),lastName:val('eL'),username:val('eE'),status:sel('eS')};
-  if(role==='zoneLeader')body.zone=document.getElementById('eZ').value;
-  try{await api('/accounts/users/'+id,{method:'PATCH',body});toast('Saved ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+const _findUser=id=>(window._allUsers||[]).find(u=>u.id===id)||{};
+const _findChurch=id=>(window._allChurches||[]).find(c=>c.id===id)||{};
+function editLeaderName(id){const u=_findUser(id);
+  modal(`<h3>Rename account</h3>
+    <div style="display:flex;gap:6px"><input class="fld" id="enF" placeholder="First name" value="${esc(u.firstName||'')}"><input class="fld" id="enL" placeholder="Last name" value="${esc(u.lastName||'')}"></div>
+    ${u.role==='zoneLeader'?'<label>Zone</label>'+zoneSel('enZ',u.zone):''}
+    <label>Status</label><select id="enS"><option value="active"${u.status!=='inactive'?' selected':''}>Active</option><option value="inactive"${u.status==='inactive'?' selected':''}>Inactive</option></select>
+    <button class="btn" style="margin-top:10px" onclick="saveLeaderName('${id}','${u.role}')">Save</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function saveLeaderName(id,role){const body={firstName:val('enF'),lastName:val('enL'),status:sel('enS')};
+  if(role==='zoneLeader')body.zone=sel('enZ');
+  if(!body.firstName||!body.lastName){toast('Enter first + last name');return;}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+function editChurchName(id){const c=_findChurch(id);
+  modal(`<h3>Rename church</h3>
+    <label>Church name</label><input class="fld" id="ecnName" value="${esc(c.name||'')}">
+    <div class="warnbox" style="margin-top:8px">⚠ Must match the registration export exactly — registrations are matched by name.</div>
+    <label>Zone</label>${zoneSel('ecnZone',c.zone)}
+    <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}')">Save</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function saveChurchName(id){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+function editUsername(id){const u=_findUser(id);
+  modal(`<h3>Change username</h3>
+    <label>Username</label><input class="fld" id="euU" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <button class="btn" style="margin-top:10px" onclick="saveUsername('${id}')">Save</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function saveUsername(id){const username=val('euU');if(username.length<2){toast('Username too short');return;}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+function changePassword(id){const u=_findUser(id);
+  modal(`<h3>Change password</h3>
+    <div class="sub" style="margin-bottom:8px">${esc(u.firstName?u.firstName+' '+u.lastName:u.username||'Account')}</div>
+    <label>New password</label><input class="fld" id="cpP" type="password" placeholder="min 6 characters" autocomplete="new-password">
+    <button class="btn" style="margin-top:10px" onclick="savePassword('${id}')">Set password</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function savePassword(id){const password=document.getElementById('cpP').value;if((password||'').length<6){toast('Password 6+ chars');return;}
+  try{await api('/accounts/users/password',{method:'POST',body:{userId:id,password}});closeModal();toast('Password updated ✓');}catch(e){toast(e.message);}}
 async function delAcct(id){if(!confirm("Delete this account?"))return;
   try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
 async function delChurch(id){if(!confirm("Delete this church and its login account?"))return;
   try{await api("/accounts/churches/"+id,{method:"DELETE"});toast("Church deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
 async function addChurch(){if(!val('ncName')||!val('ncEmail')){toast('Enter church name + login username');return;}if(val('ncPass').length<6){toast('Password 6+ chars');return;}
   const name=val('ncName');
-  const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'church';
-  const code=(val('ncCode')||name).replace(/[^A-Za-z0-9]/g,'').slice(0,6).toUpperCase()||'CHURCH';
-  const yp=(val('ncYp')||name).trim().split(/\s+/);
-  const body={churchName:name,zone:sel('ncZone'),code,selfRegisterSlug:slug,expectedCount:Number(val('ncExp'))||0,youthPastorName:val('ncYp')||undefined,accountFirstName:yp[0]||name,accountLastName:yp.slice(1).join(' ')||'Team',accountUsername:val('ncEmail'),accountPassword:val('ncPass')};
+  const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:val('ncEmail'),accountPassword:val('ncPass')};
   try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
-async function saveChurch(id){
-  const body={zone:sel('cz_'+id),contactEmail:val('ce_'+id)};
-  const cx=document.getElementById('cx_'+id);if(cx)body.expectedCount=Number(cx.value)||0;
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body});toast('Church updated ✓');}catch(e){toast(e.message);}}
 
 /* ===== ADMIN ACCOMMODATION ===== */
 RENDER.adminAccom=async function(){
@@ -1787,27 +1874,40 @@ async function doNewYear(){
   }catch(e){toast(e.message);}
 }
 
+// Pure date helpers (UTC-anchored to match dayLong/timeFmt). YYYY-MM-DD in/out.
+function _addDays(dateStr,n){const d=new Date(dateStr+'T12:00:00Z');if(isNaN(d))return'';d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function _datesBetween(start,end){const out=[];if(!start)return out;const s=new Date(start+'T12:00:00Z');let e=end?new Date(end+'T12:00:00Z'):s;if(isNaN(s)||isNaN(e)||e<s)return start&&!isNaN(s)?[start]:[];let cur=new Date(s);let guard=0;while(cur<=e&&guard++<60){out.push(cur.toISOString().slice(0,10));cur.setUTCDate(cur.getUTCDate()+1);}return out;}
 RENDER.adminSettings=async function(){
   const s=SETTINGS||await api('/settings');
   paint('adminSettings',`<div class="card">
     <label>Camp name</label><input class="fld" id="stName" value="${esc(s.campName||'')}">
     <label>Year</label><input class="fld" id="stYear" type="number" inputmode="numeric" value="${esc(s.year||'')}">
-    <label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" value="${esc(s.startDate||'')}">
-    <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" value="${esc(s.endDate||'')}">
+    <label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" type="date" value="${esc(s.startDate||'')}" onchange="onStartDateChange()">
+    <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" type="date" value="${esc(s.endDate||'')}" onchange="renderCheckinDaysPreview()">
     <label>Timezone (IANA, e.g. Australia/Brisbane)</label><input class="fld" id="stTz" value="${esc(s.timezone||'')}">
-    <label>Check-in location</label><input class="fld" id="stLoc" value="${esc(s.checkInLocation||'')}">
-    <label>Check-in from</label><input class="fld" id="stFrom" value="${esc(s.checkInFrom||'')}">
-    <label>Register base URL</label><input class="fld" id="stUrl" value="${esc(s.registerBaseUrl||'')}">
-    <label>At-camp check-in days (comma-separated YYYY-MM-DD)</label>
-    <input class="fld" id="stDays" value="${esc((s.checkInDays||[]).join(', '))}">
-    <button class="btn" onclick="saveSettings()">Save camp settings</button>
-    <p class="note-hint">Tent &amp; classroom prices are set per space in Admin → Accommodation. Changing check-in days updates the daily check-in automatically.</p></div>`,'Camp settings','Dates &amp; details');
+    <label>At-camp check-in days (auto-generated)</label>
+    <div id="stDaysPreview" class="sub" style="background:#f5f3ff;border-radius:10px;padding:9px 11px;font-size:.8rem;color:#5b21b6"></div>
+    <button class="btn" style="margin-top:12px" onclick="saveSettings()">Save camp settings</button>
+    <p class="note-hint">Setting the start date pre-fills the end date to the 4th day; you can adjust it. Check-in days are generated from the date range automatically — one Morning and one Afternoon session per day.</p></div>`,'Camp settings','Dates &amp; details');
+  renderCheckinDaysPreview();
 };
+function renderCheckinDaysPreview(){
+  const el=document.getElementById('stDaysPreview');if(!el)return;
+  const days=_datesBetween(val('stStart'),val('stEnd'));
+  el.innerHTML=days.length?days.map(d=>`${dayLong(d)} <span style="opacity:.6">${d}</span>`).join(' &nbsp;·&nbsp; '):'<span style="opacity:.6">Set a start date to generate check-in days.</span>';
+}
+// Start date pre-fills the end date to the 4th day (e.g. Mon → Thu) when the end is
+// empty or invalid; an explicit end the admin already chose is left untouched.
+function onStartDateChange(){
+  const start=val('stStart'),endEl=document.getElementById('stEnd');
+  if(start&&endEl&&(!endEl.value||new Date(endEl.value)<new Date(start))){endEl.value=_addDays(start,3);}
+  renderCheckinDaysPreview();
+}
 async function saveSettings(){
   try{
-    const days=document.getElementById('stDays').value.split(',').map(x=>x.trim()).filter(Boolean);
-    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:val('stTz'),checkInLocation:val('stLoc'),checkInFrom:val('stFrom'),registerBaseUrl:val('stUrl'),checkInDays:days}});
-    SETTINGS=await api('/settings');SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
+    const days=_datesBetween(val('stStart'),val('stEnd'));
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:val('stTz'),checkInDays:days}});
+    SETTINGS=await api('/settings',{noCache:true});SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
     toast('Settings saved ✓');
   }catch(e){toast(e.message);}
 }
@@ -2058,53 +2158,73 @@ RENDER.adminDevos=async function(){
 async function saveDevo(d){try{await api('/devotional',{method:'POST',body:{day:d,verse:val('dv_v_'+d),reference:val('dv_r_'+d),reflection:val('dv_f_'+d),prayer:val('dv_p_'+d)}});toast('Saved ✓');}catch(e){toast(e.message);}}
 
 /* ===== ADMIN SCHEDULE ===== */
+// One editable table row (Time + Activity). Index r keeps input ids unique per day.
+function _schedRow(d,r,t,n){return `<div style="display:grid;grid-template-columns:92px 1fr;gap:6px;margin-bottom:6px">`
+  +`<input class="fld" type="time" id="sr_t_${d}_${r}" value="${esc(t||'')}">`
+  +`<input class="fld" id="sr_n_${d}_${r}" placeholder="Activity" value="${esc(n||'')}"></div>`;}
+const SCHED_MIN_ROWS=10;
 RENDER.adminSchedEdit=async function(){
   const days=SETTINGS?.checkInDays||[];
   if(!days.length){paint('adminSchedEdit','<p class="note-hint">Set the camp dates first (Camp settings).</p>','Schedule','');return;}
   const blocks=await Promise.all(days.map(async d=>{
-    const items=await api('/schedule?day='+d).catch(()=>[]);const wk=dayLong(d);
-    const rows=items.map(i=>`<div class="row"><div style="flex:1;min-width:0"><div class="nm">${esc(i.startTime)} · ${esc(i.title)}</div><div class="sub">${esc(i.location||'')}</div></div><button class="btn ghost sm" style="margin-right:4px" onclick='editSchedPrompt(${JSON.stringify(i)})'>Edit</button><button class="btn red sm" onclick="delSched('${i.id}')">✕</button></div>`).join('')||'<p class="sub">No items.</p>';
-    return `<div class="card"><div class="h3" style="margin-top:0">${wk} · ${d}</div>${rows}
-      <div style="display:flex;gap:6px;margin-top:8px"><input class="fld" id="sc_t_${d}" placeholder="HH:mm" style="flex:0 0 90px"><input class="fld" id="sc_n_${d}" placeholder="Title"></div>
-      <input class="fld" id="sc_l_${d}" placeholder="Location (optional)" style="margin-top:6px">
-      <button class="btn" onclick="addSched('${d}')">Add to ${wk}</button></div>`;
+    const items=(await api('/schedule?day='+d).catch(()=>[])).slice()
+      .sort((a,b)=>String(a.startTime||'').localeCompare(String(b.startTime||'')));
+    const n=Math.max(SCHED_MIN_ROWS,items.length);
+    let rows='';for(let r=0;r<n;r++){const it=items[r]||{};rows+=_schedRow(d,r,it.startTime,it.title);}
+    return `<div class="card"><div class="h3" style="margin-top:0">${dayLong(d)} <span style="color:var(--muted);font-weight:600">· ${d}</span></div>
+      <div style="display:grid;grid-template-columns:92px 1fr;gap:6px;font-size:.6rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px"><span>Time</span><span>Activity</span></div>
+      <div id="schedRows_${d}">${rows}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn ghost sm" style="flex:1" onclick="addSchedRow('${d}')">+ Add row</button>
+        <button class="btn sm" style="flex:1" onclick="saveSchedDay('${d}')">Save ${dayLong(d)}</button></div></div>`;
   }));
-  paint('adminSchedEdit',blocks.join(''),'Schedule','Edit each camp day');
+  paint('adminSchedEdit',blocks.join(''),'Schedule','Fill a day, then Save');
 };
-async function addSched(d){if(!val('sc_t_'+d)||!val('sc_n_'+d)){toast('Enter time + title');return;}
-  try{await api('/schedule',{method:'POST',body:{day:d,startTime:val('sc_t_'+d),title:val('sc_n_'+d),location:val('sc_l_'+d)||undefined,type:'activity',isCheckInPoint:false}});toast('Added ✓');RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
-function editSchedPrompt(i){
-  modal(`<h3>Edit schedule item</h3>
-    <label>Time (HH:mm)</label><input class="fld" id="es_t" value="${esc(i.startTime)}">
-    <label>Title</label><input class="fld" id="es_n" value="${esc(i.title)}">
-    <label>Location</label><input class="fld" id="es_l" value="${esc(i.location||'')}">
-    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-      <input type="checkbox" id="es_ci" ${i.isCheckInPoint?"checked":""} style="width:auto">
-      <span style="font-size:.88rem">Is a check-in point</span></div>
-    <button class="btn" onclick="saveSchedEdit('${i.id}')">Save changes</button>
-    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
-async function saveSchedEdit(id){
-  const t=document.getElementById("es_t").value.trim(),n=document.getElementById("es_n").value.trim(),l=document.getElementById("es_l").value.trim();
-  if(!t||!n){toast("Enter time + title");return;}
-  try{await api("/schedule/"+id,{method:"PATCH",body:{startTime:t,title:n,location:l||undefined,isCheckInPoint:document.getElementById("es_ci").checked}});closeModal();toast("Saved ✓");RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
-async function delSched(id){if(!confirm('Delete this item?'))return;try{await api('/schedule/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminSchedEdit();}catch(e){toast(e.message);}}
+function addSchedRow(d){const wrap=document.getElementById('schedRows_'+d);if(!wrap)return;
+  wrap.insertAdjacentHTML('beforeend',_schedRow(d,wrap.children.length,'',''));}
+// Table is the source of truth: saving replaces the whole day's schedule with the
+// filled rows (time + title both present). Cleared rows are dropped.
+async function saveSchedDay(d){
+  const wrap=document.getElementById('schedRows_'+d);if(!wrap)return;
+  const entries=[];
+  for(let r=0;r<wrap.children.length;r++){const t=val('sr_t_'+d+'_'+r),n=val('sr_n_'+d+'_'+r);if(t&&n)entries.push({startTime:t,title:n});}
+  try{
+    const existing=await api('/schedule?day='+d,{noCache:true}).catch(()=>[]);
+    for(const it of (existing||[])){await api('/schedule/'+it.id,{method:'DELETE'});}
+    for(const e of entries){await api('/schedule',{method:'POST',body:{day:d,startTime:e.startTime,title:e.title,type:'activity'}});}
+    toast('Saved '+dayLong(d)+' ✓');RENDER.adminSchedEdit();
+  }catch(e){toast(e.message);RENDER.adminSchedEdit();}
+}
 
 /* ===== ADMIN CONTACTS ===== */
 RENDER.adminContacts=async function(){
   const churches=await api('/accounts/churches');
-  paint('adminContacts',churches.map(c=>{const ct=c.contacts||{};
+  const card=c=>{const ct=c.contacts||{};
     const mp=ct.male?.primary||{},mb=ct.male?.backup||{},fp=ct.female?.primary||{},fb=ct.female?.backup||{};
+    const filled=[mp,mb,fp,fb].filter(x=>x&&x.name&&String(x.name).trim()).length;
+    const pill=filled===4?'ok':filled?'amb':'info';
     const pair=(lbl,n,p,nv,pv)=>`<label>${lbl}</label><div style="display:flex;gap:6px"><input class="fld" id="${n}" placeholder="Name" value="${esc(nv||'')}"><input class="fld" id="${p}" placeholder="Phone" value="${esc(pv||'')}"></div>`;
-    return `<div class="card"><div class="h3" style="margin-top:0">${esc(c.name)} <span style="color:var(--muted)">· ${esc(c.zone||'—')}</span></div>
-      ${pair('Guys — primary leader','mp_n_'+c.id,'mp_p_'+c.id,mp.name,mp.phone)}
-      ${pair('Guys — secondary leader','mb_n_'+c.id,'mb_p_'+c.id,mb.name,mb.phone)}
-      ${pair('Girls — primary leader','fp_n_'+c.id,'fp_p_'+c.id,fp.name,fp.phone)}
-      ${pair('Girls — secondary leader','fb_n_'+c.id,'fb_p_'+c.id,fb.name,fb.phone)}
-      <button class="btn" onclick="saveContacts('${c.id}')">Save ${esc(c.name)}</button>
-      <p class="note-hint">Leave blank to clear. Numbers are masked until audited reveal.</p></div>`;}).join(''),'Ministry contacts','Primary &amp; backup per gender');
+    return `<div class="card" style="padding:0;overflow:hidden">
+      <div class="rowsb" style="padding:13px 14px;cursor:pointer" onclick="toggleContactCard('${c.id}')">
+        <div style="min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div><div class="sub" style="font-size:.74rem">${esc(c.zone||'—')}</div></div>
+        <div style="display:flex;align-items:center;gap:8px;flex:none">
+          <span class="pill ${pill}">${filled}/4 Contacts</span>
+          <span id="contactChev_${c.id}" style="display:inline-flex;transition:transform .15s;color:var(--muted)">${ic('chevron')}</span>
+        </div>
+      </div>
+      <div id="contactBody_${c.id}" style="display:none;padding:0 14px 14px;border-top:1px solid var(--line)">
+        ${pair('Guys — primary leader','mp_n_'+c.id,'mp_p_'+c.id,mp.name,mp.phone)}
+        ${pair('Guys — secondary leader','mb_n_'+c.id,'mb_p_'+c.id,mb.name,mb.phone)}
+        ${pair('Girls — primary leader','fp_n_'+c.id,'fp_p_'+c.id,fp.name,fp.phone)}
+        ${pair('Girls — secondary leader','fb_n_'+c.id,'fb_p_'+c.id,fb.name,fb.phone)}
+        <button class="btn" style="margin-top:10px" onclick="saveContacts('${c.id}')">Save ${esc(c.name)}</button>
+        <p class="note-hint">Leave blank to clear. Numbers are masked until audited reveal.</p>
+      </div></div>`;};
+  paint('adminContacts',churches.map(card).join('')||'<p class="note-hint">No churches yet.</p>','Ministry contacts','Tap a church to edit');
 };
+function toggleContactCard(id){const b=document.getElementById('contactBody_'+id),ch=document.getElementById('contactChev_'+id);if(!b)return;const open=b.style.display!=='none';b.style.display=open?'none':'block';if(ch)ch.style.transform=open?'':'rotate(90deg)';}
 async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');RENDER.adminContacts();}catch(e){toast(e.message);}}
 
 /* ===== BOOT ===== */
 document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
