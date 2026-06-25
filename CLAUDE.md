@@ -162,7 +162,7 @@ Users in pre-camp mode can tap **"👁 Preview at-camp view"** on the pre-camp h
 (it is pure plan communication); `ScheduleItem.isCheckInPoint` and `getCheckInPoints` no longer
 exist.
 
-- Session id = **`${day}#am` / `${day}#pm`** (e.g. `2026-09-28#pm`); this is the key in
+- Session id = **`${day}~am` / `${day}~pm`** (e.g. `2026-09-28~pm`) — delimiter is `~`, URL-safe (a `#` would be parsed as a URL fragment when the id is put in a request path; SPA also `encodeURIComponent`s it); this is the key in
   `Camper.checkInHistory[].sessionId`.
 - `getCurrentSession()` picks today's AM before midday / PM after (camp tz); falls back to the
   most recent past session. Both `checkin.service` and `dashboard.service` use the shared pure
