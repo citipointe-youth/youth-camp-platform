@@ -5,7 +5,7 @@ import type { StudentNote } from '../../core/entities/note';
 function toNote(r: Record<string, unknown>): StudentNote {
   return {
     id: r['id'] as string,
-    camperId: r['camper_id'] as string,
+    camperId: (r['camper_id'] as string | null) ?? null,
     body: r['body'] as string,
     authorId: r['author_id'] as string,
     authorName: r['author_name'] as string,
@@ -65,7 +65,7 @@ export class SupabaseNoteRepository implements INoteRepository {
     await this.sql`
       insert into notes ${this.sql({
         id: note.id,
-        camper_id: note.camperId,
+        camper_id: note.camperId ?? null,
         body: note.body,
         author_id: note.authorId,
         author_name: note.authorName,

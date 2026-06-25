@@ -122,9 +122,9 @@ export function makeAuditExportService(
       notesSheet.getRow(1).font = { bold: true };
       const personMap = new Map(people.map((p) => [p.id, p]));
       for (const note of notes) {
-        const p = personMap.get(note.camperId);
+        const p = note.camperId ? personMap.get(note.camperId) : undefined;
         notesSheet.addRow([
-          p ? `${p.firstName} ${p.lastName}` : note.camperId,
+          p ? `${p.firstName} ${p.lastName}` : 'No specific student',
           p?.churchName || '',
           p?.zone || '',
           note.category || 'note',

@@ -8,7 +8,7 @@ import type { Actor } from '../core/entities/user';
 
 // Check-in sessions are derived from settings.checkInDays (two per day, AM/PM) — the
 // schedule is no longer involved. A valid session id is `${day}#am` / `${day}#pm`.
-const SESSION_ID = '2026-07-01#am';
+const SESSION_ID = '2026-07-01~am';
 
 function actor(role: Actor['role'] = 'director'): Actor {
   return { id: 'u', role, churchId: null, churchName: null, zone: null, displayName: 'Test' };
@@ -49,7 +49,7 @@ describe('getSessions — derived from check-in days', () => {
     const svc = makeCheckInService(personRepo, settingsRepo);
     const sessions = await svc.getSessions();
     expect(sessions.map((s) => s.id)).toEqual([
-      '2026-07-01#am', '2026-07-01#pm', '2026-07-02#am', '2026-07-02#pm',
+      '2026-07-01~am', '2026-07-01~pm', '2026-07-02~am', '2026-07-02~pm',
     ]);
   });
 });
@@ -103,7 +103,7 @@ describe('getSessionStatus — roster filter', () => {
 
   it('rejects a session id for a day outside the camp', async () => {
     const svc = makeCheckInService(personRepo, settingsRepo);
-    await expect(svc.getSessionStatus(actor(), '2030-01-01#am')).rejects.toThrow();
+    await expect(svc.getSessionStatus(actor(), '2030-01-01~am')).rejects.toThrow();
   });
 });
 

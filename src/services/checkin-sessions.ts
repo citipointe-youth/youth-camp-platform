@@ -3,8 +3,9 @@
 // Check-in is intentionally UNRELATED to the schedule (the schedule communicates the
 // camp plan; check-in is the twice-daily roll-call). Each camp day has exactly two
 // sessions — Morning and Afternoon — so leaders can check youth in whenever it suits
-// the morning/afternoon rhythm. Session id is `${day}#am` / `${day}#pm` and is the key
-// used in `Person.checkInHistory[].sessionId`.
+// the morning/afternoon rhythm. Session id is `${day}~am` / `${day}~pm` and is the key
+// used in `Person.checkInHistory[].sessionId`. The delimiter is `~` (URL-safe) — NOT
+// `#`, which a browser would treat as a URL fragment when the id is put in a path.
 
 export interface CheckInSession {
   id: string;
@@ -33,7 +34,7 @@ function weekdayShort(day: string): string {
 
 export function sessionFor(day: string, sfx: 'am' | 'pm'): CheckInSession {
   const p = CHECKIN_PERIODS.find((x) => x.sfx === sfx) ?? CHECKIN_PERIODS[0];
-  return { id: `${day}#${sfx}`, label: `${weekdayShort(day)} ${p.label}`, day, startTime: p.startTime, location: null };
+  return { id: `${day}~${sfx}`, label: `${weekdayShort(day)} ${p.label}`, day, startTime: p.startTime, location: null };
 }
 
 export function buildSessions(checkInDays: readonly string[]): CheckInSession[] {
@@ -41,7 +42,7 @@ export function buildSessions(checkInDays: readonly string[]): CheckInSession[] 
 }
 
 export function parseSessionId(id: string): { day: string; sfx: 'am' | 'pm' } | null {
-  const m = /^(.+)#(am|pm)$/.exec(id);
+  const m = /^(.+)~(am|pm)$/.exec(id);
   if (!m) return null;
   return { day: m[1] as string, sfx: m[2] as 'am' | 'pm' };
 }
@@ -58,7 +59,7 @@ export function currentSession(
   const todays = sessions.filter((s) => s.day === todayStr);
   if (todays.length > 0) {
     const wantPm = nowTime >= PM_FROM;
-    return todays.find((s) => s.id.endsWith(wantPm ? '#pm' : '#am')) ?? todays[0]!;
+    return todays.find((s) => s.id.endsWith(wantPm ? '~pm' : '~am')) ?? todays[0]!;
   }
   const past = sessions.filter((s) => s.day < todayStr);
   if (past.length > 0) return past[past.length - 1]!;

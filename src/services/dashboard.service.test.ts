@@ -23,8 +23,8 @@ import type { Actor } from '../core/entities/user';
 // ---------------------------------------------------------------------------
 
 const DATE = '2026-07-01';
-const AM = `${DATE}#am`;
-const PM = `${DATE}#pm`;
+const AM = `${DATE}~am`;
+const PM = `${DATE}~pm`;
 
 // Pin "now" so a chosen session is current. 15:00 → PM current (both started);
 // 10:00 → AM current, PM next.

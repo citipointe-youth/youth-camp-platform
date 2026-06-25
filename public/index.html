@@ -32,13 +32,20 @@ body{font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe 
    Anchoring both to the dynamic viewport makes #tabs sit flush at the bottom. */
 .app{width:100%;max-width:460px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5);}
 .bar{background:linear-gradient(135deg,var(--violet),var(--navy));color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 12px;display:flex;align-items:center;gap:7px;flex:none;z-index:20;}
-.bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;}
+.bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;align-self:center;}
 .bar.canback .bk{display:grid;}
-.bar .ttl{flex:1;min-width:0;}.bar .ttl .t{font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.bar .ttl .s{font-size:.72rem;color:#c4b5fd;}
-.mode-badge{font-size:.62rem;font-weight:800;padding:3px 10px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.04em;}
-.role-badge{font-size:.62rem;font-weight:800;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:3px 10px;white-space:nowrap;flex:none;letter-spacing:.03em;}
-.sign-out{padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.15);font-size:.74rem;font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid rgba(255,255,255,.2);}
+/* Title + subtitle share one line ("My Church Hub — All churches"); the subtitle
+   truncates first, the title stays whole. */
+.bar .ttl{flex:1;min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden;}
+.bar .ttl .t{font-weight:700;font-size:1rem;white-space:nowrap;flex:none;}
+.bar .ttl .s{font-size:.72rem;color:#c4b5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.bar .ttl .s:not(:empty)::before{content:"— ";opacity:.7;}
+/* Badges/sign-out: smaller and dropped to the bottom of the bar so they don't
+   crowd the title's vertical space. */
+.bar-actions{display:flex;align-items:center;gap:6px;flex:none;align-self:flex-end;padding-bottom:1px;}
+.mode-badge{font-size:.56rem;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.04em;}
+.role-badge{font-size:.56rem;font-weight:800;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:2px 8px;white-space:nowrap;flex:none;letter-spacing:.03em;}
+.sign-out{padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.15);font-size:.66rem;font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid rgba(255,255,255,.2);}
 .stage{flex:1;position:relative;overflow:hidden;}
 .screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;display:none;}
 .screen.active{display:block;animation:rise .25s ease;}
@@ -225,11 +232,13 @@ textarea{min-height:84px;resize:vertical;}
   </div>
   <header class="bar" id="bar" style="display:none">
     <div class="bk" onclick="back()">&#8249;</div>
-    <div class="ttl"><div class="t" id="barT">Camp Platform</div><div class="s" id="barS"></div></div>
-    <div class="mode-badge" id="modeBadge"></div>
-    <div class="mode-badge" id="dayBadge" onclick="switchDay()" style="cursor:pointer;display:none" title="Tap to switch camp day"></div>
-    <div class="role-badge" id="roleBadge"></div>
-    <div class="sign-out" onclick="logout()">Sign out</div>
+    <div class="ttl"><span class="t" id="barT">Camp Platform</span><span class="s" id="barS"></span></div>
+    <div class="bar-actions">
+      <div class="mode-badge" id="modeBadge"></div>
+      <div class="mode-badge" id="dayBadge" onclick="switchDay()" style="cursor:pointer;display:none" title="Tap to switch camp day"></div>
+      <div class="role-badge" id="roleBadge"></div>
+      <div class="sign-out" onclick="logout()">Sign out</div>
+    </div>
   </header>
   <div class="stage" id="stage" style="display:none">
     <section class="screen" id="home"></section>
@@ -804,7 +813,7 @@ async function renderOversightPulse(){
   try{
     const session=await api('/checkin/sessions/current').catch(()=>null);
     if(!session)return '';
-    const st=await api('/checkin/sessions/'+session.id+'/status').catch(()=>null);
+    const st=await api('/checkin/sessions/'+encodeURIComponent(session.id)+'/status').catch(()=>null);
     if(!st)return '';
     const byZone={};
     (st.roster||[]).forEach(r=>{
@@ -974,7 +983,7 @@ RENDER.checkin=async function renderCheckin(){
   if(!SEL_SESSION){const cur=await api('/checkin/sessions/current').catch(()=>null);SEL_SESSION=(cur&&cur.id)||(SESSIONS[0]&&SESSIONS[0].id);}
   if(!SEL_SESSION){paint('checkin','<p class="note-hint">No check-in sessions configured. Set camp dates in admin settings.</p>','Daily Check-in','');return;}
   // Enriched RosterEntry now includes gender, grade, medicalFlag — no second /campers fetch needed.
-  const st=await api('/checkin/sessions/'+SEL_SESSION+'/status');
+  const st=await api('/checkin/sessions/'+encodeURIComponent(SEL_SESSION)+'/status');
   const roster=(st.roster||[]).map(r=>({
     id:r.camperId,name:(r.firstName+' '+r.lastName).trim(),
     church:r.church,zone:r.zone,
@@ -1545,26 +1554,28 @@ RENDER.faq=async function(){
 
 /* ===== NOTES ===== */
 RENDER.testimonies=async function(){
-  // A testimony is stored as a note with category 'testimony' — the backend requires a camper,
-  // so the leader selects which student the testimony is about.
+  // A testimony is stored as a note with category 'testimony'. The student is optional —
+  // the default is a general testimony with no specific student identified.
   const page=await api('/campers?pageSize=300').catch(()=>[]);
   const items=(Array.isArray(page)?page:page.items||[]).filter(c=>c.kind==='student').sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName));
-  const opts=items.map(c=>`<option value="${c.id}">${esc(c.firstName+' '+c.lastName)} · ${esc(c.churchName)}</option>`).join('');
-  paint('testimonies',`<div class="infobox" style="font-size:.82rem">Record a testimony or God-moment from camp for a student. It is saved with the records that leaders &amp; directors review.</div>
-    <div class="card"><label>Student</label><select id="tmCamper">${opts||'<option value="">No students available</option>'}</select>
+  const opts=`<option value="" selected>No specific student identified</option>`
+    +items.map(c=>`<option value="${c.id}">${esc(c.firstName+' '+c.lastName)} · ${esc(c.churchName)}</option>`).join('');
+  paint('testimonies',`<div class="infobox" style="font-size:.82rem">Record a testimony or God-moment from camp. Pick a student if it's about one, or leave it as a general testimony. It is saved with the records that leaders &amp; directors review.</div>
+    <div class="card"><label>Student (optional)</label><select id="tmCamper">${opts}</select>
     <label>Your name (leader)</label><input class="fld" id="tmLeader" value="${esc(LAST_LEADER||'')}" placeholder="e.g. Sarah Doyle">
     <label>Testimony</label><textarea id="tmBody" placeholder="What happened? Whose story is it? What did God do?" style="min-height:120px"></textarea>
     <button class="btn" onclick="submitTestimony()">Submit testimony</button></div>`,'Submit Testimonies','Day 2+');
 };
 async function submitTestimony(){const camperId=sel('tmCamper'),leader=val('tmLeader'),body=val('tmBody');
-  if(!camperId){toast('Pick a student');return;}if(!body){toast('Write the testimony');return;}LAST_LEADER=leader;
+  if(!body){toast('Write the testimony');return;}LAST_LEADER=leader;
   const full=leader&&leader!==ACTOR.displayName?`${body}\n— logged by ${leader}`:body;
-  try{await api('/notes',{method:'POST',body:{camperId,body:full,category:'testimony'}});toast('Testimony submitted ✓');const t=document.getElementById('tmBody');if(t)t.value='';}catch(e){toast(e.message);}}
+  const payload={body:full,category:'testimony'};if(camperId)payload.camperId=camperId;
+  try{await api('/notes',{method:'POST',body:payload});toast('Testimony submitted ✓');const t=document.getElementById('tmBody');if(t)t.value='';}catch(e){toast(e.message);}}
 RENDER.notes=async function(){
   // /notes/recent returns bare notes (no camper details) — join /campers for name/church/zone/gender/grade.
   const [notes,page]=await Promise.all([api('/notes/recent'),api('/campers?pageSize=300').catch(()=>[])]);
   const camps=Array.isArray(page)?page:page.items||[];const cmap={};camps.forEach(c=>{cmap[c.id]=c;});
-  window._notesAll=(notes||[]).map(n=>{const c=cmap[n.camperId]||{};return Object.assign({},n,{camperName:c.firstName?(c.firstName+' '+c.lastName):n.camperId,church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,cat:n.category||'note'});});
+  window._notesAll=(notes||[]).map(n=>{const c=cmap[n.camperId]||{};return Object.assign({},n,{camperName:c.firstName?(c.firstName+' '+c.lastName):(n.camperId||'No specific student'),church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,cat:n.category||'note'});});
   const churches=[...new Set(window._notesAll.map(n=>n.church).filter(Boolean))].sort();
   const zonesPresent=[...new Set(window._notesAll.map(n=>n.zone).filter(Boolean))].sort();
   const recSel=`<div><label>Record</label><select id="ntCat" onchange="drawNotes()"><option value="all">All records</option><option value="testimony">Testimony</option><option value="note">Student note</option></select></div>`;
@@ -1884,7 +1895,6 @@ RENDER.adminSettings=async function(){
     <label>Year</label><input class="fld" id="stYear" type="number" inputmode="numeric" value="${esc(s.year||'')}">
     <label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" type="date" value="${esc(s.startDate||'')}" onchange="onStartDateChange()">
     <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" type="date" value="${esc(s.endDate||'')}" onchange="renderCheckinDaysPreview()">
-    <label>Timezone (IANA, e.g. Australia/Brisbane)</label><input class="fld" id="stTz" value="${esc(s.timezone||'')}">
     <label>At-camp check-in days (auto-generated)</label>
     <div id="stDaysPreview" class="sub" style="background:#f5f3ff;border-radius:10px;padding:9px 11px;font-size:.8rem;color:#5b21b6"></div>
     <button class="btn" style="margin-top:12px" onclick="saveSettings()">Save camp settings</button>
@@ -1906,7 +1916,7 @@ function onStartDateChange(){
 async function saveSettings(){
   try{
     const days=_datesBetween(val('stStart'),val('stEnd'));
-    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:val('stTz'),checkInDays:days}});
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days}});
     SETTINGS=await api('/settings',{noCache:true});SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
     toast('Settings saved ✓');
   }catch(e){toast(e.message);}

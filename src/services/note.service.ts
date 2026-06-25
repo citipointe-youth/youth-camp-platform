@@ -11,7 +11,9 @@ import { toCsvString } from '../utils/csv';
 import { z } from 'zod';
 
 const AddNoteSchema = z.object({
-  camperId: z.string().min(1),
+  // Optional: a testimony may be "general" (no specific student). Empty string is
+  // treated as absent.
+  camperId: z.string().optional(),
   body: z.string().min(1).max(2000),
   sessionId: z.string().optional(),
   category: z.string().max(40).optional(),
@@ -32,13 +34,17 @@ export function makeNoteService(
     async add(actor, input) {
       assertCan(actor, 'note:write');
       const data = AddNoteSchema.parse(input);
-      const camper = await personRepo.findById(data.camperId);
-      if (!camper || !isCamper(camper)) throw new NotFoundError('Camper not found');
-      if (!canAccessPerson(actor, camper)) throw new NotFoundError('Camper not found');
+      // A general testimony has no student; only validate/scope when one is given.
+      const camperId = data.camperId && data.camperId.length > 0 ? data.camperId : null;
+      if (camperId) {
+        const camper = await personRepo.findById(camperId);
+        if (!camper || !isCamper(camper)) throw new NotFoundError('Camper not found');
+        if (!canAccessPerson(actor, camper)) throw new NotFoundError('Camper not found');
+      }
 
       const note: StudentNote = {
         id: newId('note'),
-        camperId: data.camperId,
+        camperId,
         body: data.body,
         authorId: actor.id,
         authorName: actor.displayName,
@@ -63,9 +69,13 @@ export function makeNoteService(
       const notes = await noteRepo.findRecent(limit * 3); // fetch more, then filter
       const result: StudentNote[] = [];
       for (const note of notes) {
-        const camper = await personRepo.findById(note.camperId);
-        if (!camper || !isCamper(camper)) continue;
-        if (!canAccessPerson(actor, camper)) continue;
+        if (note.camperId) {
+          const camper = await personRepo.findById(note.camperId);
+          if (!camper || !isCamper(camper)) continue;
+          if (!canAccessPerson(actor, camper)) continue;
+        }
+        // General (camper-less) testimonies have no church to scope to — visible to
+        // anyone with note:read (zoneLeader/director/admin).
         result.push(note);
         if (result.length >= limit) break;
       }
@@ -78,16 +88,19 @@ export function makeNoteService(
       const headers = ['Time', 'Student', 'Logged by', 'Church', 'Gender', 'Grade', 'Category', 'Note'];
       const rows: string[][] = [];
       for (const note of notes) {
-        const camper = await personRepo.findById(note.camperId);
-        if (!camper || !isCamper(camper)) continue;
-        if (!canAccessPerson(actor, camper)) continue;
+        let camper = null;
+        if (note.camperId) {
+          camper = await personRepo.findById(note.camperId);
+          if (!camper || !isCamper(camper)) continue;
+          if (!canAccessPerson(actor, camper)) continue;
+        }
         rows.push([
           note.createdAt,
-          `${camper.firstName} ${camper.lastName}`,
+          camper ? `${camper.firstName} ${camper.lastName}` : 'No specific student',
           note.authorName,
-          camper.churchName,
-          camper.gender,
-          camper.grade != null ? String(camper.grade) : '',
+          camper?.churchName ?? '',
+          camper?.gender ?? '',
+          camper?.grade != null ? String(camper.grade) : '',
           note.category ?? 'note',
           note.body,
         ]);
