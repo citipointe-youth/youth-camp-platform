@@ -209,12 +209,17 @@ textarea{min-height:84px;resize:vertical;}
 #previewBanner .pb-exit:active{background:rgba(255,255,255,.35);}
 /* Wide-nav element is hidden on phone; shown only inside the 980px breakpoint */
 .wide-nav{display:none;}
-/* ===== Wide layout (≥980px) — strictly additive ===== */
+/* ===== Wide layout (≥980px) — strictly additive =====
+   NOTE: the shell markup uses class="app" / id="bar" / id="stage", so the grid targets
+   #app (added to the .app div), #bar (the header), and #stage (the content area). An
+   earlier markup rebuild left these selectors as #header/#main, which matched nothing,
+   so the desktop grid silently never activated (app stayed a 460px phone column). */
 @media(min-width:980px){
-  #app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr auto;grid-template-areas:"header header" "widenav main" "tabs tabs";min-height:100dvh;}
-  #header{grid-area:header;}
+  #app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr auto;grid-template-areas:"header header" "widenav main" "tabs tabs";height:100dvh;}
+  #bar{grid-area:header;}
+  #previewBanner.show{grid-column:1 / -1;}
   #tabs{grid-area:tabs;position:static;border-top:1px solid var(--line);}
-  #main{grid-area:main;padding:12px 20px;}
+  #stage{grid-area:main;padding:0;}
   .wide-nav{grid-area:widenav;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--line);background:#f9f8ff;}
   .wide-nav-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--ink);text-decoration:none;transition:background .12s;}
   .wide-nav-item:hover{background:#ede9fe;}
@@ -225,7 +230,7 @@ textarea{min-height:84px;resize:vertical;}
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <div id="previewBanner">
     <span class="pb-label">👁 PREVIEW — at-camp view is read-only</span>
     <button class="pb-exit" onclick="exitPreview()">Exit preview ×</button>
@@ -569,8 +574,8 @@ function _renderWideNav(activeId){
   if(!nav){
     nav=document.createElement('div');nav.id='wideNav';nav.className='wide-nav';
     const app=document.getElementById('app');if(!app)return;
-    // Insert before #main
-    const main=document.getElementById('main');if(main)app.insertBefore(nav,main);else app.appendChild(nav);
+    // Insert before the content area (#stage) so the sidebar takes the widenav grid cell.
+    const stage=document.getElementById('stage');if(stage)app.insertBefore(nav,stage);else app.appendChild(nav);
   }
   if(!ACTOR){nav.innerHTML='';return;}
   let adminItems=[];
