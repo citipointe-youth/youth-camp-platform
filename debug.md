@@ -18,6 +18,13 @@
 > **Maintenance rule:** when a fix shifts offsets in `index.html`, update the affected line
 > numbers in this file *as part of that fix*, so the map is correct at the next reload.
 
+> **Verify & deploy conventions (this repo) — do NOT:**
+> - **Start a localhost dev server or drive a browser to test.** Verify with `npm run typecheck`
+>   + `npm run test` and reasoning/grep only. CSS/layout changes can't be fully proven this way —
+>   make the change and tell the user to eyeball it on-device.
+> - **Check the Vercel deployment.** GitHub is linked to Vercel; a push to `master` auto-deploys.
+>   Pushing is the deploy — no need to poll deployments or curl the prod URL to confirm.
+
 ### Per-set input template (what to give Claude each time)
 
 ```
@@ -37,6 +44,13 @@ check "expected vs actual" before touching code.
 
 This one file is the only real navigation cost in the repo. Map below (line numbers are a
 2026-06-26 snapshot); **grep the name to confirm the line** — they drift on every edit.
+
+> **Desktop/laptop wide layout (≥980px):** restored 2026-06-26 — the grid was orphaned (CSS +
+> `_renderWideNav` targeted `#app`/`#header`/`#main`, but the shell is `class="app"`+`id="app"` /
+> `id="bar"` / `id="stage"`). Grid now targets `#app`/`#bar`/`#stage` (CSS `@media(min-width:980px)`
+> ~213; `_renderWideNav` ~572). **Verified at markup level only, NOT visually** — if the desktop
+> view looks off, the `#stage` padding in that media block is the first thing to adjust. The phone
+> layout (<980px) is independent of this block.
 
 ### Global state (line ~381)
 `TOKEN, ACTOR, SETTINGS, CAMP_MODE('pre-camp'), STACK, PREVIEW_MODE` — one declaration line.

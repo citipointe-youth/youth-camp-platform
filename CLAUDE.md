@@ -90,6 +90,11 @@ npm run test         # vitest
 
 Default port: **4200**. Set `PORT=xxxx` to override.
 
+> **Verify & deploy convention:** verify changes with `npm run typecheck` + `npm run test` (+ grep/
+> reasoning) — **do not start a localhost dev server or drive a browser to test**, and flag CSS/
+> layout changes for the user to eyeball on-device. GitHub is linked to Vercel, so a **push to
+> `master` is the deploy** — no need to poll Vercel or curl prod to confirm it shipped.
+
 ### Persistence modes & env vars
 
 | `PERSISTENCE` | Backend |
