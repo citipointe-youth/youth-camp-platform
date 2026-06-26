@@ -31,7 +31,7 @@ body{font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe 
    left a strip of dark body background BELOW the bottom nav ("nav not at the bottom").
    Anchoring both to the dynamic viewport makes #tabs sit flush at the bottom. */
 .app{width:100%;max-width:460px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5);}
-.bar{background:linear-gradient(135deg,var(--violet),var(--navy));color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 14px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:6px;flex:none;z-index:20;}
+.bar{background:linear-gradient(135deg,var(--violet),var(--navy));color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 6px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px;flex:none;z-index:20;}
 .bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;align-self:center;}
 .bar.canback .bk{display:grid;}
 /* Title + subtitle share one line ("My Church Hub — All churches"); the subtitle
