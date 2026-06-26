@@ -44,7 +44,7 @@ export async function seedAll(container: Container): Promise<void> {
 
   const victory = makeChurch('Victory Church', 'Yellow');
   const gracepoint = makeChurch('Grace Point Church', 'Blue');
-  const riverbend = makeChurch('Riverbend Community', 'Green');
+  const riverbend = makeChurch('Riverbend Community', 'Black');
 
   for (const c of [victory, gracepoint, riverbend]) {
     await repos.churches.save(c);
@@ -91,7 +91,7 @@ export async function seedAll(container: Container): Promise<void> {
       role: 'church',
       churchId: riverbend.id,
       churchName: riverbend.name,
-      zone: 'Green',
+      zone: 'Black',
     }),
     makeUser({
       firstName: 'Yellow',

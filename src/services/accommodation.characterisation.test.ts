@@ -418,7 +418,7 @@ describe('AccommodationService.setReservations', () => {
   });
 
   it('director and admin can set reservations for any church', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Green' })] });
+    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Black' })] });
     await expect(
       svc.setReservations(actor('director'), { churchId: 'c1', reservations }),
     ).resolves.toEqual(reservations);

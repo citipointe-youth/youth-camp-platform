@@ -215,12 +215,16 @@ textarea{min-height:84px;resize:vertical;}
    earlier markup rebuild left these selectors as #header/#main, which matched nothing,
    so the desktop grid silently never activated (app stayed a 460px phone column). */
 @media(min-width:980px){
-  #app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr auto;grid-template-areas:"header header" "widenav main" "tabs tabs";height:100dvh;}
-  #bar{grid-area:header;}
+  #app{max-width:1600px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"header header" "widenav main";height:100dvh;}
+  #bar{grid-area:header;background:#fff;border-bottom:1px solid var(--line);color:var(--ink);padding:10px 20px;flex-wrap:nowrap;row-gap:0;}
+  #bar .ttl{flex:0 0 auto;}
+  #bar .ttl .s{display:none;}
+  #bar .sign-out{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  #bar .bk{color:var(--ink);}
   #previewBanner.show{grid-column:1 / -1;}
-  #tabs{grid-area:tabs;position:static;border-top:1px solid var(--line);}
+  #tabs{display:none;}
   #stage{grid-area:main;padding:0;}
-  .wide-nav{grid-area:widenav;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--line);background:#f9f8ff;}
+  .wide-nav{grid-area:widenav;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--line);background:#f9f8ff;overflow-y:auto;}
   .wide-nav-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--ink);text-decoration:none;transition:background .12s;}
   .wide-nav-item:hover{background:#ede9fe;}
   .wide-nav-item.on{background:#ddd6fe;color:#5b21b6;font-weight:700;}
@@ -462,6 +466,7 @@ async function doLogin(){
     TOKEN=d.token;ACTOR={...d.user,displayName:((d.user.firstName||'')+' '+(d.user.lastName||'')).trim()};
     SETTINGS=await api('/settings');
     CAMP_MODE=SETTINGS.campMode||'pre-camp';
+    localStorage.setItem('ycp_token',TOKEN);localStorage.setItem('ycp_actor',JSON.stringify(ACTOR));
     document.getElementById('login').style.display='none';
     document.getElementById('bar').style.display='flex';
     document.getElementById('stage').style.display='block';
@@ -473,6 +478,7 @@ function logout(){
   // Clear preview state before the POST so the write guard doesn't block the logout call.
   PREVIEW_MODE=false;
   api('/auth/logout',{method:'POST'}).catch(()=>{});
+  localStorage.removeItem('ycp_token');localStorage.removeItem('ycp_actor');
   TOKEN=null;ACTOR=null;location.reload();
 }
 function updateModeUI(){
@@ -580,20 +586,23 @@ function _renderWideNav(activeId){
   if(!ACTOR){nav.innerHTML='';return;}
   let adminItems=[];
   if(ACTOR.role==='admin'){
+    const atOnly=CAMP_MODE==='at-camp';const preOnly=CAMP_MODE==='pre-camp';
     adminItems=[
-      {id:'home',label:'Home'},{id:'checkin',label:'Check-in'},
-      {id:'search',label:'Search'},{id:'notes',label:'Notes'},
+      {id:'home',label:'Home'},
+      ...(atOnly?[{id:'checkin',label:'Check-in'},{id:'search',label:'Search'},{id:'notes',label:'Notes'},{id:'notifs',label:'Notices'}]:[]),
+      ...(preOnly?[{id:'people',label:'My Youth'}]:[]),
       {id:'adminAccounts',label:'Accounts'},{id:'adminSettings',label:'Settings'},
       {id:'adminAccom',label:'Accommodation'},{id:'adminSchedEdit',label:'Schedule'},
-      {id:'adminData',label:'Data &amp; Reset'},{id:'adminChurchImport',label:'Church Import'},
-      {id:'adminRecords',label:'Records &amp; Export'},{id:'adminWizard',label:'Setup Wizard'},
+      {id:'adminData',label:'Data, Reset &amp; Exports'},{id:'adminWizard',label:'Setup Wizard'},
     ];
   }else if(ACTOR.role==='director'){
+    const atOnly=CAMP_MODE==='at-camp';const preOnly=CAMP_MODE==='pre-camp';
     adminItems=[
-      {id:'home',label:'Home'},{id:'checkin',label:'Check-in'},
-      {id:'search',label:'Search'},{id:'notes',label:'Notes'},
+      {id:'home',label:'Home'},
+      ...(atOnly?[{id:'checkin',label:'Check-in'},{id:'search',label:'Search'},{id:'notes',label:'Notes'},{id:'notifs',label:'Notices'}]:[]),
+      ...(preOnly?[{id:'people',label:'My Youth'}]:[]),
       {id:'import',label:'Import Students'},
-      {id:'adminRecords',label:'Records &amp; Export'},
+      {id:'adminData',label:'Records &amp; Exports'},
     ];
   }
   if(!adminItems.length)return;
@@ -1332,8 +1341,11 @@ async function sendNotif(){const title=document.getElementById('ntitle').value.t
 /* ===== FIRST DAY SIGN IN ===== */
 RENDER.firstday=async function(){
   paint('firstday','<p class="note-hint" style="margin-top:40px;text-align:center">Loading…</p>','First Day Sign In','Select students to confirm');
-  const page=await api('/campers?pageSize=300');
-  window._fdAll=(Array.isArray(page)?page:page.items||[]).filter(c=>c.kind==='student');
+  const [camperPage,regList]=await Promise.all([api('/campers?pageSize=300'),api('/registrants')]);
+  const campers=(Array.isArray(camperPage)?camperPage:camperPage.items||[]).filter(c=>c.kind==='student');
+  const camperIds=new Set(campers.map(c=>c.id));
+  const registrants=(Array.isArray(regList)?regList:[]).filter(c=>c.kind!=='leader'&&!camperIds.has(c.id));
+  window._fdAll=[...registrants,...campers];
   window._fdPending=new Set();
   window._fdGender='all';window._fdGrade='all';
   fdDraw();
@@ -1617,7 +1629,7 @@ RENDER.admin=function(){
   const isAdmin=ACTOR.role==='admin';
   const isAdminOrDirector=['admin','director'].includes(ACTOR.role);
   const modeTile=isAdmin?`<div class="tile" onclick="switchMode()"><div class="l">Switch to ${CAMP_MODE==='pre-camp'?'At-Camp':'Pre-Camp'}</div></div>`:'';
-  const recordsTile=isAdminOrDirector?`<div class="tile" onclick="go('adminRecords')"><div class="l">Records &amp; Export</div></div>`:'';
+  const dataTile=isAdmin?`<div class="tile" onclick="go('adminData')"><div class="l">Data, Reset &amp; Exports</div></div>`:isAdminOrDirector?`<div class="tile" onclick="go('adminData')"><div class="l">Records &amp; Export</div></div>`:'';
   const wizardTile=isAdmin?`<div class="tile" onclick="go('adminWizard')"><div class="l">Setup Wizard</div></div>`:'';
   paint('admin',`<div class="infobox">Admin console — configure camp here year-round.</div>
     <div class="tiles">
@@ -1628,8 +1640,7 @@ RENDER.admin=function(){
       <div class="tile" onclick="go('adminFaq')"><div class="l">FAQ</div></div>
       <div class="tile" onclick="go('adminDevos')"><div class="l">Devotionals</div></div>
       <div class="tile" onclick="go('adminSchedEdit')"><div class="l">Schedule</div></div>
-      <div class="tile" onclick="go('adminData')"><div class="l">Data &amp; reset</div></div>
-      ${recordsTile}${wizardTile}${modeTile}
+      ${dataTile}${wizardTile}${modeTile}
     </div>`,'Admin console','Back office');
 };
 
@@ -1649,7 +1660,7 @@ async function switchMode(){
 }
 
 /* ===== ADMIN ACCOUNTS ===== */
-const ZONE_OPTS=['Yellow','Blue','Green','Red'];
+const ZONE_OPTS=['Yellow','Blue','Black','Red'];
 const zoneSel=(id,s)=>`<select id="${id}">${ZONE_OPTS.map(z=>`<option${z===s?' selected':''}>${z}</option>`).join('')}</select>`;
 RENDER.adminAccounts=async function(){
   const [users,churches]=await Promise.all([api('/accounts/users'),api('/accounts/churches')]);
@@ -1686,40 +1697,44 @@ RENDER.adminAccounts=async function(){
     <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>${lr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Churches</div>${cr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add leadership account</div>
-      <div style="display:flex;gap:6px"><input class="fld" id="aF" placeholder="First name"><input class="fld" id="aL" placeholder="Last name"></div>
-      <label>Username</label><input class="fld" id="aE" placeholder="e.g. yr10leaders" autocapitalize="none" autocorrect="off" spellcheck="false">
-      <label>Password</label><input class="fld" id="aP" placeholder="min 6 characters">
-      <label>Role</label><select id="aR" onchange="aRoleChange()">${roleOpts}</select>
-      <div id="aZoneWrap" style="display:none"><label>Zone</label>${zoneSel('aZ')}</div>
-      <button class="btn" onclick="addAcct()">Create account</button></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Name</label><input class="fld" id="aName" placeholder="Full name" style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="aE" placeholder="e.g. yr10leaders" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Password</label><input class="fld" id="aP" placeholder="min 6 chars" style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Role</label><select id="aR" onchange="aRoleChange()" style="flex:1">${roleOpts}</select></div>
+      <div id="aZoneWrap" style="display:none"><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('aZ')}</div></div></div>
+      <button class="btn" onclick="addAcct()" style="margin-top:10px;width:100%">Create account</button></div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
       <div class="warnbox">⚠ Church name must match the registration export exactly — registrations are matched by name.</div>
-      <label>Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside">
-      <label>Zone</label>${zoneSel('ncZone')}
-      <label>Login username</label><input class="fld" id="ncEmail" placeholder="e.g. northside" autocapitalize="none" autocorrect="off" spellcheck="false">
-      <label>Password</label><input class="fld" id="ncPass" placeholder="min 6 characters">
-      <button class="btn" onclick="addChurch()">Create church + account</button></div>`,'Accounts &amp; churches','Admin');
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside" style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('ncZone')}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="ncEmail" placeholder="e.g. northside" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Password</label><input class="fld" id="ncPass" placeholder="min 6 chars" style="flex:1"></div>
+      <button class="btn" onclick="addChurch()" style="margin-top:10px;width:100%">Create church + account</button></div>`,'Accounts &amp; churches','Admin');
 };
 function aRoleChange(){
   const r=document.getElementById('aR').value;
   const zw=document.getElementById('aZoneWrap');if(zw)zw.style.display=r==='zoneLeader'?'block':'none';
 }
-async function addAcct(){const role=sel('aR');const body={firstName:val('aF'),lastName:val('aL'),username:val('aE'),password:val('aP'),role};
+async function addAcct(){const role=sel('aR');const nm=val('aName').trim();const sp=nm.indexOf(' ');
+  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?(nm.slice(sp+1).trim()||firstName):firstName;
+  const body={firstName,lastName,username:val('aE'),password:val('aP'),role};
   if(role==='zoneLeader')body.zone=sel('aZ');
-  if(!body.firstName||!body.lastName||!body.username){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
+  if(!firstName||!val('aE')){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
   try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
 const _findUser=id=>(window._allUsers||[]).find(u=>u.id===id)||{};
 const _findChurch=id=>(window._allChurches||[]).find(c=>c.id===id)||{};
 function editLeaderName(id){const u=_findUser(id);
   modal(`<h3>Rename account</h3>
-    <div style="display:flex;gap:6px"><input class="fld" id="enF" placeholder="First name" value="${esc(u.firstName||'')}"><input class="fld" id="enL" placeholder="Last name" value="${esc(u.lastName||'')}"></div>
+    <input class="fld" id="enName" placeholder="Full name" value="${esc(((u.firstName||'')+' '+(u.lastName||'')).trim())}">
     ${u.role==='zoneLeader'?'<label>Zone</label>'+zoneSel('enZ',u.zone):''}
     <label>Status</label><select id="enS"><option value="active"${u.status!=='inactive'?' selected':''}>Active</option><option value="inactive"${u.status==='inactive'?' selected':''}>Inactive</option></select>
     <button class="btn" style="margin-top:10px" onclick="saveLeaderName('${id}','${u.role}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
-async function saveLeaderName(id,role){const body={firstName:val('enF'),lastName:val('enL'),status:sel('enS')};
+async function saveLeaderName(id,role){const nm=val('enName').trim();const sp=nm.indexOf(' ');
+  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?(nm.slice(sp+1).trim()||firstName):firstName;
+  const body={firstName,lastName,status:sel('enS')};
   if(role==='zoneLeader')body.zone=sel('enZ');
-  if(!body.firstName||!body.lastName){toast('Enter first + last name');return;}
+  if(!firstName){toast('Enter a name');return;}
   try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
 function editChurchName(id){const c=_findChurch(id);
   modal(`<h3>Rename church</h3>
@@ -1759,25 +1774,47 @@ RENDER.adminAccom=async function(){
   // Backend model is accommodation blocks (tent/classroom spaces with capacity + price).
   const blocks=await api('/accommodation/blocks');
   window._adminBlocks=blocks||[];
-  const blockCards=(blocks||[]).map(b=>`<div class="card" style="background:#fafbff">
-    <div class="rowsb"><div style="font-weight:700">${b.kind==='tent'?'△':'⌂'} ${esc(b.name)}</div><button class="btn red sm" onclick="delBlock('${b.id}')">Delete</button></div>
-    <div style="display:flex;gap:6px;margin-top:6px"><div style="flex:1"><label style="font-size:.62rem">Name</label><input class="fld" id="bn_${b.id}" value="${esc(b.name)}"></div></div>
-    <div style="display:flex;gap:6px;margin-top:6px"><div style="flex:1"><label style="font-size:.62rem">Capacity</label><input class="fld" id="bc_${b.id}" type="number" inputmode="numeric" min="0" value="${b.capacity}"></div>
-    <div style="flex:1"><label style="font-size:.62rem">Price $</label><input class="fld" id="bp_${b.id}" type="number" inputmode="numeric" min="0" value="${b.price}"></div>
-    <div style="flex:1"><label style="font-size:.62rem">Already taken</label><input class="fld" id="bt_${b.id}" type="number" inputmode="numeric" min="0" value="${b.baseTaken||0}"></div></div>
-    <button class="btn sm" style="width:100%;margin-top:8px" onclick="saveBlock('${b.id}')">Save</button></div>`).join('')||'<p class="note-hint">No spaces yet.</p>';
+  const hdr=`<div style="display:flex;gap:6px;padding:4px 0 6px;border-bottom:2px solid var(--line);font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase">
+    <span style="width:22px">&nbsp;</span><span style="flex:3">Name</span>
+    <span style="flex:1;min-width:48px;max-width:70px">Cap</span>
+    <span style="flex:1;min-width:48px;max-width:70px">Price</span>
+    <span style="flex:1;min-width:48px;max-width:70px">Taken</span>
+    <span style="width:68px">&nbsp;</span></div>`;
+  const blockCards=(blocks||[]).map(b=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)">
+      <span style="width:22px;text-align:center;font-size:.85rem;flex:none">${b.kind==='tent'?'△':'⌂'}</span>
+      <input class="fld" id="bn_${b.id}" value="${esc(b.name)}" placeholder="Name" style="flex:3;min-width:0">
+      <input class="fld" id="bc_${b.id}" type="number" inputmode="numeric" min="0" value="${b.capacity}" placeholder="Cap" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
+      <input class="fld" id="bp_${b.id}" type="number" inputmode="numeric" min="0" value="${b.price}" placeholder="$" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
+      <input class="fld" id="bt_${b.id}" type="number" inputmode="numeric" min="0" value="${b.baseTaken||0}" placeholder="0" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
+      <button class="btn sm" onclick="saveBlock('${b.id}')" style="flex:none;padding:5px 10px">✓</button>
+      <button class="btn red sm" onclick="delBlock('${b.id}')" style="flex:none;padding:5px 8px">✕</button>
+    </div>`).join('')||'<p class="note-hint">No spaces yet.</p>';
   paint('adminAccom',`<div class="infobox">Define the camp's accommodation spaces — tents &amp; classroom blocks with capacity and price. Per-church spot allocation is on the Accommodation allocations page.</div>
-    ${blockCards}
+    <div class="card">${(blocks||[]).length?hdr:''}${blockCards}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a space</div>
-    <label>Type</label><select id="nbKind"><option value="tent">Tent</option><option value="classroom">Classroom</option></select>
-    <label>Name</label><input class="fld" id="nbName" placeholder="e.g. Classroom Block 2">
-    <div style="display:flex;gap:6px"><div style="flex:1"><label>Capacity</label><input class="fld" id="nbCap" type="number" inputmode="numeric" min="0" value="40"></div>
-    <div style="flex:1"><label>Price $</label><input class="fld" id="nbPrice" type="number" inputmode="numeric" min="0" value="120"></div></div>
-    <button class="btn" onclick="addBlock()">Add space</button></div>`,'Accommodation setup','Tent &amp; classroom spaces');
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+      <div><label style="font-size:.72rem">Type</label><select id="nbKind"><option value="tent">Tent △</option><option value="classroom">Classroom ⌂</option></select></div>
+      <div style="flex:2;min-width:110px"><label style="font-size:.72rem">Name</label><input class="fld" id="nbName" placeholder="e.g. Block 2"></div>
+      <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Cap</label><input class="fld" id="nbCap" type="number" inputmode="numeric" min="0" value="40"></div>
+      <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Price $</label><input class="fld" id="nbPrice" type="number" inputmode="numeric" min="0" value="120"></div>
+      <button class="btn" onclick="addBlock()" style="flex:none;align-self:flex-end">Add</button>
+    </div></div>`,'Accommodation setup','Tent &amp; classroom spaces');
 };
-async function saveBlock(id){try{await api('/accommodation/blocks/'+id,{method:'PATCH',body:{name:val('bn_'+id),capacity:Number(val('bc_'+id))||0,price:Number(val('bp_'+id))||0,baseTaken:Number(val('bt_'+id))||0}});toast('Saved ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
+async function saveBlock(id){
+  const el=document.getElementById('stage');const scrollY=el?el.scrollTop:0;
+  try{await api('/accommodation/blocks/'+id,{method:'PATCH',body:{name:val('bn_'+id),capacity:Number(val('bc_'+id))||0,price:Number(val('bp_'+id))||0,baseTaken:Number(val('bt_'+id))||0}});toast('Saved ✓');
+  await RENDER.adminAccom();if(el)el.scrollTop=scrollY;}catch(e){toast(e.message);}
+}
 async function delBlock(id){if(!confirm('Delete this space?'))return;try{await api('/accommodation/blocks/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminAccom();}catch(e){toast(e.message);}}
-async function addBlock(){if(!val('nbName')){toast('Enter a name');return;}try{await api('/accommodation/blocks',{method:'POST',body:{kind:sel('nbKind'),name:val('nbName'),capacity:Number(val('nbCap'))||0,price:Number(val('nbPrice'))||0}});toast('Space added ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
+async function addBlock(){if(!val('nbName')){toast('Enter a name');return;}
+  const name=val('nbName').trim();
+  const dup=(window._adminBlocks||[]).find(b=>b.name.toLowerCase()===name.toLowerCase());
+  if(dup){toast('A space named "'+name+'" already exists');return;}
+  const el=document.getElementById('stage');const scrollY=el?el.scrollTop:0;
+  try{await api('/accommodation/blocks',{method:'POST',body:{kind:sel('nbKind'),name,capacity:Number(val('nbCap'))||0,price:Number(val('nbPrice'))||0}});toast('Space added ✓');
+  await RENDER.adminAccom();if(el)el.scrollTop=scrollY;}catch(e){toast(e.message);}
+}
 
 /* ===== ADMIN FAQ (pre-camp) ===== */
 RENDER.adminFaq=async function(){
@@ -1806,24 +1843,8 @@ async function delFaqAt(id){if(!confirm('Delete?'))return;try{await api('/faq/'+
 async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added ✓');RENDER.adminFaqEdit();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN SETTINGS ===== */
-/* ===== RECORDS & EXPORT ===== */
-RENDER.adminRecords=async function(){
-  let exported='Never';
-  try{const s=await api('/settings');if(s&&s.lastExportedAt)exported=dtFmt(s.lastExportedAt);}catch(e){}
-  paint('adminRecords',`<div class="card">
-    <div class="lbl" style="margin-top:0">Compliance Export</div>
-    <div class="kv"><span class="k">Last exported</span><span class="v">${esc(exported)}</span></div>
-    <p class="note-hint" style="text-align:left">Download the full audit workbook (xlsx) or the sign-in/out log (CSV) as standalone files. The xlsx includes: Summary, Attendees, Sign-in/Sign-out Log, Daily Check-in Log, Notes &amp; Testimonies, and Temp Passwords (if applicable).</p>
-    <button class="btn" style="width:100%;margin-top:8px" onclick="downloadAuditExport()">↓ Download audit workbook (.xlsx)</button>
-    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out','sign-in-out-log.csv')">↓ Sign-in/out log (.csv)</button>
-  </div>
-  <div class="card" style="border:1px solid #fbbf24">
-    <div class="lbl" style="margin-top:0;color:#92400e">Close-out camp</div>
-    <p class="note-hint" style="text-align:left;color:#92400e">Complete all 3 steps before rolling over to a new year.</p>
-    <div id="closeoutSteps"></div>
-    <button class="btn" onclick="go('adminCloseOut')">Start close-out →</button>
-  </div>`,'Records &amp; Export','Post-camp');
-};
+/* ===== RECORDS & EXPORT (redirects to adminData) ===== */
+RENDER.adminRecords=function(){go('adminData');};
 async function downloadAuditExport(){
   try{
     const resp=await fetch('/export/audit',{headers:{Authorization:'Bearer '+TOKEN}});
@@ -1847,7 +1868,7 @@ async function downloadCsvExport(path,filename){
 
 RENDER.adminCloseOut=function(){
   paint('adminCloseOut',`
-    <div style="padding:12px 0 4px"><button class="btn ghost sm" onclick="go('adminRecords')">← Back</button></div>
+    <div style="padding:12px 0 4px"><button class="btn ghost sm" onclick="go('adminData')">← Back</button></div>
     <div class="card">
       <div class="lbl" style="margin-top:0">Close-out checklist</div>
       <div style="margin-bottom:14px">
@@ -1928,24 +1949,37 @@ async function saveSettings(){
 }
 
 /* ===== ADMIN DATA ===== */
-RENDER.adminData=function(){
-  // CSV student import is available to the admin in BOTH modes (the Admin console is
-  // admin-only); only the at-camp Notifications card stays mode-gated.
+RENDER.adminData=async function(){
+  let exported='Never';
+  try{const s=await api('/settings');if(s&&s.lastExportedAt)exported=dtFmt(s.lastExportedAt);}catch(e){}
+  const isAdmin=ACTOR.role==='admin';
   const uploadSection=`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
     <input type="file" id="fileIn" accept=".csv" class="fld">
     <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
     <p class="note-hint">Matches existing students by name — adds new ones and updates changed fields.</p>
     <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`
     +(CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'');
-  paint('adminData',`${uploadSection}
+  const exportCards=`<div class="card">
+    <div class="lbl" style="margin-top:0">Compliance Export</div>
+    <div class="kv"><span class="k">Last exported</span><span class="v">${esc(exported)}</span></div>
+    <p class="note-hint" style="text-align:left">Download the full audit workbook (xlsx) or the sign-in/out log (CSV) as standalone files. The xlsx includes: Summary, Attendees, Sign-in/Sign-out Log, Daily Check-in Log, Notes &amp; Testimonies, and Temp Passwords (if applicable).</p>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="downloadAuditExport()">↓ Download audit workbook (.xlsx)</button>
+    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out','sign-in-out-log.csv')">↓ Sign-in/out log (.csv)</button>
+  </div>
+  <div class="card" style="border:1px solid #fbbf24">
+    <div class="lbl" style="margin-top:0;color:#92400e">Close-out camp</div>
+    <p class="note-hint" style="text-align:left;color:#92400e">Complete all 3 steps before rolling over to a new year.</p>
+    <div id="closeoutSteps"></div>
+    <button class="btn" onclick="go('adminCloseOut')">Start close-out →</button>
+  </div>`;
+  paint('adminData',`${exportCards}${uploadSection}${isAdmin?`
     <div class="card"><div class="h3" style="margin-top:0">New year rollover</div>
       <button class="btn" onclick="adminSaveDefaults()">Save baseline (incl. devotionals)</button>
-      <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline. Run this once camp is fully configured, before rolling over.</p>
-      <button class="btn ghost" style="margin-top:10px" onclick="go('adminRecords')">Records &amp; Export → Close-out flow</button>
-      <p class="note-hint" style="text-align:left">Year rollover is done through the guided close-out flow — it ensures the audit workbook is downloaded before any data is purged.</p></div>
+      <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline. Run this once camp is fully configured, before rolling over.</p></div>
     <div class="card"><div class="h3" style="margin-top:0">Factory reset</div>
       <button class="btn red" onclick="adminReset()">Full reset (wipe to bare)</button>
-      <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`,'Camp data','Upload / reset');
+      <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`:''}
+  `,'Data, Reset &amp; Exports','Upload / export / reset');
 };
 /* Standalone import screen — gives director (who has import:run but not the Admin
    tab) a way to import. Reuses adminUpload()'s #fileIn/#impResult elements. */
@@ -2074,11 +2108,44 @@ function adminUpload(){
 function _renderImportPreview(r){
   const box=document.getElementById('impResult');if(!box)return;
   box.style.display='block';
-  const phantoms=(r.phantomChurches||[]).length?`<div class="warnbox">⚠ ${r.phantomChurches.length} unrecognised church name(s) would be auto-created: ${(r.phantomChurches).map(n=>`<b>${esc(n)}</b>`).join(', ')}. Fix spelling or create them first.</div>`:'';
+  const phantoms=r.phantomChurches||[];
   const errHtml=(r.errors||[]).slice(0,5).map(e=>`<div style="color:#b91c1c;font-size:.8rem">Row ${e.row}: ${esc(e.message)}</div>`).join('');
-  box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add · ${r.updated} to update · ${r.skipped} to skip · ${(r.errors||[]).length} errors</div>
-    ${phantoms}${errHtml}
-    ${_pendingImportCsv&&!r.phantomChurches?.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:''}`;
+  let phantomHtml='';
+  if(phantoms.length){
+    const autoUser=n=>n.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,30)||'church';
+    const rows=phantoms.map((n,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="font-weight:700;margin-bottom:6px">${esc(n)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="flex:1;min-width:130px"><label style="font-size:.7rem">Zone</label>${zoneSel('pzZone_'+i)}</div>
+        <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Username</label><input class="fld" id="pzUser_${i}" value="${esc(autoUser(n))}" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+        <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Password (min 6)</label><input class="fld" id="pzPass_${i}" placeholder="min 6 chars"></div>
+      </div></div>`).join('');
+    const btnLabel=`Create ${phantoms.length} church${phantoms.length===1?'':'es'} →`;
+    phantomHtml=`<div class="warnbox">⚠ ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the CSV — set zone, username &amp; password to create them first:</div>
+      ${rows}
+      <button class="btn" style="margin-top:6px" onclick="_createPhantomChurches(${JSON.stringify(phantoms)})">${btnLabel}</button>
+      <button class="btn ghost" style="margin-top:6px;margin-left:6px" onclick="_clearImport()">Cancel</button>`;
+  }
+  const confirmHtml=_pendingImportCsv&&!phantoms.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:'';
+  box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip \xb7 ${(r.errors||[]).length} errors</div>
+    ${phantomHtml}${errHtml}${confirmHtml}`;
+}
+async function _createPhantomChurches(names){
+  const btn=event.currentTarget||event.target;
+  const origLabel=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Creating…';}
+  const autoUser=n=>n.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,30)||'church';
+  for(let i=0;i<names.length;i++){
+    const name=names[i];
+    const zone=sel('pzZone_'+i)||'Yellow';
+    const username=(document.getElementById('pzUser_'+i)?.value||'').trim()||autoUser(name);
+    const pass=(document.getElementById('pzPass_'+i)?.value||'').trim();
+    if(pass.length<6){toast('Password for "'+name+'" must be 6+ chars');if(btn){btn.disabled=false;btn.textContent=origLabel;}return;}
+    try{await api('/accounts/churches',{method:'POST',body:{churchName:name,zone,accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:pass}});}
+    catch(e){toast('Failed to create "'+name+'": '+(e.message||'error'));if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
+  }
+  toast(names.length+' church'+(names.length===1?'':'es')+' created ✓');
+  try{const r=await api('/import/csv',{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:true}});_renderImportPreview(r);}catch(e){toast(e.message);}
 }
 async function _confirmImport(){
   if(!_pendingImportCsv){toast('No import pending');return;}
@@ -2092,45 +2159,6 @@ async function _confirmImport(){
 }
 function _clearImport(){_pendingImportCsv=null;const b=document.getElementById('impResult');if(b)b.style.display='none';}
 
-/* ===== ADMIN CHURCH IMPORT ===== */
-RENDER.adminChurchImport=function(){
-  paint('adminChurchImport',`<div class="card">
-    <div class="lbl" style="margin-top:0">Bulk church import (CSV)</div>
-    <p class="note-hint" style="text-align:left;margin-bottom:10px">CSV columns: <b>Church Name, Zone, Username, Password</b></p>
-    <input type="file" id="ciFileIn" accept=".csv" class="fld">
-    <button class="btn" onclick="churchImportUpload()">Preview import</button>
-    <div id="ciResult" style="display:none;margin-top:10px"></div>
-  </div>`,'Bulk Church Import','Admin');
-};
-let _pendingChurchCsv=null;
-function churchImportUpload(){
-  const f=document.getElementById('ciFileIn')?.files[0];if(!f){toast('Choose a CSV file first');return;}
-  const reader=new FileReader();
-  reader.onload=async()=>{try{
-    const csvData=reader.result;
-    const r=await api('/import/churches',{method:'POST',body:{csvData,dryRun:true}});
-    _pendingChurchCsv=csvData;_renderChurchImportPreview(r);
-  }catch(e){toast(e.message);}};
-  reader.readAsText(f);
-}
-function _renderChurchImportPreview(r){
-  const box=document.getElementById('ciResult');if(!box)return;
-  box.style.display='block';
-  const warnHtml=(r.warnings||[]).slice(0,5).map(w=>`<div style="color:#92400e;font-size:.8rem">Row ${w.row}: ${esc(w.message)}</div>`).join('');
-  const errHtml=(r.errors||[]).slice(0,5).map(e=>`<div style="color:#b91c1c;font-size:.8rem">Row ${e.row}: ${esc(e.message)}</div>`).join('');
-  box.innerHTML=`<div class="infobox"><b>Preview:</b> ${r.created} to create · ${r.skipped} to skip</div>${warnHtml}${errHtml}
-    ${_pendingChurchCsv?`<button class="btn" style="margin-top:8px" onclick="_confirmChurchImport()">Confirm &amp; import</button>`:''}`;
-}
-async function _confirmChurchImport(){
-  if(!_pendingChurchCsv){toast('No import pending');return;}
-  try{
-    const r=await api('/import/churches',{method:'POST',body:{csvData:_pendingChurchCsv,dryRun:false}});
-    _pendingChurchCsv=null;
-    const box=document.getElementById('ciResult');if(box){box.style.display='block';
-      box.innerHTML=`<div class="callbox">${r.created} created · ${r.skipped} skipped</div>`;}
-    toast('Church import complete ✓');
-  }catch(e){toast(e.message);}
-}
 
 /* ===== SETUP WIZARD ===== */
 const WIZARD_STEPS=[
@@ -2241,11 +2269,29 @@ function toggleContactCard(id){const b=document.getElementById('contactBody_'+id
 async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
   try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');RENDER.adminContacts();}catch(e){toast(e.message);}}
 
+async function _tryRestoreSession(){
+  const tok=localStorage.getItem('ycp_token');const actorJson=localStorage.getItem('ycp_actor');
+  if(!tok||!actorJson)return;
+  TOKEN=tok;
+  try{
+    ACTOR=JSON.parse(actorJson);
+    SETTINGS=await api('/settings');
+    CAMP_MODE=SETTINGS.campMode||'pre-camp';
+    document.getElementById('login').style.display='none';
+    document.getElementById('bar').style.display='flex';
+    document.getElementById('stage').style.display='block';
+    document.getElementById('tabs').style.display='flex';
+    updateModeUI();buildTabs();_prefetch();STACK=['home'];await gotoTab('home');
+  }catch(e){
+    TOKEN=null;ACTOR=null;
+    localStorage.removeItem('ycp_token');localStorage.removeItem('ycp_actor');
+  }
+}
 /* ===== BOOT ===== */
 document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('username').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show'))closeModal();});
-_initDemoLogin();
+_initDemoLogin();_tryRestoreSession();
 
 /* PWA: register the service worker (network-first HTML shell, network-only API,
    cache-first assets). On a new SW taking control after a deploy, reload once so

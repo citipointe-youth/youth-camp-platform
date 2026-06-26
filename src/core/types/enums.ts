@@ -4,7 +4,7 @@ export type Gender = (typeof GENDERS)[number];
 export const GRADES = [7, 8, 9, 10, 11, 12] as const;
 export type Grade = (typeof GRADES)[number];
 
-export const ZONE_NAMES = ['Yellow', 'Blue', 'Green', 'Red'] as const;
+export const ZONE_NAMES = ['Yellow', 'Blue', 'Black', 'Red'] as const;
 export type ZoneName = (typeof ZONE_NAMES)[number];
 
 // Combined roles — church is the shared per-church login (covers both pre-camp and at-camp)
