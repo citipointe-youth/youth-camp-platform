@@ -40,7 +40,7 @@ Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolve
    deploys still work but the git auto-deploy fails with *"Cannot find module './data/seed'"*.
 
 ### Status of the bigger roadmap
-- **Gate 0 passes** — `npm run typecheck` clean, **186 tests pass** (the once-pending compiler gate, R1, is closed). After the 2026-06-23 audit, test count will be higher (new tests added — see Audit fixes below).
+- **Gate 0 passes** — `npm run typecheck` clean, **219 tests pass**.
 - **Supabase repo layer is complete and wired** (`PERSISTENCE==='supabase'` branch in `container.ts`); migrations applied; all repos verified round-tripping in prod (R11 closed).
 - **Phase 1 (Person unification) is COMPLETE.** The unified `Person` entity/repo/service is the live path. `/registrants` and `/campers` are lifecycle-filtered DTO views over `PersonService` — no separate Registrant/Camper services exist. The Supabase layer targets the `people` table. `docs/STEP4-SWITCHOVER.md` has been archived.
 - **Fixed defects** (now compiler-confirmed): app-won't-start, accommodation availability (B1), reset/new-year (A3/A4), timezone (B3), CSV import perf + BOM (C1), remind scoping (C2), stateless auth + security headers + login rate-limit.
@@ -275,7 +275,7 @@ quick-login panel only appears on localhost/dev (gated by `_initDemoLogin()`).
 |----------|------|-------------|
 | `victory` | church | Victory Church · Yellow |
 | `gracepoint` | church | Grace Point Church · Blue |
-| `riverbend` | church | Riverbend Community · Green |
+| `riverbend` | church | Riverbend Community · Black |
 | `yellowzone` | zoneLeader | Yellow Zone |
 | `director` | director | — |
 | `admin` | admin | — |

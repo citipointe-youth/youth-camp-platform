@@ -55,7 +55,7 @@ This one file is the only real navigation cost in the repo. Map below (line numb
 ### Global state (line ~381)
 `TOKEN, ACTOR, SETTINGS, CAMP_MODE('pre-camp'), STACK, PREVIEW_MODE` — one declaration line.
 Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (~530),
-`SCHED_DAY` (~1519), `DEVO_DAY` (~1533), `_pendingChurchCsv` (~2100).
+`SCHED_DAY` (~1519), `DEVO_DAY` (~1533), `_pendingImportCsv` (~2060).
 
 ### Infrastructure / plumbing
 | Symbol | ~Line | Owns |
@@ -67,7 +67,7 @@ Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (
 | `toast / modal / closeModal` | 422–424 | Transient UI |
 | `dayLong / timeFmt / dtFmt` | 425 | Date formatting (UTC-anchored). `_addDays / _datesBetween` near `adminSettings` derive check-in days. |
 | `_initDemoLogin / quick` | 444 / 451 | Demo quick-login (localhost only) |
-| `doLogin / logout` | 452 / 467 | Auth. `doLogin` clears Cache + calls `_prefetch`; `logout` clears PREVIEW_MODE first. |
+| `doLogin / logout / _tryRestoreSession` | 452 / 467 / ~2244 | Auth. `doLogin` saves token+actor to localStorage; `logout` clears localStorage; `_tryRestoreSession` (called at boot) restores session across page reloads. |
 
 ### Navigation / shell
 | Symbol | ~Line | Owns |
@@ -76,7 +76,7 @@ Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (
 | `enterPreview / exitPreview` | 483 / 491 | Client-only at-camp preview (no backend) |
 | `TAB_OF` | 505 | Tab-id → highlighted-tab map. **Wrong tab highlighted = here.** |
 | `_showScreen / _paint / _navTo / go / gotoTab / back` | 513–554 | Router. `_navTo` is **stale-while-revalidate**: shows the previous render (no spinner) on revisits. |
-| `_renderWideNav` | 567 | Desktop sidebar items (**admin & director only**) |
+| `_renderWideNav` | 567 | Desktop sidebar — **admin & director only**. Mode-conditional: at-camp shows Check-in/Search/Notes/Notices; pre-camp shows My Youth. Church Import removed. Data/Records merged into "Data, Reset & Exports". |
 | `buildTabs` | 605 | Bottom-nav tabs per role × mode. **Missing/extra tab = here.** |
 
 ### Home (dispatch at `RENDER.home`, line 629)
@@ -112,7 +112,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `RENDER.search / runSearch / reveal` | 1193 / 1198 / 1215 | Contact search + reveal |
 | `RENDER.notifs / deleteNotice` | 1218 / 1230 | Notices |
 | `RENDER.compose / sendNotif` | 1302 / 1317 | Send notice (zoneLeader/director/admin) |
-| `RENDER.firstday` | 1328 | Day-1 arrivals (sign-in) |
+| `RENDER.firstday` | 1328 | Day-1 arrivals (sign-in). Fetches **both** `/registrants` (lifecycle=registered, kind≠leader) and `/campers` (kind=student) in parallel; deduplicates by id so pre-arrival students appear in "not signed in". |
 | `RENDER.myyouth` | 1405 | Leader's youth roster |
 | `openCamper` | 1449 | Camper detail |
 | `signOutPrompt/Confirm`, `signInPrompt/Confirm` | 1485 / 1509 | **Attendance** (writes atCamp/lifecycle) |
@@ -131,14 +131,13 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | ⮑ `aRoleChange` 1698, `addAcct` 1702, `editLeaderName/saveLeaderName` 1708/1715, `editChurchName/saveChurchName` 1719/1726, `editUsername/saveUsername` 1728/1733, `changePassword/savePassword` 1735/1741, `delAcct/delChurch` 1743/1745, `addChurch` 1747 | — |
 | `RENDER.adminAccom` (+ saveBlock/delBlock/addBlock) | 1753 / 1773–1775 |
 | `RENDER.adminFaq / adminFaqEdit` | 1778 / 1791 |
-| `RENDER.adminRecords` | 1805 |
-| `RENDER.adminCloseOut` (+ `doNewYear`) | 1843 / 1867 |
+| `RENDER.adminRecords` | ~1808 | **Redirects to `adminData`** — all export/close-out content merged there. |
+| `RENDER.adminCloseOut` (+ `doNewYear`) | ~1830 / ~1855 | Back button → `adminData`. |
 | `RENDER.adminSettings / saveSettings` | 1891 / 1916 |
 | ⮑ **Timezone hardcoded** to Australia/Brisbane (field removed); check-in days **auto-derived** from start/end via `_datesBetween`; `renderCheckinDaysPreview`/`onStartDateChange` (start pre-fills end +3 days). | — |
-| `RENDER.adminData` (+ `adminReset` 2038, `adminClear` 2053) | 1926 |
-| `RENDER.import / adminUpload / _confirmImport` | 1947 / ~2030 / 2078 |
-| `RENDER.adminChurchImport` (+ `_renderChurchImportPreview`/`_confirmChurchImport`) | 2091 / 2101 / 2119 |
-| `RENDER.adminWizard` | 2138 |
+| `RENDER.adminData` (+ `adminReset`, `adminClear`) | ~1926 | **Merged from Records & Export**: shows compliance export card, close-out card, CSV upload, notifications clear (at-camp), rollover, factory reset. Title = "Data, Reset & Exports". |
+| `RENDER.import / adminUpload / _renderImportPreview / _confirmImport / _createPhantomChurches` | ~1947 / ~2030 / ~2074 / ~2090 / ~2095 | Phantom churches now get a per-church form (zone + username + password) with a "Create N churches" pre-step that re-runs dry-run after creation. |
+| `RENDER.adminWizard` | ~2130 |
 | `RENDER.adminDevos / saveDevo` | 2153 / 2168 |
 | `RENDER.adminSchedEdit` — **per-day table** (`_schedRow` 2172, `addSchedRow` 2193, `saveSchedDay` 2197 = source-of-truth replace). No location, no `isCheckInPoint`. | 2176 |
 | `RENDER.adminContacts / saveContacts` (+ `toggleContactCard` 2235; header shows `n/4 Contacts`) | 2210 / 2236 |
@@ -158,9 +157,12 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `firstAid` | Home · Search · Schedule (**same in both modes**) | Home · Search · Schedule |
 
 **Desktop wide sidebar** (`_renderWideNav`, line ~567) — only **admin** and **director** get items
-(`zoneLeader` gets wide layout but empty sidebar):
-- **admin:** Home, Check-in, Search, Notes, Accounts, Settings, Accommodation, Schedule, Data & Reset, Church Import, Records & Export, Setup Wizard
-- **director:** Home, Check-in, Search, Notes, Import Students, Records & Export
+(`zoneLeader` gets wide layout but empty sidebar). Items are **mode-conditional**:
+- **admin at-camp:** Home, Check-in, Search, Notes, Notices, Accounts, Settings, Accommodation, Schedule, Data & Reset & Exports, Setup Wizard
+- **admin pre-camp:** Home, My Youth, Accounts, Settings, Accommodation, Schedule, Data, Reset & Exports, Setup Wizard
+- **director at-camp:** Home, Check-in, Search, Notes, Notices, Import Students, Records & Exports
+- **director pre-camp:** Home, My Youth, Import Students, Records & Exports
+- Bottom tabs hidden (`#tabs{display:none}`) at ≥980px; sidebar is the sole nav.
 
 (Full capability/scope matrix is in CLAUDE.md → "Roles". firstAid = read-only, attendance-only,
 no notes/admin/pre-camp data.)
