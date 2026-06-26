@@ -1720,7 +1720,7 @@ async function addAcct(){const role=sel('aR');const nm=val('aName').trim();const
   const body={firstName,lastName,username:val('aE'),password:val('aP'),role};
   if(role==='zoneLeader')body.zone=sel('aZ');
   if(!firstName||!val('aE')){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
-  try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');await _rAccts();}catch(e){toast(e.message);}}
 const _findUser=id=>(window._allUsers||[]).find(u=>u.id===id)||{};
 const _findChurch=id=>(window._allChurches||[]).find(c=>c.id===id)||{};
 function editLeaderName(id){const u=_findUser(id);
@@ -1735,7 +1735,7 @@ async function saveLeaderName(id,role){const nm=val('enName').trim();const sp=nm
   const body={firstName,lastName,status:sel('enS')};
   if(role==='zoneLeader')body.zone=sel('enZ');
   if(!firstName){toast('Enter a name');return;}
-  try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved ✓');await _rAccts();}catch(e){toast(e.message);}}
 function editChurchName(id){const c=_findChurch(id);
   modal(`<h3>Rename church</h3>
     <label>Church name</label><input class="fld" id="ecnName" value="${esc(c.name||'')}">
@@ -1744,14 +1744,14 @@ function editChurchName(id){const c=_findChurch(id);
     <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveChurchName(id){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated ✓');await _rAccts();}catch(e){toast(e.message);}}
 function editUsername(id){const u=_findUser(id);
   modal(`<h3>Change username</h3>
     <label>Username</label><input class="fld" id="euU" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
     <button class="btn" style="margin-top:10px" onclick="saveUsername('${id}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveUsername(id){const username=val('euU');if(username.length<2){toast('Username too short');return;}
-  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated ✓');await _rAccts();}catch(e){toast(e.message);}}
 function changePassword(id){const u=_findUser(id);
   modal(`<h3>Change password</h3>
     <div class="sub" style="margin-bottom:8px">${esc(u.firstName?u.firstName+' '+u.lastName:u.username||'Account')}</div>
@@ -1761,13 +1761,20 @@ function changePassword(id){const u=_findUser(id);
 async function savePassword(id){const password=document.getElementById('cpP').value;if((password||'').length<6){toast('Password 6+ chars');return;}
   try{await api('/accounts/users/password',{method:'POST',body:{userId:id,password}});closeModal();toast('Password updated ✓');}catch(e){toast(e.message);}}
 async function delAcct(id){if(!confirm("Delete this account?"))return;
-  try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");await _rAccts();}catch(e){toast(e.message);}}
 async function delChurch(id){if(!confirm("Delete this church and its login account?"))return;
-  try{await api("/accounts/churches/"+id,{method:"DELETE"});toast("Church deleted");RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api("/accounts/churches/"+id,{method:"DELETE"});toast("Church deleted");await _rAccts();}catch(e){toast(e.message);}}
 async function addChurch(){if(!val('ncName')||!val('ncEmail')){toast('Enter church name + login username');return;}if(val('ncPass').length<6){toast('Password 6+ chars');return;}
   const name=val('ncName');
   const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:val('ncEmail'),accountPassword:val('ncPass')};
-  try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');RENDER.adminAccounts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');await _rAccts();}catch(e){toast(e.message);}}
+
+// Scroll-preserving re-loaders — capture scrollTop before re-render, restore after.
+async function _rAccts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rAccts();if(el)el.scrollTop=y;}
+async function _rFaq(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rFaq();if(el)el.scrollTop=y;}
+async function _rFaqEdit(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rFaqEdit();if(el)el.scrollTop=y;}
+async function _rSched(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rSched();if(el)el.scrollTop=y;}
+async function _rContacts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rContacts();if(el)el.scrollTop=y;}
 
 /* ===== ADMIN ACCOMMODATION ===== */
 RENDER.adminAccom=async function(){
@@ -1826,8 +1833,8 @@ RENDER.adminFaq=async function(){
     `<div class="card"><div class="lbl" style="margin-top:0">Add FAQ</div><input class="fld" id="nfq" placeholder="Question"><textarea id="nfa" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqPre()">Add FAQ</button></div>`,'FAQ','Edit answers');
 };
 async function saveFaqPre(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_'+id),answer:val('fa_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
-async function delFaqPre(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});RENDER.adminFaq();}catch(e){toast(e.message);}}
-async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('nfq'),answer:val('nfa'),order:99}});toast('Added ✓');RENDER.adminFaq();}catch(e){toast(e.message);}}
+async function delFaqPre(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});await _rFaq();}catch(e){toast(e.message);}}
+async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('nfq'),answer:val('nfa'),order:99}});toast('Added ✓');await _rFaq();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN FAQ (at-camp) ===== */
 RENDER.adminFaqEdit=async function(){
@@ -1839,8 +1846,8 @@ RENDER.adminFaqEdit=async function(){
     `<div class="card"><div class="h3" style="margin-top:0">Add FAQ</div><input class="fld" id="fqNewQ" placeholder="Question"><textarea id="fqNewA" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqAt()">Add FAQ</button></div>`,'FAQ','Edit all answers');
 };
 async function saveFaqAt(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_q_'+id),answer:val('fq_a_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
-async function delFaqAt(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});RENDER.adminFaqEdit();}catch(e){toast(e.message);}}
-async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added ✓');RENDER.adminFaqEdit();}catch(e){toast(e.message);}}
+async function delFaqAt(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});await _rFaqEdit();}catch(e){toast(e.message);}}
+async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added ✓');await _rFaqEdit();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN SETTINGS ===== */
 /* ===== RECORDS & EXPORT (redirects to adminData) ===== */
@@ -2235,8 +2242,8 @@ async function saveSchedDay(d){
     const existing=await api('/schedule?day='+d,{noCache:true}).catch(()=>[]);
     for(const it of (existing||[])){await api('/schedule/'+it.id,{method:'DELETE'});}
     for(const e of entries){await api('/schedule',{method:'POST',body:{day:d,startTime:e.startTime,title:e.title,type:'activity'}});}
-    toast('Saved '+dayLong(d)+' ✓');RENDER.adminSchedEdit();
-  }catch(e){toast(e.message);RENDER.adminSchedEdit();}
+    toast('Saved '+dayLong(d)+' ✓');await _rSched();
+  }catch(e){toast(e.message);await _rSched();}
 }
 
 /* ===== ADMIN CONTACTS ===== */
@@ -2267,7 +2274,7 @@ RENDER.adminContacts=async function(){
 };
 function toggleContactCard(id){const b=document.getElementById('contactBody_'+id),ch=document.getElementById('contactChev_'+id);if(!b)return;const open=b.style.display!=='none';b.style.display=open?'none':'block';if(ch)ch.style.transform=open?'':'rotate(90deg)';}
 async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');RENDER.adminContacts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');await _rContacts();}catch(e){toast(e.message);}}
 
 async function _tryRestoreSession(){
   const tok=localStorage.getItem('ycp_token');const actorJson=localStorage.getItem('ycp_actor');
