@@ -12,13 +12,10 @@ import { withCheckIn, withSignEvent } from './person-lifecycle';
 /**
  * PersonService — the unified registrant + camper service (design D2), operating
  * over the single `people` store. It exposes a pre-camp ("registrant") view and an
- * at-camp ("camper") view, both filtered by lifecycle, so the existing /registrants
- * and /campers routes can be repointed here in Step 4 without changing their shapes.
- *
- * Step 3 introduces this additively alongside the legacy RegistrantService /
- * CamperService. The route switchover + legacy removal happen in Step 4 (compiler in
- * the loop). RBAC reuses the canonical helpers in access-control.ts; person scoping
- * reads churchId/zone (the only fields the camper/registrant access rules use).
+ * at-camp ("camper") view, both filtered by lifecycle. The /registrants and /campers
+ * routes are lifecycle-filtered DTO views over this service (Phase 1 complete).
+ * RBAC reuses the canonical helpers in access-control.ts; person scoping reads
+ * churchId/zone (the only fields the camper/registrant access rules use).
  */
 
 export interface PersonProfile extends Person {

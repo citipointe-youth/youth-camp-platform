@@ -42,7 +42,7 @@ Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolve
 ### Status of the bigger roadmap
 - **Gate 0 passes** — `npm run typecheck` clean, **186 tests pass** (the once-pending compiler gate, R1, is closed). After the 2026-06-23 audit, test count will be higher (new tests added — see Audit fixes below).
 - **Supabase repo layer is complete and wired** (`PERSISTENCE==='supabase'` branch in `container.ts`); migrations applied; all repos verified round-tripping in prod (R11 closed).
-- **Phase 1 (Person unification) is still HALF-DONE BY DESIGN.** The unified `Person` entity/repo/service exist, are tested, AND the Supabase layer targets the `people` table — but the live read/write paths still run on the separate `Registrant`/`Camper` services. The "Step 4" switchover (`docs/STEP4-SWITCHOVER.md`) is still pending (R2). Don't assume `Person` is the live path.
+- **Phase 1 (Person unification) is COMPLETE.** The unified `Person` entity/repo/service is the live path. `/registrants` and `/campers` are lifecycle-filtered DTO views over `PersonService` — no separate Registrant/Camper services exist. The Supabase layer targets the `people` table. `docs/STEP4-SWITCHOVER.md` has been archived.
 - **Fixed defects** (now compiler-confirmed): app-won't-start, accommodation availability (B1), reset/new-year (A3/A4), timezone (B3), CSV import perf + BOM (C1), remind scoping (C2), stateless auth + security headers + login rate-limit.
 
 ### Audit fixes applied (2026-06-23)
