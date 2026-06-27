@@ -15,6 +15,8 @@ export interface CampSettings {
   // At-camp
   checkInDays: string[];
   accommodationLocked: boolean;
+  tentPrice: number;
+  classroomPrice: number;
   // Mode switch
   campMode: CampMode;
   // Temp passwords from the most recent new-year rollover, cleared after export.
@@ -29,7 +31,7 @@ export interface CampDefaults {
   id: 'defaults';
   churches: unknown[];
   users: unknown[];
-  accommodationBlocks: unknown[];
+  classrooms: unknown[];
   faqs: unknown[];
   schedule: unknown[];
   devotionals: unknown[];
