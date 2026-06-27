@@ -1748,7 +1748,7 @@ RENDER.adminAccounts=async function(){
       <div class="warnbox">⚠ Church name must match the registration export exactly — registrations are matched by name.</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside" style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('ncZone')}</div></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="ncEmail" placeholder="e.g. northside" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="ncUser" placeholder="e.g. northside (letters, numbers, . _ -)" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Password</label><input class="fld" id="ncPass" placeholder="min 6 chars" style="flex:1"></div>
       <button class="btn" onclick="addChurch()" style="margin-top:10px;width:100%">Create church + account</button></div>`,'Accounts &amp; churches','Admin');
 };
@@ -1805,9 +1805,11 @@ async function delAcct(id){if(!confirm("Delete this account?"))return;
   try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");await _rAccts();}catch(e){toast(e.message);}}
 async function delChurch(id){if(!confirm("Delete this church and its login account?"))return;
   try{await api("/accounts/churches/"+id,{method:"DELETE"});toast("Church deleted");await _rAccts();}catch(e){toast(e.message);}}
-async function addChurch(){if(!val('ncName')||!val('ncEmail')){toast('Enter church name + login username');return;}if(val('ncPass').length<6){toast('Password 6+ chars');return;}
+async function addChurch(){if(!val('ncName')||!val('ncUser')){toast('Enter church name + login username');return;}if(val('ncPass').length<6){toast('Password 6+ chars');return;}
+  const username=val('ncUser');
+  if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username: letters, numbers, . _ - only (min 2 chars)');return;}
   const name=val('ncName');
-  const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:val('ncEmail'),accountPassword:val('ncPass')};
+  const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:val('ncPass')};
   try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');await _rAccts();}catch(e){toast(e.message);}}
 
 // Scroll-preserving re-loaders — capture scrollTop before re-render, restore after.
@@ -2158,7 +2160,7 @@ function _renderImportPreview(r){
     const btnLabel=`Create ${phantoms.length} church${phantoms.length===1?'':'es'} →`;
     phantomHtml=`<div class="warnbox">⚠ ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the CSV — set zone, username &amp; password to create them first:</div>
       ${rows}
-      <button class="btn" style="margin-top:6px" onclick="_createPhantomChurches(${JSON.stringify(phantoms)})">${btnLabel}</button>
+      <button class="btn" style="margin-top:6px" onclick="_createPhantomChurches(${esc(JSON.stringify(phantoms))})">${btnLabel}</button>
       <button class="btn ghost" style="margin-top:6px;margin-left:6px" onclick="_clearImport()">Cancel</button>`;
   }
   const confirmHtml=_pendingImportCsv&&!phantoms.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:'';
@@ -2176,6 +2178,7 @@ async function _createPhantomChurches(names){
     const username=(document.getElementById('pzUser_'+i)?.value||'').trim()||autoUser(name);
     const pass=(document.getElementById('pzPass_'+i)?.value||'').trim();
     if(pass.length<6){toast('Password for "'+name+'" must be 6+ chars');if(btn){btn.disabled=false;btn.textContent=origLabel;}return;}
+    if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username for "'+name+'" is invalid — use letters, numbers, . _ - only (min 2 chars)');if(btn){btn.disabled=false;btn.textContent=origLabel;}return;}
     try{await api('/accounts/churches',{method:'POST',body:{churchName:name,zone,accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:pass}});}
     catch(e){toast('Failed to create "'+name+'": '+(e.message||'error'));if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
   }
