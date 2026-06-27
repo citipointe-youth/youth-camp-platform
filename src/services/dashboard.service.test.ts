@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { makeDashboardService } from './dashboard.service';
 import {
   InMemoryPersonRepository,
-  InMemoryAccommodationRepository,
   InMemoryNotificationRepository,
   InMemoryChurchRepository,
 } from '../repositories/in-memory';
@@ -60,17 +59,16 @@ function settings(): CampSettings {
   return {
     id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: DATE, endDate: '2026-07-05',
     timezone: 'UTC', checkInDays: [DATE],
-    accommodationLocked: false, campMode: 'at-camp', createdAt: now, updatedAt: now,
+    accommodationLocked: false, tentPrice: 80, classroomPrice: 120, campMode: 'at-camp', createdAt: now, updatedAt: now,
   };
 }
 
 async function build() {
   const personRepo = new InMemoryPersonRepository();
-  const accommodationRepo = new InMemoryAccommodationRepository();
   const notifRepo = new InMemoryNotificationRepository();
   const churchRepo = new InMemoryChurchRepository();
-  for (const r of [personRepo, accommodationRepo, notifRepo, churchRepo]) await r.init();
-  const svc = makeDashboardService(personRepo, accommodationRepo, notifRepo, churchRepo);
+  for (const r of [personRepo, notifRepo, churchRepo]) await r.init();
+  const svc = makeDashboardService(personRepo, notifRepo, churchRepo);
   return { svc, personRepo };
 }
 

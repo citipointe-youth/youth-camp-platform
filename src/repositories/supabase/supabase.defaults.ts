@@ -8,7 +8,7 @@ function toDefaults(r: Record<string, unknown>): CampDefaults {
     id: 'defaults',
     churches: (snap['churches'] as unknown[]) ?? [],
     users: (snap['users'] as unknown[]) ?? [],
-    accommodationBlocks: (snap['accommodationBlocks'] as unknown[]) ?? [],
+    classrooms: (snap['classrooms'] as unknown[]) ?? [],
     faqs: (snap['faqs'] as unknown[]) ?? [],
     schedule: (snap['schedule'] as unknown[]) ?? [],
     devotionals: (snap['devotionals'] as unknown[]) ?? [],
@@ -32,7 +32,7 @@ export class SupabaseDefaultsRepository implements ISnapshotRepository {
     const snapJson = JSON.stringify({
       churches: defaults.churches,
       users: defaults.users,
-      accommodationBlocks: defaults.accommodationBlocks,
+      classrooms: defaults.classrooms,
       faqs: defaults.faqs,
       schedule: defaults.schedule,
       devotionals: defaults.devotionals,

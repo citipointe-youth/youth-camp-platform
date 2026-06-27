@@ -129,7 +129,6 @@ export function makeAccountService(
         name: data.churchName,
         zone: data.zone,
         contactPhone: data.contactPhone,
-        reservations: [],
         contacts: {
           male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
           female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },

@@ -4,7 +4,8 @@ import {
   InMemoryUserRepository,
   InMemoryChurchRepository,
   InMemoryPersonRepository,
-  InMemoryAccommodationRepository,
+  InMemoryClassroomRepository,
+  InMemoryAllocationRepository,
   InMemoryFaqRepository,
   InMemoryScheduleRepository,
   InMemoryNotificationRepository,
@@ -16,7 +17,7 @@ import {
 import type { User, Actor } from '../core/entities/user';
 import type { Church } from '../core/entities/church';
 import type { Person } from '../core/entities/person';
-import type { AccommodationBlock } from '../core/entities/accommodation';
+import type { Classroom } from '../core/entities/accommodation';
 import type { FaqItem } from '../core/entities/content';
 import type { ScheduleItem } from '../core/entities/schedule';
 import type { Notification } from '../core/entities/notification';
@@ -60,7 +61,6 @@ function church(over: Partial<Church>): Church {
     id: 'c',
     name: 'Victory',
     zone: 'Yellow',
-    reservations: [],
     contacts: {
       male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
       female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -95,14 +95,11 @@ function person(over: Partial<Person>): Person {
   };
 }
 
-function block(over: Partial<AccommodationBlock>): AccommodationBlock {
+function room(over: Partial<Classroom>): Classroom {
   return {
     id: 'b',
-    kind: 'tent',
-    name: 'Tent A',
-    price: 0,
+    name: 'Room A',
     capacity: 0,
-    baseTaken: 0,
     createdAt: NOW,
     updatedAt: NOW,
     ...over,
@@ -160,6 +157,8 @@ function settings(over: Partial<CampSettings> = {}): CampSettings {
     timezone: 'Australia/Brisbane',
     checkInDays: [],
     accommodationLocked: false,
+    tentPrice: 80,
+    classroomPrice: 120,
     campMode: 'pre-camp',
     // Default to exported so tests pass the wipe guard without needing force opts.
     lastExportedAt: NOW,
@@ -174,7 +173,8 @@ interface Repos {
   userRepo: InMemoryUserRepository;
   churchRepo: InMemoryChurchRepository;
   personRepo: InMemoryPersonRepository;
-  accommodationRepo: InMemoryAccommodationRepository;
+  classroomRepo: InMemoryClassroomRepository;
+  allocationRepo: InMemoryAllocationRepository;
   faqRepo: InMemoryFaqRepository;
   scheduleRepo: InMemoryScheduleRepository;
   notifRepo: InMemoryNotificationRepository;
@@ -189,7 +189,8 @@ async function makeRepos(): Promise<Repos> {
     userRepo: new InMemoryUserRepository(),
     churchRepo: new InMemoryChurchRepository(),
     personRepo: new InMemoryPersonRepository(),
-    accommodationRepo: new InMemoryAccommodationRepository(),
+    classroomRepo: new InMemoryClassroomRepository(),
+    allocationRepo: new InMemoryAllocationRepository(),
     faqRepo: new InMemoryFaqRepository(),
     scheduleRepo: new InMemoryScheduleRepository(),
     notifRepo: new InMemoryNotificationRepository(),
@@ -202,7 +203,8 @@ async function makeRepos(): Promise<Repos> {
     repos.userRepo.init(),
     repos.churchRepo.init(),
     repos.personRepo.init(),
-    repos.accommodationRepo.init(),
+    repos.classroomRepo.init(),
+    repos.allocationRepo.init(),
     repos.faqRepo.init(),
     repos.scheduleRepo.init(),
     repos.notifRepo.init(),
@@ -219,7 +221,8 @@ function build(r: Repos) {
     r.userRepo,
     r.churchRepo,
     r.personRepo,
-    r.accommodationRepo,
+    r.classroomRepo,
+    r.allocationRepo,
     r.faqRepo,
     r.scheduleRepo,
     r.notifRepo,
@@ -239,7 +242,7 @@ async function seedEverything(r: Repos): Promise<void> {
     r.churchRepo.save(church({ id: 'c2', name: 'Grace' })),
     r.personRepo.save(person({ id: 'p1' })),
     r.personRepo.save(person({ id: 'p2', lifecycle: 'arrived', atCamp: true })),
-    r.accommodationRepo.save(block({ id: 'b1' })),
+    r.classroomRepo.save(room({ id: 'b1' })),
     r.faqRepo.save(faq({ id: 'f1' })),
     r.scheduleRepo.save(scheduleItem({ id: 's1' })),
     r.notifRepo.save(notification({ id: 'n1' })),
@@ -276,7 +279,7 @@ describe('AdminService.reset', () => {
 
     expect(await repos.personRepo.findAll()).toEqual([]);
     expect(await repos.churchRepo.findAll()).toEqual([]);
-    expect(await repos.accommodationRepo.findAll()).toEqual([]);
+    expect(await repos.classroomRepo.findAll()).toEqual([]);
     expect(await repos.faqRepo.findAll()).toEqual([]);
     expect(await repos.scheduleRepo.findAll()).toEqual([]);
     expect(await repos.notifRepo.findAll()).toEqual([]);
@@ -350,7 +353,7 @@ describe('AdminService.saveDefaults', () => {
     expect(defaults).not.toBeNull();
     expect(defaults!.id).toBe('defaults');
     expect((defaults!.churches as Church[]).map((c) => c.id).sort()).toEqual(['c1', 'c2']);
-    expect((defaults!.accommodationBlocks as AccommodationBlock[]).map((b) => b.id)).toEqual(['b1']);
+    expect((defaults!.classrooms as Classroom[]).map((b) => b.id)).toEqual(['b1']);
     expect((defaults!.faqs as FaqItem[]).map((f) => f.id)).toEqual(['f1']);
     expect((defaults!.schedule as ScheduleItem[]).map((s) => s.id)).toEqual(['s1']);
 
@@ -376,7 +379,7 @@ describe('AdminService.saveDefaults', () => {
     const defaults = await repos.snapshotRepo.getDefaults();
     // CampDefaults captures the scaffold (incl. devotionals) but no people/transient data.
     expect(Object.keys(defaults!).sort()).toEqual(
-      ['accommodationBlocks', 'churches', 'createdAt', 'devotionals', 'faqs', 'id', 'schedule', 'users'].sort(),
+      ['classrooms', 'churches', 'createdAt', 'devotionals', 'faqs', 'id', 'schedule', 'users'].sort(),
     );
   });
 });
@@ -422,7 +425,7 @@ describe('AdminService.newYear', () => {
       id: 'defaults',
       churches: [church({ id: 'baseC' })],
       users: [{ ...user({ id: 'baseChurchUser', role: 'church' }), passwordHash: undefined } as unknown as Record<string, unknown>],
-      accommodationBlocks: [block({ id: 'baseB' })],
+      classrooms: [room({ id: 'baseB' })],
       faqs: [faq({ id: 'baseF' })],
       schedule: [scheduleItem({ id: 'baseS' })],
       devotionals: [devotional({ id: 'baseD' })],
@@ -459,7 +462,7 @@ describe('AdminService.newYear', () => {
     await svc.newYear(actor('admin'), 2027);
     // Live seed (c1/c2, b1, f1, s1, d1) is replaced by the baseline (baseC/baseB/...).
     expect((await repos.churchRepo.findAll()).map((c) => c.id)).toEqual(['baseC']);
-    expect((await repos.accommodationRepo.findAll()).map((b) => b.id)).toEqual(['baseB']);
+    expect((await repos.classroomRepo.findAll()).map((b) => b.id)).toEqual(['baseB']);
     expect((await repos.faqRepo.findAll()).map((f) => f.id)).toEqual(['baseF']);
     expect((await repos.scheduleRepo.findAll()).map((s) => s.id)).toEqual(['baseS']);
     expect((await repos.devotionalRepo.findAll()).map((d) => d.id)).toEqual(['baseD']);

@@ -109,7 +109,6 @@ export function makeImportService(
           id,
           name,
           zone: 'Yellow',
-          reservations: [],
           contacts: {
             male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
             female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
