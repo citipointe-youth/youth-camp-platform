@@ -1,38 +1,29 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { makeAccommodationService } from './accommodation.service';
 import {
-  InMemoryAccommodationRepository,
+  InMemoryClassroomRepository,
+  InMemoryAllocationRepository,
   InMemoryChurchRepository,
   InMemorySettingsRepository,
   InMemoryPersonRepository,
 } from '../repositories/in-memory';
-import type { AccommodationBlock } from '../core/entities/accommodation';
-import type { Church, AccommodationReservation } from '../core/entities/church';
+import type { Classroom } from '../core/entities/accommodation';
+import type { Church } from '../core/entities/church';
 import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
 import type { Person } from '../core/entities/person';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
 
 // ---------------------------------------------------------------------------
-// Builders — mirror the seed/actor pattern used in registrant.service.test.ts
+// Builders
 // ---------------------------------------------------------------------------
 function actor(role: Actor['role'], over: Partial<Actor> = {}): Actor {
   return { id: 'u', role, churchId: null, churchName: null, zone: null, displayName: role, ...over };
 }
 
-function block(over: Partial<AccommodationBlock>): AccommodationBlock {
+function room(over: Partial<Classroom>): Classroom {
   const now = new Date().toISOString();
-  return {
-    id: 'b',
-    kind: 'tent',
-    name: 'Tent A',
-    price: 100,
-    capacity: 10,
-    baseTaken: 0,
-    createdAt: now,
-    updatedAt: now,
-    ...over,
-  };
+  return { id: 'rm', name: 'Room 1', capacity: 6, createdAt: now, updatedAt: now, ...over };
 }
 
 function church(over: Partial<Church>): Church {
@@ -41,7 +32,6 @@ function church(over: Partial<Church>): Church {
     id: 'c1',
     name: 'Victory',
     zone: 'Yellow',
-    reservations: [],
     contacts: {
       male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
       female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -65,6 +55,7 @@ function reg(over: Partial<Person> & { status?: 'registered' | 'cancelled' }): P
     churchId: 'c1',
     churchName: 'Victory',
     zone: 'Yellow',
+    accommodationKind: 'classroom',
     lifecycle: status === 'cancelled' ? 'cancelled' : 'registered',
     atCamp: false,
     medicalConditions: [],
@@ -89,6 +80,8 @@ function settings(over: Partial<CampSettings>): CampSettings {
     timezone: 'Australia/Brisbane',
     checkInDays: [],
     accommodationLocked: false,
+    tentPrice: 80,
+    classroomPrice: 120,
     campMode: 'pre-camp',
     createdAt: now,
     updatedAt: now,
@@ -97,422 +90,195 @@ function settings(over: Partial<CampSettings>): CampSettings {
 }
 
 async function build(opts: {
-  blocks?: AccommodationBlock[];
+  rooms?: Classroom[];
   churches?: Church[];
   settings?: CampSettings | null;
   registrants?: Person[];
-} = {}): Promise<{
-  svc: ReturnType<typeof makeAccommodationService>;
-  blockRepo: InMemoryAccommodationRepository;
-  churchRepo: InMemoryChurchRepository;
-  settingsRepo: InMemorySettingsRepository;
-  personRepo: InMemoryPersonRepository;
-}> {
-  const blockRepo = new InMemoryAccommodationRepository();
+} = {}) {
+  const classroomRepo = new InMemoryClassroomRepository();
+  const allocationRepo = new InMemoryAllocationRepository();
   const churchRepo = new InMemoryChurchRepository();
   const settingsRepo = new InMemorySettingsRepository();
   const personRepo = new InMemoryPersonRepository();
-  await blockRepo.init();
-  await churchRepo.init();
-  await settingsRepo.init();
-  await personRepo.init();
-  for (const b of opts.blocks ?? []) await blockRepo.save(b);
+  await Promise.all([classroomRepo.init(), allocationRepo.init(), churchRepo.init(), settingsRepo.init(), personRepo.init()]);
+  for (const r of opts.rooms ?? []) await classroomRepo.save(r);
   for (const c of opts.churches ?? []) await churchRepo.save(c);
-  for (const r of opts.registrants ?? []) await personRepo.save(r);
-  if (opts.settings) await settingsRepo.saveSingleton(opts.settings);
-  const svc = makeAccommodationService(blockRepo, churchRepo, settingsRepo, personRepo);
-  return { svc, blockRepo, churchRepo, settingsRepo, personRepo };
+  for (const p of opts.registrants ?? []) await personRepo.save(p);
+  await settingsRepo.saveSingleton(opts.settings ?? settings({}));
+  const svc = makeAccommodationService(classroomRepo, allocationRepo, churchRepo, settingsRepo, personRepo);
+  return { svc, classroomRepo, allocationRepo, churchRepo, settingsRepo, personRepo };
 }
 
-// ---------------------------------------------------------------------------
-// listBlocks / getBlock — available math
-// ---------------------------------------------------------------------------
-describe('AccommodationService.listBlocks — available math (B1 FIX)', () => {
-  it('subtracts assigned (non-cancelled) registrant occupants from availability', async () => {
-    // B1 FIX (was CHARACTERISATION of the bug): getLiveBlocks now routes through
-    // the shared occupancy module, so assigned registrants reduce availability.
-    // Church-level reservations remain a separate concept and are NOT subtracted
-    // (documented decision — see accommodation-occupancy.ts / CHANGELOG KNOWN RISKS).
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', kind: 'tent', name: 'Tent A', capacity: 10, baseTaken: 3 })],
-      registrants: [
-        reg({ id: 'r1', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
-        reg({ id: 'r2', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
-      ],
-      churches: [
-        church({
-          id: 'c1',
-          reservations: [{ kind: 'tent', spots: 4, label: 'Tent A', confirmed: true }],
-        }),
-      ],
-    });
-    const list = await svc.listBlocks(actor('admin'));
-    expect(list).toHaveLength(1);
-    expect(list[0]!.liveTaken).toBe(5); // baseTaken 3 + r1 + r2 (reservations NOT counted)
-    expect(list[0]!.available).toBe(5); // 10 - 5
-  });
-
-  it('ignores cancelled registrants and non-matching assignments', async () => {
-    // B1 FIX: matching is by kind + label === block.name; cancelled excluded.
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', kind: 'tent', name: 'Tent A', capacity: 10, baseTaken: 0 })],
-      registrants: [
-        reg({ id: 'r1', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
-        reg({ id: 'r2', accommodationKind: 'tent', accommodationLabel: 'Tent A', status: 'cancelled' }),
-        reg({ id: 'r3', accommodationKind: 'tent', accommodationLabel: 'No Such' }),
-        reg({ id: 'r4', accommodationKind: null, accommodationLabel: null }),
-      ],
-    });
-    const list = await svc.listBlocks(actor('director'));
-    expect(list[0]!.liveTaken).toBe(1); // only r1 matches and is active
-    expect(list[0]!.available).toBe(9);
-  });
-
-  it('with no registrants, liveTaken equals baseTaken', async () => {
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', kind: 'tent', name: 'Tent A', capacity: 10, baseTaken: 0 })],
-    });
-    const list = await svc.listBlocks(actor('director'));
-    expect(list[0]!.liveTaken).toBe(0);
-    expect(list[0]!.available).toBe(10);
-  });
-
-  it('available can go negative when baseTaken exceeds capacity (no clamping)', async () => {
-    // CHARACTERISATION: current behaviour — no Math.max clamp on available.
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', capacity: 5, baseTaken: 8 })],
-    });
-    const list = await svc.listBlocks(actor('admin'));
-    expect(list[0]!.available).toBe(-3);
-  });
-});
-
-describe('AccommodationService.listBlocks — RBAC', () => {
-  it.each(['church', 'zoneLeader', 'director', 'admin'] as const)(
-    'role %s can list (has registrant:read)',
-    async (role) => {
-      const { svc } = await build({ blocks: [block({ id: 'b1' })] });
-      const list = await svc.listBlocks(actor(role, { churchId: 'c1', zone: 'Yellow' }));
-      expect(list).toHaveLength(1);
-    },
-  );
-});
-
-describe('AccommodationService.getBlock', () => {
-  it('with no occupants, liveTaken == baseTaken (B1 fix consistent here)', async () => {
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', capacity: 12, baseTaken: 2 })],
-    });
-    const got = await svc.getBlock(actor('church', { churchId: 'c1' }), 'b1');
-    expect(got.liveTaken).toBe(2);
-    expect(got.available).toBe(10);
-  });
-
-  it('subtracts assigned occupants for a single block (B1 fix)', async () => {
-    const { svc } = await build({
-      blocks: [block({ id: 'b1', kind: 'tent', name: 'Tent A', capacity: 12, baseTaken: 2 })],
-      registrants: [reg({ id: 'r1', accommodationKind: 'tent', accommodationLabel: 'Tent A' })],
-    });
-    const got = await svc.getBlock(actor('admin'), 'b1');
-    expect(got.liveTaken).toBe(3); // baseTaken 2 + r1
-    expect(got.available).toBe(9);
-  });
-
-  it('throws NotFoundError for an unknown id', async () => {
-    const { svc } = await build({ blocks: [block({ id: 'b1' })] });
-    await expect(svc.getBlock(actor('admin'), 'nope')).rejects.toBeInstanceOf(NotFoundError);
-  });
-});
+// Three male + one female classroom-kind youth at Victory (c1) -> 100% eligible.
+const victoryClassroomRegs = [
+  reg({ id: 'r1', churchId: 'c1', gender: 'male' }),
+  reg({ id: 'r2', churchId: 'c1', gender: 'male' }),
+  reg({ id: 'r3', churchId: 'c1', gender: 'male' }),
+  reg({ id: 'r4', churchId: 'c1', gender: 'female' }),
+];
 
 // ---------------------------------------------------------------------------
-// computeLiveTaken — exposed helper (this DOES count reservations-free occupancy)
+// Classrooms CRUD + RBAC
 // ---------------------------------------------------------------------------
-describe('AccommodationService.computeLiveTaken (helper, not used by listBlocks)', () => {
-  it('starts from baseTaken and adds one per matching non-cancelled person', async () => {
+describe('AccommodationService — classrooms', () => {
+  it('admin can create, list and delete classrooms', async () => {
+    const { svc, classroomRepo } = await build();
+    const created = await svc.createClassroom(actor('admin'), { name: 'Room 1', capacity: 6 });
+    expect(created.id).toMatch(/^room_/);
+    expect(await svc.listClassrooms(actor('admin'))).toHaveLength(1);
+    await svc.deleteClassroom(actor('admin'), created.id);
+    expect(await classroomRepo.findById(created.id)).toBeNull();
+  });
+
+  it.each(['church', 'zoneLeader', 'director'] as const)('role %s cannot create a classroom', async (role) => {
     const { svc } = await build();
-    const blocks = [
-      block({ id: 'b1', kind: 'tent', name: 'Tent A', baseTaken: 1 }),
-      block({ id: 'b2', kind: 'classroom', name: 'Room 1', baseTaken: 0 }),
-    ];
-    const persons = [
-      reg({ id: 'r1', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
-      reg({ id: 'r2', accommodationKind: 'tent', accommodationLabel: 'Tent A' }),
-      reg({ id: 'r3', accommodationKind: 'classroom', accommodationLabel: 'Room 1', status: 'cancelled' }),
-      reg({ id: 'r4', accommodationKind: 'classroom', accommodationLabel: 'Room 1' }),
-      reg({ id: 'r5', accommodationKind: 'tent', accommodationLabel: 'No Such' }), // no match
-      reg({ id: 'r6', accommodationKind: null, accommodationLabel: null }), // unassigned
-    ];
-    const taken = svc.computeLiveTaken(blocks, persons);
-    expect(taken.get('b1')).toBe(3); // baseTaken 1 + r1 + r2
-    expect(taken.get('b2')).toBe(1); // baseTaken 0 + r4 (r3 cancelled, skipped)
-  });
-});
-
-// ---------------------------------------------------------------------------
-// createBlock — admin gating + lock
-// ---------------------------------------------------------------------------
-describe('AccommodationService.createBlock', () => {
-  const input = { kind: 'tent', name: 'New Tent', price: 50, capacity: 8 };
-
-  it('admin creates a block and baseTaken defaults to 0', async () => {
-    const { svc } = await build();
-    const created = await svc.createBlock(actor('admin'), input);
-    expect(created.name).toBe('New Tent');
-    expect(created.baseTaken).toBe(0);
-    expect(created.capacity).toBe(8);
-    expect(created.id).toMatch(/^block_/);
+    await expect(svc.createClassroom(actor(role), { name: 'R', capacity: 4 })).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('honours an explicit baseTaken', async () => {
-    const { svc } = await build();
-    const created = await svc.createBlock(actor('admin'), { ...input, baseTaken: 4 });
-    expect(created.baseTaken).toBe(4);
+  it.each(['church', 'zoneLeader', 'director', 'admin'] as const)('role %s can list classrooms', async (role) => {
+    const { svc } = await build({ rooms: [room({ id: 'rm1' })] });
+    expect(await svc.listClassrooms(actor(role, { churchId: 'c1', zone: 'Yellow' }))).toHaveLength(1);
   });
 
-  it.each(['church', 'zoneLeader', 'director'] as const)(
-    'role %s cannot create (no admin:manage)',
-    async (role) => {
-      const { svc } = await build();
-      await expect(svc.createBlock(actor(role), input)).rejects.toBeInstanceOf(ForbiddenError);
-    },
-  );
-
-  it('admin can create even when accommodation is locked (admin bypasses lock)', async () => {
+  it('admin bypasses the lock to create a classroom', async () => {
     const { svc } = await build({ settings: settings({ accommodationLocked: true }) });
-    const created = await svc.createBlock(actor('admin'), input);
-    expect(created.name).toBe('New Tent');
+    const created = await svc.createClassroom(actor('admin'), { name: 'Room 1', capacity: 6 });
+    expect(created.name).toBe('Room 1');
   });
 
-  it('rejects invalid input via Zod (capacity < 1)', async () => {
+  it('rejects an invalid classroom (capacity < 1)', async () => {
     const { svc } = await build();
-    await expect(svc.createBlock(actor('admin'), { ...input, capacity: 0 })).rejects.toBeTruthy();
+    await expect(svc.createClassroom(actor('admin'), { name: 'R', capacity: 0 })).rejects.toBeTruthy();
   });
-});
 
-// ---------------------------------------------------------------------------
-// updateBlock
-// ---------------------------------------------------------------------------
-describe('AccommodationService.updateBlock', () => {
-  it('admin updates fields and preserves the id', async () => {
-    const { svc } = await build({ blocks: [block({ id: 'b1', name: 'Old', capacity: 10 })] });
-    const updated = await svc.updateBlock(actor('admin'), 'b1', { name: 'Renamed', capacity: 20 });
-    expect(updated.id).toBe('b1');
+  it('updateClassroom preserves id; unknown id throws NotFound', async () => {
+    const { svc } = await build({ rooms: [room({ id: 'rm1', name: 'Old', capacity: 6 })] });
+    const updated = await svc.updateClassroom(actor('admin'), 'rm1', { name: 'Renamed', capacity: 8 });
+    expect(updated.id).toBe('rm1');
     expect(updated.name).toBe('Renamed');
-    expect(updated.capacity).toBe(20);
+    expect(updated.capacity).toBe(8);
+    await expect(svc.updateClassroom(actor('admin'), 'nope', { name: 'X' })).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('throws NotFoundError for an unknown id (admin)', async () => {
-    const { svc } = await build({ blocks: [block({ id: 'b1' })] });
-    await expect(svc.updateBlock(actor('admin'), 'nope', { name: 'X' })).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
-  });
-
-  it('non-admin is forbidden BEFORE the not-found check (RBAC first)', async () => {
-    // CHARACTERISATION: assertCan runs before findById, so a non-admin hitting
-    // an unknown id still gets ForbiddenError, not NotFoundError.
-    const { svc } = await build({ blocks: [block({ id: 'b1' })] });
-    await expect(svc.updateBlock(actor('director'), 'nope', { name: 'X' })).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
+  it('deleting a classroom cascades its allocation rows', async () => {
+    const { svc, allocationRepo } = await build({
+      rooms: [room({ id: 'rm1', capacity: 6 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs,
+    });
+    await svc.setAllocations(actor('director'), { allocations: { rm1: [{ key: 'c1|male', n: 3 }] } });
+    expect(await allocationRepo.findAll()).toHaveLength(1);
+    await svc.deleteClassroom(actor('admin'), 'rm1');
+    expect(await allocationRepo.findAll()).toHaveLength(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// deleteBlock
+// Groups (eligibility)
 // ---------------------------------------------------------------------------
-describe('AccommodationService.deleteBlock', () => {
-  it('admin deletes an existing block', async () => {
-    const { svc, blockRepo } = await build({ blocks: [block({ id: 'b1' })] });
-    await svc.deleteBlock(actor('admin'), 'b1');
-    expect(await blockRepo.findById('b1')).toBeNull();
+describe('AccommodationService.listGroups', () => {
+  it('director/admin get eligible per-gender groups', async () => {
+    const { svc } = await build({ churches: [church({ id: 'c1' })], registrants: victoryClassroomRegs });
+    const groups = await svc.listGroups(actor('director'));
+    expect(groups.map((g) => g.key).sort()).toEqual(['c1|female', 'c1|male']);
   });
 
-  it('throws NotFoundError when deleting an unknown id', async () => {
+  it('church/zoneLeader cannot read groups', async () => {
     const { svc } = await build();
-    await expect(svc.deleteBlock(actor('admin'), 'nope')).rejects.toBeInstanceOf(NotFoundError);
-  });
-
-  it.each(['church', 'zoneLeader', 'director'] as const)(
-    'role %s cannot delete (no admin:manage)',
-    async (role) => {
-      const { svc } = await build({ blocks: [block({ id: 'b1' })] });
-      await expect(svc.deleteBlock(actor(role), 'b1')).rejects.toBeInstanceOf(ForbiddenError);
-    },
-  );
-
-  it('admin can delete even when locked', async () => {
-    const { svc, blockRepo } = await build({
-      blocks: [block({ id: 'b1' })],
-      settings: settings({ accommodationLocked: true }),
-    });
-    await svc.deleteBlock(actor('admin'), 'b1');
-    expect(await blockRepo.findById('b1')).toBeNull();
+    await expect(svc.listGroups(actor('church', { churchId: 'c1' }))).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(svc.listGroups(actor('zoneLeader', { zone: 'Yellow' }))).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Lock gating for non-admin write paths (createBlock is admin-only so the lock
-// is moot there; setReservations is the realistic non-admin write path)
+// Allocations round-trip + validation
 // ---------------------------------------------------------------------------
-describe('AccommodationService lock gating', () => {
-  it('createBlock by a non-admin is forbidden by RBAC before the lock is consulted', async () => {
-    // CHARACTERISATION: assertCan('admin:manage') runs before assertNotLocked,
-    // and only admins reach assertNotLocked anyway (which they bypass).
-    const { svc } = await build({ settings: settings({ accommodationLocked: true }) });
-    await expect(
-      svc.createBlock(actor('director'), { kind: 'tent', name: 'T', price: 1, capacity: 1 }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// setReservations
-// ---------------------------------------------------------------------------
-describe('AccommodationService.setReservations', () => {
-  const reservations: AccommodationReservation[] = [
-    { kind: 'tent', spots: 5, label: 'Tent A', confirmed: false },
-  ];
-
-  it('a church sets reservations for its own church and they persist', async () => {
-    const { svc, churchRepo } = await build({ churches: [church({ id: 'c1', zone: 'Yellow' })] });
-    const result = await svc.setReservations(actor('church', { churchId: 'c1' }), {
-      churchId: 'c1',
-      reservations,
-    });
-    expect(result).toEqual(reservations);
-    const saved = await churchRepo.findById('c1');
-    expect(saved!.reservations).toEqual(reservations);
-  });
-
-  it('confirmed defaults to false when omitted in a reservation patch', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Yellow' })] });
-    const result = await svc.setReservations(actor('admin'), {
-      churchId: 'c1',
-      reservations: [{ kind: 'tent', spots: 2, label: 'Tent A' }],
-    });
-    expect(result[0]!.confirmed).toBe(false);
-  });
-
-  it('a church cannot set reservations for another church', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c2', zone: 'Blue' })] });
-    await expect(
-      svc.setReservations(actor('church', { churchId: 'c1' }), { churchId: 'c2', reservations }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  it('a zone leader can set reservations for a church in their zone', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Yellow' })] });
-    const result = await svc.setReservations(actor('zoneLeader', { zone: 'Yellow' }), {
-      churchId: 'c1',
-      reservations,
-    });
-    expect(result).toEqual(reservations);
-  });
-
-  it('a zone leader cannot set reservations for a church outside their zone', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Blue' })] });
-    await expect(
-      svc.setReservations(actor('zoneLeader', { zone: 'Yellow' }), { churchId: 'c1', reservations }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  it('director and admin can set reservations for any church', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Black' })] });
-    await expect(
-      svc.setReservations(actor('director'), { churchId: 'c1', reservations }),
-    ).resolves.toEqual(reservations);
-    await expect(
-      svc.setReservations(actor('admin'), { churchId: 'c1', reservations }),
-    ).resolves.toEqual(reservations);
-  });
-
-  it('throws NotFoundError for an unknown church', async () => {
-    const { svc } = await build();
-    await expect(
-      svc.setReservations(actor('admin'), { churchId: 'nope', reservations }),
-    ).rejects.toBeInstanceOf(NotFoundError);
-  });
-
-  it('lock blocks a non-admin BEFORE the church is looked up', async () => {
-    // CHARACTERISATION: parse -> assertNotLocked -> findById(church). So when
-    // locked, a non-admin with a *non-existent* churchId gets ForbiddenError
-    // (the lock), NOT NotFoundError.
-    const { svc } = await build({ settings: settings({ accommodationLocked: true }) });
-    await expect(
-      svc.setReservations(actor('church', { churchId: 'nope' }), { churchId: 'nope', reservations }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  it('admin bypasses the lock and can set reservations while locked', async () => {
+describe('AccommodationService allocations', () => {
+  it('director sets + gets allocations (map round-trips)', async () => {
     const { svc } = await build({
-      churches: [church({ id: 'c1', zone: 'Yellow' })],
-      settings: settings({ accommodationLocked: true }),
+      rooms: [room({ id: 'rm1', capacity: 6 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs,
     });
-    await expect(
-      svc.setReservations(actor('admin'), { churchId: 'c1', reservations }),
-    ).resolves.toEqual(reservations);
+    const map = { rm1: [{ key: 'c1|male', n: 3 }] };
+    const saved = await svc.setAllocations(actor('director'), { allocations: map });
+    expect(saved).toEqual(map);
+    expect(await svc.getAllocations(actor('admin'))).toEqual(map);
   });
 
-  it('a church is blocked by the lock for its own church', async () => {
+  it('rejects mixing genders in one room', async () => {
     const { svc } = await build({
-      churches: [church({ id: 'c1', zone: 'Yellow' })],
-      settings: settings({ accommodationLocked: true }),
+      rooms: [room({ id: 'rm1', capacity: 6 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs,
     });
-    await expect(
-      svc.setReservations(actor('church', { churchId: 'c1' }), { churchId: 'c1', reservations }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(svc.setAllocations(actor('director'), {
+      allocations: { rm1: [{ key: 'c1|male', n: 2 }, { key: 'c1|female', n: 1 }] },
+    })).rejects.toThrow(/single gender/i);
   });
 
-  it('rejects invalid input via Zod (missing churchId)', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Yellow' })] });
-    await expect(
-      svc.setReservations(actor('admin'), { reservations }),
-    ).rejects.toBeTruthy();
+  it('rejects exceeding room capacity', async () => {
+    const { svc } = await build({
+      rooms: [room({ id: 'rm1', capacity: 2 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs,
+    });
+    await expect(svc.setAllocations(actor('director'), {
+      allocations: { rm1: [{ key: 'c1|male', n: 3 }] },
+    })).rejects.toThrow(/capacity/i);
+  });
+
+  it("rejects over-allocating a group beyond its available count", async () => {
+    const { svc } = await build({
+      rooms: [room({ id: 'rm1', capacity: 100 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs, // female n = 1
+    });
+    await expect(svc.setAllocations(actor('director'), {
+      allocations: { rm1: [{ key: 'c1|female', n: 2 }] },
+    })).rejects.toThrow(/more than available/i);
+  });
+
+  it('church actor cannot read camp-wide allocations', async () => {
+    const { svc } = await build({ churches: [church({ id: 'c1' })] });
+    await expect(svc.getAllocations(actor('church', { churchId: 'c1' }))).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('blocks a non-admin write when accommodation is locked', async () => {
+    const { svc } = await build({
+      rooms: [room({ id: 'rm1', capacity: 6 })],
+      churches: [church({ id: 'c1' })],
+      registrants: victoryClassroomRegs,
+      settings: settings({ accommodationLocked: true }),
+    });
+    await expect(svc.setAllocations(actor('director'), {
+      allocations: { rm1: [{ key: 'c1|male', n: 1 }] },
+    })).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// listHeldByChurch
+// getChurchRooms (church-facing)
 // ---------------------------------------------------------------------------
-describe('AccommodationService.listHeldByChurch', () => {
-  const held: AccommodationReservation[] = [
-    { kind: 'classroom', spots: 3, label: 'Room 1', confirmed: true },
-  ];
-
-  it('returns the reservations held by an accessible church', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Yellow', reservations: held })] });
-    const result = await svc.listHeldByChurch(actor('church', { churchId: 'c1' }), 'c1');
-    expect(result).toEqual(held);
-  });
-
-  it('returns [] for a church with no reservations', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c1', zone: 'Yellow', reservations: [] })] });
-    const result = await svc.listHeldByChurch(actor('admin'), 'c1');
-    expect(result).toEqual([]);
+describe('AccommodationService.getChurchRooms', () => {
+  it("returns only the requesting church's rooms", async () => {
+    const { svc } = await build({
+      rooms: [room({ id: 'rm1', name: 'Room 1', capacity: 6 })],
+      churches: [church({ id: 'c1', zone: 'Yellow' })],
+      registrants: victoryClassroomRegs,
+    });
+    await svc.setAllocations(actor('director'), { allocations: { rm1: [{ key: 'c1|male', n: 3 }] } });
+    const result = await svc.getChurchRooms(actor('church', { churchId: 'c1' }), 'c1');
+    expect(result.rooms).toEqual([{ name: 'Room 1', gender: 'male', n: 3 }]);
   });
 
   it('a church cannot view another church', async () => {
-    const { svc } = await build({ churches: [church({ id: 'c2', zone: 'Blue', reservations: held })] });
-    await expect(
-      svc.listHeldByChurch(actor('church', { churchId: 'c1' }), 'c2'),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const { svc } = await build({ churches: [church({ id: 'c2', zone: 'Blue' })] });
+    await expect(svc.getChurchRooms(actor('church', { churchId: 'c1' }), 'c2')).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('a zone leader can view churches in their zone but not outside it', async () => {
-    const { svc } = await build({
-      churches: [church({ id: 'c1', zone: 'Yellow', reservations: held })],
-    });
-    await expect(
-      svc.listHeldByChurch(actor('zoneLeader', { zone: 'Yellow' }), 'c1'),
-    ).resolves.toEqual(held);
-    await expect(
-      svc.listHeldByChurch(actor('zoneLeader', { zone: 'Blue' }), 'c1'),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  it('throws NotFoundError for an unknown church', async () => {
+  it('throws NotFound for an unknown church', async () => {
     const { svc } = await build();
-    await expect(svc.listHeldByChurch(actor('admin'), 'nope')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(svc.getChurchRooms(actor('admin'), 'nope')).rejects.toBeInstanceOf(NotFoundError);
   });
 });

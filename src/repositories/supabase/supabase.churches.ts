@@ -1,9 +1,8 @@
-import type { SqlClient, TxClient } from './client';
+import type { SqlClient } from './client';
 import type { IChurchRepository } from '../interfaces/entity-repositories';
 import type { Church } from '../../core/entities/church';
-import { newId } from '../../utils/id';
 
-function toChurch(row: Record<string, unknown>, reservations: Church['reservations']): Church {
+function toChurch(row: Record<string, unknown>): Church {
   return {
     id: row['id'] as string,
     name: row['name'] as string,
@@ -13,7 +12,6 @@ function toChurch(row: Record<string, unknown>, reservations: Church['reservatio
       male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
       female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
     },
-    reservations,
     createdAt: (row['created_at'] as Date).toISOString(),
     updatedAt: (row['updated_at'] as Date).toISOString(),
   };
@@ -40,63 +38,25 @@ export class SupabaseChurchRepository implements IChurchRepository {
 
   async init(): Promise<void> {}
 
-  private async loadReservations(churchIds: string[]): Promise<Map<string, Church['reservations']>> {
-    const map = new Map<string, Church['reservations']>();
-    if (churchIds.length === 0) return map;
-    const rows = await this.sql`select * from reservations where church_id in ${this.sql(churchIds)}`;
-    for (const r of rows) {
-      const cid = r['church_id'] as string;
-      if (!map.has(cid)) map.set(cid, []);
-      map.get(cid)!.push({
-        kind: r['kind'] as 'tent' | 'classroom',
-        spots: r['spots'] as number,
-        label: r['label'] as string,
-        confirmed: r['confirmed'] as boolean,
-      });
-    }
-    return map;
-  }
-
-  private async hydrate(rows: readonly Record<string, unknown>[]): Promise<Church[]> {
-    const ids = rows.map((r) => r['id'] as string);
-    const resMap = await this.loadReservations(ids);
-    return rows.map((r) => toChurch(r, resMap.get(r['id'] as string) ?? []));
-  }
-
   async findAll(): Promise<Church[]> {
-    return this.hydrate(await this.sql`select * from churches order by zone, name`);
+    return (await this.sql`select * from churches order by zone, name`).map(toChurch);
   }
 
   async findById(id: string): Promise<Church | null> {
     const rows = await this.sql`select * from churches where id = ${id}`;
-    return rows[0] ? (await this.hydrate(rows))[0] ?? null : null;
+    return rows[0] ? toChurch(rows[0]) : null;
   }
 
   async findByZone(zone: string): Promise<Church[]> {
-    return this.hydrate(await this.sql`select * from churches where zone = ${zone} order by name`);
+    return (await this.sql`select * from churches where zone = ${zone} order by name`).map(toChurch);
   }
 
   async save(church: Church): Promise<Church> {
-    await this.sql.begin(async (tx: TxClient) => {
-      await tx`
-        insert into churches ${tx(churchColumns(church))}
-        on conflict (id) do update set ${tx(churchColumns(church), ...UPDATE_COLS)}
-      `;
-      // Replace reservations: delete existing, re-insert with generated IDs.
-      await tx`delete from reservations where church_id = ${church.id}`;
-      if (church.reservations.length > 0) {
-        await tx`insert into reservations ${tx(
-          church.reservations.map((r) => ({
-            id: newId('rsv'),
-            church_id: church.id,
-            kind: r.kind,
-            spots: r.spots,
-            label: r.label,
-            confirmed: r.confirmed,
-          })),
-        )}`;
-      }
-    });
+    const c = churchColumns(church);
+    await this.sql`
+      insert into churches ${this.sql(c)}
+      on conflict (id) do update set ${this.sql(c, ...UPDATE_COLS)}
+    `;
     return church;
   }
 

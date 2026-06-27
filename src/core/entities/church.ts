@@ -1,12 +1,5 @@
 import type { ID, ISODateString } from '../types/common';
-import type { ZoneName, AccommodationKind } from '../types/enums';
-
-export interface AccommodationReservation {
-  kind: AccommodationKind;
-  spots: number;
-  label: string;
-  confirmed: boolean;
-}
+import type { ZoneName } from '../types/enums';
 
 export interface ChurchContact {
   name: string;
@@ -18,7 +11,6 @@ export interface Church {
   name: string;
   zone: ZoneName;
   contactPhone?: string;
-  reservations: AccommodationReservation[];
   contacts: {
     male: { primary: ChurchContact; backup: ChurchContact };
     female: { primary: ChurchContact; backup: ChurchContact };

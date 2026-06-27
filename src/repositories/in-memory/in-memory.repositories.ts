@@ -6,7 +6,7 @@ import type { User } from '../../core/entities/user';
 import type { Church } from '../../core/entities/church';
 import type { Person } from '../../core/entities/person';
 import { isCamper } from '../../core/entities/person';
-import type { AccommodationBlock } from '../../core/entities/accommodation';
+import type { Classroom, RoomAllocation } from '../../core/entities/accommodation';
 import type { Zone } from '../../core/entities/zone';
 import type { Group } from '../../core/entities/group';
 import type { StudentNote } from '../../core/entities/note';
@@ -21,7 +21,8 @@ import type {
   IUserRepository,
   IChurchRepository,
   IPersonRepository,
-  IAccommodationRepository,
+  IClassroomRepository,
+  IAllocationRepository,
   IZoneRepository,
   IGroupRepository,
   INoteRepository,
@@ -154,20 +155,32 @@ export class InMemoryPersonRepository
 }
 
 // ---------------------------------------------------------------------------
-// Accommodation
+// Classrooms (reusable scaffold rooms)
 // ---------------------------------------------------------------------------
-export class InMemoryAccommodationRepository
-  extends InMemoryBaseRepository<AccommodationBlock>
-  implements IAccommodationRepository
+export class InMemoryClassroomRepository
+  extends InMemoryBaseRepository<Classroom>
+  implements IClassroomRepository
 {
-  constructor(persistence?: IPersistenceAdapter<AccommodationBlock>) {
+  constructor(persistence?: IPersistenceAdapter<Classroom>) {
+    super(persistence);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Allocations (classroom placement rows)
+// ---------------------------------------------------------------------------
+export class InMemoryAllocationRepository
+  extends InMemoryBaseRepository<RoomAllocation>
+  implements IAllocationRepository
+{
+  constructor(persistence?: IPersistenceAdapter<RoomAllocation>) {
     super(persistence);
   }
 
-  async findByKind(kind: string): Promise<AccommodationBlock[]> {
+  async findByRoom(roomId: string): Promise<RoomAllocation[]> {
     return Array.from(this.store.values())
-      .filter((b) => b.kind === kind)
-      .map((b) => this.clone(b));
+      .filter((a) => a.roomId === roomId)
+      .map((a) => this.clone(a));
   }
 }
 

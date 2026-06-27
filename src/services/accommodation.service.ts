@@ -1,126 +1,147 @@
-import type { IAccommodationRepository, IChurchRepository, ISettingsRepository, IPersonRepository } from '../repositories/interfaces/entity-repositories';
-import type { AccommodationBlock } from '../core/entities/accommodation';
-import type { AccommodationReservation } from '../core/entities/church';
-import type { Person } from '../core/entities/person';
+import type {
+  IClassroomRepository, IAllocationRepository, IChurchRepository,
+  ISettingsRepository, IPersonRepository,
+} from '../repositories/interfaces/entity-repositories';
+import type { Classroom, RoomAllocation, AllocationGender } from '../core/entities/accommodation';
 import type { Actor } from '../core/entities/user';
 import { assertCan, assertCanAccessChurch } from './access-control';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
-import { CreateBlockSchema, UpdateBlockSchema, SetReservationsSchema } from '../core/validation/accommodation.schema';
+import { CreateClassroomSchema, UpdateClassroomSchema, SetAllocationsSchema } from '../core/validation/accommodation.schema';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
-import { computeLiveTaken as computeLiveTakenPure, availableForBlock } from './accommodation-occupancy';
+import {
+  computeGroups, validateAllocations,
+  type AllocationOccupant, type AllocationGroup, type AllocationMap,
+} from './accommodation-allocation';
 
-export interface LiveBlock extends AccommodationBlock {
-  liveTaken: number;
-  available: number;
+export interface ChurchRooms {
+  rooms: Array<{ name: string; gender: AllocationGender; n: number }>;
 }
 
 export interface AccommodationService {
-  listBlocks(actor: Actor): Promise<LiveBlock[]>;
-  getBlock(actor: Actor, id: string): Promise<LiveBlock>;
-  createBlock(actor: Actor, input: unknown): Promise<AccommodationBlock>;
-  updateBlock(actor: Actor, id: string, input: unknown): Promise<AccommodationBlock>;
-  deleteBlock(actor: Actor, id: string): Promise<void>;
-  setReservations(actor: Actor, input: unknown): Promise<AccommodationReservation[]>;
-  listHeldByChurch(actor: Actor, churchId: string): Promise<AccommodationReservation[]>;
-  computeLiveTaken(blocks: AccommodationBlock[], persons: Person[]): Map<string, number>;
+  listClassrooms(actor: Actor): Promise<Classroom[]>;
+  createClassroom(actor: Actor, input: unknown): Promise<Classroom>;
+  updateClassroom(actor: Actor, id: string, input: unknown): Promise<Classroom>;
+  deleteClassroom(actor: Actor, id: string): Promise<void>;
+  listGroups(actor: Actor): Promise<AllocationGroup[]>;
+  getAllocations(actor: Actor): Promise<AllocationMap>;
+  setAllocations(actor: Actor, input: unknown): Promise<AllocationMap>;
+  getChurchRooms(actor: Actor, churchId: string): Promise<ChurchRooms>;
 }
 
 export function makeAccommodationService(
-  blockRepo: IAccommodationRepository,
+  classroomRepo: IClassroomRepository,
+  allocationRepo: IAllocationRepository,
   churchRepo: IChurchRepository,
   settingsRepo: ISettingsRepository,
   personRepo: IPersonRepository,
 ): AccommodationService {
   async function assertNotLocked(actor: Actor): Promise<void> {
     if (actor.role === 'admin') return;
-    const settings = await settingsRepo.getSingleton();
-    if (settings?.accommodationLocked) {
-      throw new ForbiddenError('Accommodation is locked. Contact admin to make changes.');
+    const s = await settingsRepo.getSingleton();
+    if (s?.accommodationLocked) throw new ForbiddenError('Accommodation is locked. Contact admin to make changes.');
+  }
+
+  function assertDirectorOrAdmin(actor: Actor): void {
+    if (actor.role !== 'admin' && actor.role !== 'director') {
+      throw new ForbiddenError('Allocations are managed by directors and admins only');
     }
   }
 
-  // Thin wrapper over the pure occupancy module (single source of truth, see
-  // accommodation-occupancy.ts). Kept on the interface for callers/tests.
-  function computeLiveTaken(blocks: AccommodationBlock[], persons: Person[]): Map<string, number> {
-    return computeLiveTakenPure(blocks, persons);
+  async function occupants(): Promise<AllocationOccupant[]> {
+    const people = await personRepo.findAll();
+    return people.map((p) => ({
+      churchId: p.churchId ?? '',
+      churchName: p.churchName,
+      gender: p.gender,
+      kind: p.kind,
+      accommodationKind: p.accommodationKind ?? null,
+      lifecycle: p.lifecycle ?? null,
+    }));
   }
 
-  // B1 FIX: live blocks now subtract assigned occupants (was baseTaken only).
-  async function getLiveBlocks(): Promise<LiveBlock[]> {
-    const [blocks, persons] = await Promise.all([blockRepo.findAll(), personRepo.findAll()]);
-    const taken = computeLiveTakenPure(blocks, persons);
-    return blocks.map((b) => {
-      const liveTaken = taken.get(b.id) ?? b.baseTaken;
-      return { ...b, liveTaken, available: availableForBlock(b, liveTaken) };
-    });
+  function rowsToMap(rows: readonly RoomAllocation[]): AllocationMap {
+    const map: AllocationMap = {};
+    for (const r of rows) {
+      (map[r.roomId] ??= []).push({ key: `${r.churchId}|${r.gender}`, n: r.n });
+    }
+    return map;
   }
 
   return {
-    computeLiveTaken,
-
-    async listBlocks(actor) {
+    async listClassrooms(actor) {
       assertCan(actor, 'registrant:read');
-      return getLiveBlocks();
+      return (await classroomRepo.findAll()).sort((a, b) => a.name.localeCompare(b.name));
     },
 
-    async getBlock(actor, id) {
-      assertCan(actor, 'registrant:read');
-      const block = await blockRepo.findById(id);
-      if (!block) throw new NotFoundError('Accommodation block not found');
-      const persons = await personRepo.findAll();
-      const liveTaken = computeLiveTakenPure([block], persons).get(block.id) ?? block.baseTaken;
-      return { ...block, liveTaken, available: availableForBlock(block, liveTaken) };
-    },
-
-    async createBlock(actor, input) {
+    async createClassroom(actor, input) {
       assertCan(actor, 'admin:manage');
       await assertNotLocked(actor);
-      const data = CreateBlockSchema.parse(input);
+      const data = CreateClassroomSchema.parse(input);
       const now = nowISO();
-      const block: AccommodationBlock = {
-        id: newId('block'),
-        ...data,
-        baseTaken: data.baseTaken ?? 0,
-        createdAt: now,
-        updatedAt: now,
+      return classroomRepo.save({ id: newId('room'), name: data.name, capacity: data.capacity, createdAt: now, updatedAt: now });
+    },
+
+    async updateClassroom(actor, id, input) {
+      assertCan(actor, 'admin:manage');
+      await assertNotLocked(actor);
+      const existing = await classroomRepo.findById(id);
+      if (!existing) throw new NotFoundError('Classroom not found');
+      const data = UpdateClassroomSchema.parse(input);
+      return classroomRepo.save({ ...existing, ...data, id: existing.id, updatedAt: nowISO() });
+    },
+
+    async deleteClassroom(actor, id) {
+      assertCan(actor, 'admin:manage');
+      await assertNotLocked(actor);
+      const ok = await classroomRepo.delete(id);
+      if (!ok) throw new NotFoundError('Classroom not found');
+      // Cascade: drop its allocation rows (in-memory has no FK cascade).
+      const rows = await allocationRepo.findByRoom(id);
+      for (const r of rows) await allocationRepo.delete(r.id);
+    },
+
+    async listGroups(actor) {
+      assertDirectorOrAdmin(actor);
+      return computeGroups(await occupants());
+    },
+
+    async getAllocations(actor) {
+      assertDirectorOrAdmin(actor);
+      return rowsToMap(await allocationRepo.findAll());
+    },
+
+    async setAllocations(actor, input) {
+      assertDirectorOrAdmin(actor);
+      await assertNotLocked(actor);
+      const { allocations } = SetAllocationsSchema.parse(input);
+      const rooms = await classroomRepo.findAll();
+      const groups = computeGroups(await occupants());
+      validateAllocations(allocations, { rooms, groups });
+      // Replace-all: clear then insert non-zero rows.
+      await allocationRepo.deleteAll();
+      for (const [roomId, entries] of Object.entries(allocations)) {
+        for (const e of entries) {
+          if (e.n <= 0) continue;
+          const [churchId, gender] = e.key.split('|') as [string, AllocationGender];
+          await allocationRepo.save({ id: newId('alloc'), roomId, churchId, gender, n: e.n });
+        }
+      }
+      return rowsToMap(await allocationRepo.findAll());
+    },
+
+    async getChurchRooms(actor, churchId) {
+      const church = await churchRepo.findById(churchId);
+      if (!church) throw new NotFoundError('Church not found');
+      assertCanAccessChurch(actor, churchId, church.zone);
+      const rows = await allocationRepo.findAll();
+      const rooms = await classroomRepo.findAll();
+      const nameById = new Map(rooms.map((r) => [r.id, r.name]));
+      return {
+        rooms: rows
+          .filter((r) => r.churchId === churchId && r.n > 0)
+          .map((r) => ({ name: nameById.get(r.roomId) ?? 'Room', gender: r.gender, n: r.n })),
       };
-      return blockRepo.save(block);
-    },
-
-    async updateBlock(actor, id, input) {
-      assertCan(actor, 'admin:manage');
-      await assertNotLocked(actor);
-      const existing = await blockRepo.findById(id);
-      if (!existing) throw new NotFoundError('Accommodation block not found');
-      const data = UpdateBlockSchema.parse(input);
-      return blockRepo.save({ ...existing, ...data, id: existing.id, updatedAt: nowISO() });
-    },
-
-    async deleteBlock(actor, id) {
-      assertCan(actor, 'admin:manage');
-      await assertNotLocked(actor);
-      const ok = await blockRepo.delete(id);
-      if (!ok) throw new NotFoundError('Accommodation block not found');
-    },
-
-    async setReservations(actor, input) {
-      const { churchId, reservations } = SetReservationsSchema.parse(input);
-      await assertNotLocked(actor);
-      // church can only set for own church
-      const church = await churchRepo.findById(churchId);
-      if (!church) throw new NotFoundError('Church not found');
-      assertCanAccessChurch(actor, churchId, church.zone);
-      const updated = { ...church, reservations, updatedAt: nowISO() };
-      await churchRepo.save(updated);
-      return reservations;
-    },
-
-    async listHeldByChurch(actor, churchId) {
-      const church = await churchRepo.findById(churchId);
-      if (!church) throw new NotFoundError('Church not found');
-      assertCanAccessChurch(actor, churchId, church.zone);
-      return church.reservations ?? [];
     },
   };
 }

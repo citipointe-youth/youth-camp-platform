@@ -2,7 +2,8 @@ import type {
   IUserRepository,
   IChurchRepository,
   IPersonRepository,
-  IAccommodationRepository,
+  IClassroomRepository,
+  IAllocationRepository,
   IFaqRepository,
   IScheduleRepository,
   INotificationRepository,
@@ -14,7 +15,7 @@ import type {
 import type { CampSettings } from '../core/entities/settings';
 import type { Church } from '../core/entities/church';
 import type { User } from '../core/entities/user';
-import type { AccommodationBlock } from '../core/entities/accommodation';
+import type { Classroom } from '../core/entities/accommodation';
 import type { FaqItem } from '../core/entities/content';
 import type { ScheduleItem } from '../core/entities/schedule';
 import type { Devotional } from '../core/entities/devotional';
@@ -55,7 +56,8 @@ export function makeAdminService(
   userRepo: IUserRepository,
   churchRepo: IChurchRepository,
   personRepo: IPersonRepository,
-  accommodationRepo: IAccommodationRepository,
+  classroomRepo: IClassroomRepository,
+  allocationRepo: IAllocationRepository,
   faqRepo: IFaqRepository,
   scheduleRepo: IScheduleRepository,
   notifRepo: INotificationRepository,
@@ -100,7 +102,8 @@ export function makeAdminService(
       await Promise.all([
         personRepo.deleteAll(),
         churchRepo.deleteAll(),
-        accommodationRepo.deleteAll(),
+        classroomRepo.deleteAll(),
+        allocationRepo.deleteAll(),
         faqRepo.deleteAll(),
         scheduleRepo.deleteAll(),
         notifRepo.deleteAll(),
@@ -117,10 +120,10 @@ export function makeAdminService(
 
     async saveDefaults(actor) {
       if (actor.role !== 'admin') throw new ForbiddenError('Only admin can save defaults');
-      const [churches, users, blocks, faqs, schedule, devotionals] = await Promise.all([
+      const [churches, users, classrooms, faqs, schedule, devotionals] = await Promise.all([
         churchRepo.findAll(),
         userRepo.findAll(),
-        accommodationRepo.findAll(),
+        classroomRepo.findAll(),
         faqRepo.findAll(),
         scheduleRepo.findAll(),
         devotionalRepo.findAll(),
@@ -133,7 +136,7 @@ export function makeAdminService(
           const { passwordHash: _pw, ...rest } = u;
           return rest;
         }),
-        accommodationBlocks: blocks,
+        classrooms,
         faqs,
         schedule,
         devotionals,
@@ -157,11 +160,13 @@ export function makeAdminService(
         throw new NotFoundError('No defaults snapshot saved — run Save Defaults before New Year');
       }
 
-      // Purge this year's people + transient data.
+      // Purge this year's people + transient data. Allocations are people-dependent
+      // and never restored from the scaffold snapshot — wipe them here too.
       await Promise.all([
         personRepo.deleteAll(),
         noteRepo.deleteAll(),
         notifRepo.deleteAll(),
+        allocationRepo.deleteAll(),
       ]);
 
       // Restore the scaffold from the baseline. Accounts: replace all EXCEPT the
@@ -169,7 +174,7 @@ export function makeAdminService(
       // — restore them with a temp password; an operator shares these at rollover).
       const admins = (await userRepo.findAll()).filter((u) => u.role === 'admin');
       await replaceAll<Church>(churchRepo, defaults.churches as Church[]);
-      await replaceAll<AccommodationBlock>(accommodationRepo, defaults.accommodationBlocks as AccommodationBlock[]);
+      await replaceAll<Classroom>(classroomRepo, defaults.classrooms as Classroom[]);
       await replaceAll<FaqItem>(faqRepo, defaults.faqs as FaqItem[]);
       await replaceAll<ScheduleItem>(scheduleRepo, defaults.schedule as ScheduleItem[]);
       await replaceAll<Devotional>(devotionalRepo, defaults.devotionals as Devotional[]);

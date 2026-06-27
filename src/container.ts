@@ -6,7 +6,8 @@ import {
   InMemoryUserRepository,
   InMemoryChurchRepository,
   InMemoryPersonRepository,
-  InMemoryAccommodationRepository,
+  InMemoryClassroomRepository,
+  InMemoryAllocationRepository,
   InMemoryZoneRepository,
   InMemoryGroupRepository,
   InMemoryNoteRepository,
@@ -22,7 +23,8 @@ import {
   SupabaseUserRepository,
   SupabaseChurchRepository,
   SupabasePersonRepository,
-  SupabaseAccommodationRepository,
+  SupabaseClassroomRepository,
+  SupabaseAllocationRepository,
   SupabaseZoneRepository,
   SupabaseGroupRepository,
   SupabaseNoteRepository,
@@ -38,7 +40,8 @@ import type {
   IUserRepository,
   IChurchRepository,
   IPersonRepository,
-  IAccommodationRepository,
+  IClassroomRepository,
+  IAllocationRepository,
   IZoneRepository,
   IGroupRepository,
   INoteRepository,
@@ -52,7 +55,7 @@ import type {
 import type { User } from './core/entities/user';
 import type { Church } from './core/entities/church';
 import type { Person } from './core/entities/person';
-import type { AccommodationBlock } from './core/entities/accommodation';
+import type { Classroom, RoomAllocation } from './core/entities/accommodation';
 import type { Zone } from './core/entities/zone';
 import type { Group } from './core/entities/group';
 import type { StudentNote } from './core/entities/note';
@@ -85,7 +88,8 @@ export interface Repositories {
   users: IUserRepository;
   churches: IChurchRepository;
   people: IPersonRepository;
-  accommodation: IAccommodationRepository;
+  classrooms: IClassroomRepository;
+  allocations: IAllocationRepository;
   zones: IZoneRepository;
   groups: IGroupRepository;
   notes: INoteRepository;
@@ -138,7 +142,8 @@ export async function buildContainer(): Promise<Container> {
     const users: IUserRepository = new SupabaseUserRepository(sql);
     const churches: IChurchRepository = new SupabaseChurchRepository(sql);
     const people: IPersonRepository = new SupabasePersonRepository(sql);
-    const accommodationRepo: IAccommodationRepository = new SupabaseAccommodationRepository(sql);
+    const classrooms: IClassroomRepository = new SupabaseClassroomRepository(sql);
+    const allocations: IAllocationRepository = new SupabaseAllocationRepository(sql);
     const zones: IZoneRepository = new SupabaseZoneRepository(sql);
     const groups: IGroupRepository = new SupabaseGroupRepository(sql);
     const notes: INoteRepository = new SupabaseNoteRepository(sql);
@@ -150,13 +155,13 @@ export async function buildContainer(): Promise<Container> {
     const snapshots: ISnapshotRepository = new SupabaseDefaultsRepository(sql);
 
     const repos: Repositories = {
-      users, churches, people, accommodation: accommodationRepo,
+      users, churches, people, classrooms, allocations,
       zones, groups, notes, notifications, schedule: scheduleRepo,
       devotionals, faqs, settings: settingsRepo, snapshots,
     };
 
     await Promise.all([
-      users.init(), churches.init(), people.init(), accommodationRepo.init(),
+      users.init(), churches.init(), people.init(), classrooms.init(), allocations.init(),
       zones.init(), groups.init(), notes.init(), notifications.init(),
       scheduleRepo.init(), devotionals.init(), faqs.init(), settingsRepo.init(), snapshots.init(),
     ]);
@@ -164,7 +169,7 @@ export async function buildContainer(): Promise<Container> {
     const auth = makeAuthService(users);
     const settings = makeSettingsService(settingsRepo);
     const personSvc = makePersonService(people);
-    const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
+    const accommodationSvc = makeAccommodationService(classrooms, allocations, churches, settingsRepo, people);
     const checkIn = makeCheckInService(people, settingsRepo);
     const notification = makeNotificationService(notifications, people, churches);
     const search = makeSearchService(people, churches);
@@ -176,9 +181,9 @@ export async function buildContainer(): Promise<Container> {
     const churchImportSvc = makeChurchImportService(users, churches);
     const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
     const account = makeAccountService(users, churches);
-    const dashboard = makeDashboardService(people, accommodationRepo, notifications, churches);
+    const dashboard = makeDashboardService(people, notifications, churches);
     const admin = makeAdminService(
-      users, churches, people, accommodationRepo, faqs, scheduleRepo,
+      users, churches, people, classrooms, allocations, faqs, scheduleRepo,
       notifications, notes, devotionals, settingsRepo, snapshots,
     );
 
@@ -204,8 +209,11 @@ export async function buildContainer(): Promise<Container> {
   const people: IPersonRepository = new InMemoryPersonRepository(
     useJson ? makeJsonPersistence<Person>('people.json') : undefined,
   );
-  const accommodationRepo: IAccommodationRepository = new InMemoryAccommodationRepository(
-    useJson ? makeJsonPersistence<AccommodationBlock>('accommodation.json') : undefined,
+  const classrooms: IClassroomRepository = new InMemoryClassroomRepository(
+    useJson ? makeJsonPersistence<Classroom>('classrooms.json') : undefined,
+  );
+  const allocations: IAllocationRepository = new InMemoryAllocationRepository(
+    useJson ? makeJsonPersistence<RoomAllocation>('allocations.json') : undefined,
   );
   const zones: IZoneRepository = new InMemoryZoneRepository(
     useJson ? makeJsonPersistence<Zone>('zones.json') : undefined,
@@ -239,7 +247,8 @@ export async function buildContainer(): Promise<Container> {
     users,
     churches,
     people,
-    accommodation: accommodationRepo,
+    classrooms,
+    allocations,
     zones,
     groups,
     notes,
@@ -256,7 +265,8 @@ export async function buildContainer(): Promise<Container> {
     users.init(),
     churches.init(),
     people.init(),
-    accommodationRepo.init(),
+    classrooms.init(),
+    allocations.init(),
     zones.init(),
     groups.init(),
     notes.init(),
@@ -272,7 +282,7 @@ export async function buildContainer(): Promise<Container> {
   const auth = makeAuthService(users);
   const settings = makeSettingsService(settingsRepo);
   const personSvc = makePersonService(people);
-  const accommodationSvc = makeAccommodationService(accommodationRepo, churches, settingsRepo, people);
+  const accommodationSvc = makeAccommodationService(classrooms, allocations, churches, settingsRepo, people);
   const checkIn = makeCheckInService(people, settingsRepo);
   const notification = makeNotificationService(notifications, people, churches);
   const search = makeSearchService(people, churches);
@@ -286,7 +296,6 @@ export async function buildContainer(): Promise<Container> {
   const account = makeAccountService(users, churches);
   const dashboard = makeDashboardService(
     people,
-    accommodationRepo,
     notifications,
     churches,
   );
@@ -294,7 +303,8 @@ export async function buildContainer(): Promise<Container> {
     users,
     churches,
     people,
-    accommodationRepo,
+    classrooms,
+    allocations,
     faqs,
     scheduleRepo,
     notifications,

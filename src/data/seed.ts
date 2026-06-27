@@ -3,7 +3,7 @@ import type { User } from '../core/entities/user';
 import type { Church } from '../core/entities/church';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';
-import type { AccommodationBlock } from '../core/entities/accommodation';
+import type { Classroom } from '../core/entities/accommodation';
 import type { ScheduleItem } from '../core/entities/schedule';
 import type { ZoneName } from '../core/types/enums';
 import { hashPassword } from '../utils/crypto';
@@ -32,7 +32,6 @@ export async function seedAll(container: Container): Promise<void> {
       id: newId('church'),
       name,
       zone,
-      reservations: [],
       contacts: {
         male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
         female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -136,37 +135,24 @@ export async function seedAll(container: Container): Promise<void> {
     // Check-in days = each date of the camp (drives the auto AM/PM check-in sessions).
     checkInDays: ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04'],
     accommodationLocked: false,
+    tentPrice: 80,
+    classroomPrice: 120,
     campMode: 'pre-camp',
     createdAt: now,
     updatedAt: now,
   };
   await repos.settings.saveSingleton(settings);
 
-  // ----- Accommodation blocks (small scaffold) -----
-  const blocks: AccommodationBlock[] = [
-    {
-      id: newId('block'),
-      kind: 'tent',
-      name: 'Tent Field A',
-      price: 80,
-      capacity: 100,
-      baseTaken: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: newId('block'),
-      kind: 'classroom',
-      name: 'Classroom Block',
-      price: 120,
-      capacity: 60,
-      baseTaken: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
+  // ----- Classroom rooms (reusable scaffold) -----
+  const rooms: Array<{ name: string; capacity: number }> = [
+    { name: 'Room 1', capacity: 8 },
+    { name: 'Room 2', capacity: 8 },
+    { name: 'Room 3', capacity: 8 },
+    { name: 'Room 4', capacity: 6 },
   ];
-  for (const b of blocks) {
-    await repos.accommodation.save(b);
+  for (const r of rooms) {
+    const room: Classroom = { id: newId('room'), name: r.name, capacity: r.capacity, createdAt: now, updatedAt: now };
+    await repos.classrooms.save(room);
   }
 
   // ----- Schedule (pure plan communication; unrelated to daily check-in) -----

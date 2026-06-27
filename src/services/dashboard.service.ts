@@ -1,6 +1,5 @@
 import type {
   IPersonRepository,
-  IAccommodationRepository,
   INotificationRepository,
   IChurchRepository,
 } from '../repositories/interfaces/entity-repositories';
@@ -8,7 +7,6 @@ import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
 import { daysUntil, zonedNow } from '../utils/date';
 import { buildSessions } from './checkin-sessions';
-import { computeLiveTaken } from './accommodation-occupancy';
 import { isRegistrant, isCamper } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
 
@@ -24,12 +22,9 @@ export interface PreCampDashboard {
   unpaidCount: number;
   noBlueCardCount: number;
   accommodationSummary: Array<{
-    blockId: string;
-    blockName: string;
     kind: string;
-    capacity: number;
-    taken: number;
-    available: number;
+    label: string;
+    campers: number;
   }>;
   perChurchBreakdown?: Array<{
     churchId: string;
@@ -61,7 +56,6 @@ export interface DashboardService {
 
 export function makeDashboardService(
   personRepo: IPersonRepository,
-  accommodationRepo: IAccommodationRepository,
   notifRepo: INotificationRepository,
   churchRepo: IChurchRepository,
 ): DashboardService {
@@ -80,21 +74,14 @@ export function makeDashboardService(
         const unpaidCount = scoped.filter((p) => p.paymentStatus === 'unpaid').length;
         const noBlueCardCount = scoped.filter((p) => p.kind === 'leader' && p.blueCardNumber == null).length;
 
-        // B1 FIX: accommodation summary now reflects assigned occupants, not just
-        // baseTaken — via the shared occupancy module (accommodation-occupancy.ts).
-        const blocks = await accommodationRepo.findAll();
-        const takenByBlock = computeLiveTaken(blocks, allPersons);
-        const accommodationSummary = blocks.map((b) => {
-          const taken = takenByBlock.get(b.id) ?? b.baseTaken;
-          return {
-            blockId: b.id,
-            blockName: b.name,
-            kind: b.kind,
-            capacity: b.capacity,
-            taken,
-            available: b.capacity - taken,
-          };
-        });
+        // Head counts by accommodation kind (blocks removed; capacity is no longer
+        // modelled — tents auto-distribute, classrooms are allocated by room).
+        const tentN = scoped.filter((p) => p.accommodationKind === 'tent').length;
+        const classroomN = scoped.filter((p) => p.accommodationKind === 'classroom').length;
+        const accommodationSummary = [
+          { kind: 'tent', label: 'Tent City', campers: tentN },
+          { kind: 'classroom', label: 'Classrooms', campers: classroomN },
+        ];
 
         const dashboard: PreCampDashboard = {
           mode: 'pre-camp',

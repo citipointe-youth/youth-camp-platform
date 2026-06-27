@@ -65,6 +65,8 @@ export const UpdateSettingsSchema = z.object({
   checkInDays: z.array(z.string()).optional(),
   accommodationLocked: z.boolean().optional(),
   campMode: z.enum(CAMP_MODES).optional(),
+  tentPrice: z.number().min(0).optional(),
+  classroomPrice: z.number().min(0).optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof UpdateSettingsSchema>;

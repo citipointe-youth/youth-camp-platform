@@ -1,38 +1,20 @@
 import { z } from 'zod';
-import { ACCOMMODATION_KINDS } from '../types/enums';
 
-export const CreateBlockSchema = z.object({
-  kind: z.enum(ACCOMMODATION_KINDS),
+export const CreateClassroomSchema = z.object({
   name: z.string().min(1),
-  price: z.number().min(0),
   capacity: z.number().int().min(1),
-  baseTaken: z.number().int().min(0).optional().default(0),
 });
+export type CreateClassroomInput = z.infer<typeof CreateClassroomSchema>;
 
-export type CreateBlockInput = z.infer<typeof CreateBlockSchema>;
-
-export const UpdateBlockSchema = z.object({
-  kind: z.enum(ACCOMMODATION_KINDS).optional(),
+export const UpdateClassroomSchema = z.object({
   name: z.string().min(1).optional(),
-  price: z.number().min(0).optional(),
   capacity: z.number().int().min(1).optional(),
-  baseTaken: z.number().int().min(0).optional(),
 });
+export type UpdateClassroomInput = z.infer<typeof UpdateClassroomSchema>;
 
-export type UpdateBlockInput = z.infer<typeof UpdateBlockSchema>;
-
-export const ReservationPatchSchema = z.object({
-  kind: z.enum(ACCOMMODATION_KINDS),
-  spots: z.number().int().min(0),
-  label: z.string().min(1),
-  confirmed: z.boolean().optional().default(false),
+// Allocation map: roomId -> [{ key: "<churchId>|male|female", n }]
+const AllocEntrySchema = z.object({ key: z.string().min(1), n: z.number().int().min(0) });
+export const SetAllocationsSchema = z.object({
+  allocations: z.record(z.string(), z.array(AllocEntrySchema)),
 });
-
-export type ReservationPatchInput = z.infer<typeof ReservationPatchSchema>;
-
-export const SetReservationsSchema = z.object({
-  churchId: z.string().min(1),
-  reservations: z.array(ReservationPatchSchema),
-});
-
-export type SetReservationsInput = z.infer<typeof SetReservationsSchema>;
+export type SetAllocationsInput = z.infer<typeof SetAllocationsSchema>;

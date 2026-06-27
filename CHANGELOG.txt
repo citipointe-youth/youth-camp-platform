@@ -1,5 +1,30 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
+
+2026-06-27 — ACCOMMODATION ALLOCATION REWORK (branch accom-allocation-rework)
+-----------------------------------------------------------------------------
+Replaced the per-church "spot count" accommodation model with the original
+prototype's classroom-room allocation model.
+  * NEW entities: Classroom (name+capacity, reusable scaffold) + RoomAllocation
+    (roomId+churchId+gender+n). Pure logic in src/services/accommodation-allocation.ts
+    (computeGroups @75% eligibility, validateAllocations = single-gender + capacity
+    + group-cap, tentDistribution = 7/tent, leaders separate).
+  * REMOVED entirely: AccommodationBlock + per-church reservations (entity, service,
+    routes, schema, church.reservations field, occupancy module, supabase repo).
+  * Prices (tent/classroom) MOVED onto CampSettings; Budget reads them from settings.
+  * Lifecycle: classrooms join the defaults snapshot (restored on new-year, wiped on
+    reset); allocations are transient (wiped on new-year AND reset, never snapshotted).
+  * SPA: RENDER.accom = room cards + auto-fill + "unallocated" table + Tent City;
+    RENDER.adminAccom = room mgmt; church "Your accommodation" tile gated to real
+    at-camp only (not pre-camp, not preview). sw cache bumped camp-v2 -> camp-v3.
+  * Verified: tsc clean, 202 vitest pass (was 219; replaced 45 block/reservation
+    tests with 23 service + 11 pure-module; removed occupancy tests).
+  * PENDING DEPLOY: migration supabase/migrations/004_accommodation_rework.sql is
+    written but NOT applied to prod, and the branch is NOT pushed/merged. 004 is
+    DESTRUCTIVE (drops accommodation_blocks + reservations) — run an audit export
+    first, then apply + push master to deploy.
+
+
 Production-deployment work, porting the in-memory camp platform toward a real
 Supabase backend. Reference implementation: ../connection-made-simple-master
 (same hexagonal architecture, already deployed). Design + plan live in

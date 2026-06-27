@@ -2,7 +2,7 @@ import type { IRepository } from './base.repository';
 import type { User } from '../../core/entities/user';
 import type { Church } from '../../core/entities/church';
 import type { Person } from '../../core/entities/person';
-import type { AccommodationBlock } from '../../core/entities/accommodation';
+import type { Classroom, RoomAllocation } from '../../core/entities/accommodation';
 import type { Zone } from '../../core/entities/zone';
 import type { Group } from '../../core/entities/group';
 import type { StudentNote } from '../../core/entities/note';
@@ -40,8 +40,10 @@ export interface IPersonRepository extends IRepository<Person> {
   // deleteAll() inherited from IRepository (bulk clear; Supabase: TRUNCATE).
 }
 
-export interface IAccommodationRepository extends IRepository<AccommodationBlock> {
-  findByKind(kind: string): Promise<AccommodationBlock[]>;
+export interface IClassroomRepository extends IRepository<Classroom> {}
+
+export interface IAllocationRepository extends IRepository<RoomAllocation> {
+  findByRoom(roomId: string): Promise<RoomAllocation[]>;
 }
 
 export interface IZoneRepository extends IRepository<Zone> {

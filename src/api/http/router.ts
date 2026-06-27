@@ -88,13 +88,14 @@ export function buildRoutes(services: Services): (Route | BufferRoute)[] {
     { method: 'DELETE', path: '/registrants/:id', auth: true, handler: (r) => registrant.remove(r) },
 
     // ----- Accommodation -----
-    { method: 'GET', path: '/accommodation/blocks', auth: true, handler: (r) => accommodation.blocks(r) },
-    { method: 'POST', path: '/accommodation/blocks', auth: true, handler: (r) => accommodation.createBlock(r) },
-    { method: 'GET', path: '/accommodation/blocks/:id', auth: true, handler: (r) => accommodation.getBlock(r) },
-    { method: 'PATCH', path: '/accommodation/blocks/:id', auth: true, handler: (r) => accommodation.updateBlock(r) },
-    { method: 'DELETE', path: '/accommodation/blocks/:id', auth: true, handler: (r) => accommodation.deleteBlock(r) },
-    { method: 'GET', path: '/accommodation/held/:churchId', auth: true, handler: (r) => accommodation.held(r) },
-    { method: 'POST', path: '/accommodation/reservations', auth: true, handler: (r) => accommodation.setReservations(r) },
+    { method: 'GET', path: '/accommodation/classrooms', auth: true, handler: (r) => accommodation.classrooms(r) },
+    { method: 'POST', path: '/accommodation/classrooms', auth: true, handler: (r) => accommodation.createClassroom(r) },
+    { method: 'PATCH', path: '/accommodation/classrooms/:id', auth: true, handler: (r) => accommodation.updateClassroom(r) },
+    { method: 'DELETE', path: '/accommodation/classrooms/:id', auth: true, handler: (r) => accommodation.deleteClassroom(r) },
+    { method: 'GET', path: '/accommodation/groups', auth: true, handler: (r) => accommodation.groups(r) },
+    { method: 'GET', path: '/accommodation/allocations', auth: true, handler: (r) => accommodation.allocations(r) },
+    { method: 'PATCH', path: '/accommodation/allocations', auth: true, handler: (r) => accommodation.setAllocations(r) },
+    { method: 'GET', path: '/accommodation/church-rooms/:churchId', auth: true, handler: (r) => accommodation.churchRooms(r) },
 
     // ----- Campers (at-camp / Portal) -----
     // NOTE: literal routes (/campers/medical) must be declared BEFORE parameterised (/campers/:id)

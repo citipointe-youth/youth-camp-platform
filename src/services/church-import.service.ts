@@ -94,7 +94,6 @@ export function makeChurchImportService(
             id: churchId,
             name,
             zone,
-            reservations: [],
             contacts: {
               male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
               female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
