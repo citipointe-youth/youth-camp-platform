@@ -9,7 +9,6 @@ import type { IPersonRepository } from '../interfaces/entity-repositories';
 import type { Person } from '../../core/entities/person';
 import type { CheckInEntry, SignOutEvent, ElvantoMeta } from '../../core/entities/person';
 import { isCamper } from '../../core/entities/person';
-import { chunk } from './bulk';
 
 // ---------------------------------------------------------------------------
 // Row → entity mappers
@@ -215,12 +214,14 @@ export class SupabasePersonRepository implements IPersonRepository {
   async saveMany(people: Person[]): Promise<Person[]> {
     if (people.length === 0) return [];
     await this.sql.begin(async (tx: TxClient) => {
-      for (const batch of chunk(people)) {
+      // Each person must be upserted individually — the batch ON CONFLICT DO UPDATE
+      // would incorrectly overwrite every conflicting row with batch[0]'s values.
+      for (const p of people) {
         await tx`
-          insert into people ${tx(batch.map(personColumns))}
-          on conflict (id) do update set ${tx(batch[0] ? personColumns(batch[0]) : {}, ...PERSON_UPDATE_COLS)}
+          insert into people ${tx(personColumns(p))}
+          on conflict (id) do update set ${tx(personColumns(p), ...PERSON_UPDATE_COLS)}
         `;
-        for (const p of batch) await replaceHistories(tx, p);
+        await replaceHistories(tx, p);
       }
     });
     return people;

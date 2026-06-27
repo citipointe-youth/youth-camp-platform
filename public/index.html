@@ -470,7 +470,7 @@ async function doLogin(){
     document.getElementById('login').style.display='none';
     document.getElementById('bar').style.display='flex';
     document.getElementById('stage').style.display='block';
-    document.getElementById('tabs').style.display='flex';
+    document.getElementById('tabs').style.display='';  // let CSS media query control visibility
     updateModeUI();buildTabs();_prefetch();STACK=['home'];await gotoTab('home');
   }catch(e){if(err){err.textContent=e.message;err.style.display='block';}else toast(e.message);}
 }
@@ -586,24 +586,42 @@ function _renderWideNav(activeId){
   if(!ACTOR){nav.innerHTML='';return;}
   let adminItems=[];
   if(ACTOR.role==='admin'){
-    const atOnly=CAMP_MODE==='at-camp';const preOnly=CAMP_MODE==='pre-camp';
-    adminItems=[
-      {id:'home',label:'Home'},
-      ...(atOnly?[{id:'checkin',label:'Check-in'},{id:'search',label:'Search'},{id:'notes',label:'Notes'},{id:'notifs',label:'Notices'}]:[]),
-      ...(preOnly?[{id:'people',label:'My Youth'}]:[]),
-      {id:'adminAccounts',label:'Accounts'},{id:'adminSettings',label:'Settings'},
-      {id:'adminAccom',label:'Accommodation'},{id:'adminSchedEdit',label:'Schedule'},
-      {id:'adminData',label:'Data, Reset &amp; Exports'},{id:'adminWizard',label:'Setup Wizard'},
-    ];
+    if(CAMP_MODE==='pre-camp'){
+      adminItems=[
+        {id:'home',label:'Home'},
+        {id:'people',label:'My Youth'},
+        {id:'data',label:'Data'},
+        {id:'notifs',label:'Notices'},
+        {id:'budget',label:'Budget & Costings'},
+        {id:'accom',label:'Accommodation Allocations'},
+        {id:'adminSettings',label:'Admin Settings'},
+      ];
+    }else{
+      adminItems=[
+        {id:'home',label:'Home'},
+        {id:'checkin',label:'Check-in'},
+        {id:'search',label:'Search'},
+        {id:'notes',label:'Notes'},
+        {id:'notifs',label:'Notices'},
+        {id:'adminSettings',label:'Admin Settings'},
+      ];
+    }
   }else if(ACTOR.role==='director'){
-    const atOnly=CAMP_MODE==='at-camp';const preOnly=CAMP_MODE==='pre-camp';
-    adminItems=[
-      {id:'home',label:'Home'},
-      ...(atOnly?[{id:'checkin',label:'Check-in'},{id:'search',label:'Search'},{id:'notes',label:'Notes'},{id:'notifs',label:'Notices'}]:[]),
-      ...(preOnly?[{id:'people',label:'My Youth'}]:[]),
-      {id:'import',label:'Import Students'},
-      {id:'adminData',label:'Records &amp; Exports'},
-    ];
+    if(CAMP_MODE==='pre-camp'){
+      adminItems=[
+        {id:'home',label:'Home'},
+        {id:'people',label:'My Youth'},
+        {id:'data',label:'Data'},
+        {id:'notifs',label:'Notices'},
+      ];
+    }else{
+      adminItems=[
+        {id:'home',label:'Home'},
+        {id:'checkin',label:'Check-in'},
+        {id:'search',label:'Search'},
+        {id:'notifs',label:'Notices'},
+      ];
+    }
   }
   if(!adminItems.length)return;
   nav.innerHTML=adminItems.map(item=>
@@ -1711,32 +1729,32 @@ RENDER.adminAccounts=async function(){
   const leaderRoles=['zoneLeader','director','firstAid'];
   const leaders=users.filter(u=>leaderRoles.includes(u.role));
   const roleLabel=r=>r==='zoneLeader'?'Zone leader':r==='firstAid'?'First aid':r==='director'?'Director':r;
-  const legend=`<div class="acct-legend"><span>${ic('edit')} Rename</span><span>${ic('at')} Username</span><span>${ic('key')} Password</span><span>${ic('trash')} Delete</span></div>`;
-  const row=o=>`<div class="acct-row"><div style="flex:1;min-width:0">
-      <div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.title}</div>
-      <div class="sub" style="font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.sub}</div></div>
-    <div class="acct-actions">
-      <button class="iconbtn" title="Rename" onclick="${o.onName}">${ic('edit')}</button>
-      <button class="iconbtn" title="Change username" onclick="${o.onUser}">${ic('at')}</button>
-      <button class="iconbtn" title="Change password" onclick="${o.onPass}">${ic('key')}</button>
-      <button class="iconbtn danger" title="Delete" onclick="${o.onDel}">${ic('trash')}</button></div></div>`;
-  const lr=leaders.map(u=>row({
-    title:esc(u.firstName+' '+u.lastName)+' <span style="color:var(--muted);font-weight:600">· '+roleLabel(u.role)+'</span>',
-    sub:'@'+esc(u.username||'')+(u.zone?' · '+esc(u.zone):'')+(u.status==='inactive'?' · inactive':''),
+  const acctTile=o=>`<div class="tile" style="align-items:stretch;text-align:left;padding:12px;min-height:unset;cursor:default;gap:0">
+      <div style="font-weight:700;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">${o.title}</div>
+      <div style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px">${o.sub}</div>
+      <div style="display:flex;gap:5px;margin-top:auto;flex-wrap:wrap">
+        <button class="iconbtn" title="Rename" onclick="${o.onName}">${ic('edit')}</button>
+        <button class="iconbtn" title="Change username" onclick="${o.onUser}">${ic('at')}</button>
+        <button class="iconbtn" title="Change password" onclick="${o.onPass}">${ic('key')}</button>
+        <button class="iconbtn danger" title="Delete" onclick="${o.onDel}">${ic('trash')}</button>
+      </div></div>`;
+  const tileGrid=items=>items.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:4px">${items.join('')}</div>`:'<p class="note-hint">None yet.</p>';
+  const lr=tileGrid(leaders.map(u=>acctTile({
+    title:esc(u.firstName+' '+u.lastName),
+    sub:roleLabel(u.role)+(u.username?' · @'+esc(u.username):'')+(u.zone?' · '+esc(u.zone):'')+(u.status==='inactive'?' · inactive':''),
     onName:`editLeaderName('${u.id}')`,onUser:`editUsername('${u.id}')`,onPass:`changePassword('${u.id}')`,onDel:`delAcct('${u.id}')`
-  })).join('')||'<p class="note-hint">No leadership accounts yet.</p>';
-  const cr=churches.map(c=>{const cu=users.find(u=>u.role==='church'&&u.churchId===c.id)||{};
-    return row({
-      title:esc(c.name)+' <span style="color:var(--muted);font-weight:600">· Church</span>',
-      sub:(cu.username?'@'+esc(cu.username):'<span style="color:var(--danger)">no login</span>')+' · '+esc(c.zone||'—'),
+  })));
+  const cr=tileGrid(churches.map(c=>{const cu=users.find(u=>u.role==='church'&&u.churchId===c.id)||{};
+    return acctTile({
+      title:esc(c.name),
+      sub:'Church · '+esc(c.zone||'—')+(cu.username?' · @'+esc(cu.username):'<span style="color:var(--danger)"> · no login</span>'),
       onName:`editChurchName('${c.id}')`,
       onUser:cu.id?`editUsername('${cu.id}')`:`toast('No login account for this church')`,
       onPass:cu.id?`changePassword('${cu.id}')`:`toast('No login account for this church')`,
       onDel:`delChurch('${c.id}')`
-    });}).join('')||'<p class="note-hint">No churches yet.</p>';
+    });}));
   const roleOpts=`<option value="director">Director</option><option value="zoneLeader">Zone leader</option><option value="firstAid">First aid</option>`;
   paint('adminAccounts',`
-    ${legend}
     <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>${lr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Churches</div>${cr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add leadership account</div>
@@ -1825,21 +1843,25 @@ async function _rContacts(){const el=document.getElementById('stage');const y=el
 RENDER.adminAccom=async function(){
   const rooms=await api('/accommodation/classrooms');
   window._adminRooms=rooms||[];
-  const rows=(rooms||[]).map(rm=>`
-    <div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)">
-      <span style="width:22px;text-align:center;flex:none">⌂</span>
-      <input class="fld" id="rn_${rm.id}" value="${esc(rm.name)}" placeholder="Name" style="flex:3;min-width:0">
-      <input class="fld" id="rc_${rm.id}" type="number" inputmode="numeric" min="0" value="${rm.capacity}" placeholder="Cap" style="flex:1;min-width:48px;max-width:80px;padding:6px 4px">
-      <button class="btn sm" onclick="saveRoom('${rm.id}')" style="flex:none;padding:5px 10px">✓</button>
-      <button class="btn red sm" onclick="delRoom('${rm.id}')" style="flex:none;padding:5px 8px">✕</button>
+  const tiles=(rooms||[]).map(rm=>`
+    <div class="tile" style="align-items:stretch;text-align:left;padding:12px;min-height:unset;cursor:default">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input class="fld" id="rn_${rm.id}" value="${esc(rm.name)}" placeholder="Name" style="flex:1;min-width:0">
+        <input class="fld" id="rc_${rm.id}" type="number" inputmode="numeric" min="0" value="${rm.capacity}" placeholder="Cap" style="width:60px;flex:none;padding:6px 4px">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn sm" onclick="saveRoom('${rm.id}')" style="flex:1">Save ✓</button>
+        <button class="btn red sm" onclick="delRoom('${rm.id}')" style="flex:none">✕</button>
+      </div>
     </div>`).join('')||'<p class="note-hint">No classroom rooms yet.</p>';
+  const tileGrid=rooms&&rooms.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:4px">${tiles}</div>`:tiles;
   paint('adminAccom',`<div class="infobox">Classroom rooms have a name &amp; capacity. Tent City is auto-distributed (7 per tent) — no setup needed. Prices are set in Camp settings.</div>
-    <div class="card"><h3 class="sec" style="margin-top:0">Classroom rooms</h3>${rows}</div>
+    <div class="card"><h3 class="sec" style="margin-top:0">Classroom rooms</h3>${tileGrid}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a room</div>
       <div style="display:flex;gap:6px;align-items:flex-end">
         <div style="flex:2;min-width:110px"><label style="font-size:.72rem">Name</label><input class="fld" id="nrName" placeholder="e.g. Room 5"></div>
         <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Cap</label><input class="fld" id="nrCap" type="number" inputmode="numeric" min="0" value="8"></div>
-        <button class="btn" onclick="addRoom()" style="flex:none;align-self:flex-end">Add</button>
+        <button class="btn sm" onclick="addRoom()" style="flex:none;align-self:flex-end">Add</button>
       </div></div>`,'Accommodation setup','Classroom rooms');
 };
 async function saveRoom(id){const el=document.getElementById('stage');const y=el?el.scrollTop:0;
@@ -2167,7 +2189,9 @@ function _renderImportPreview(r){
       <button class="btn ghost" style="margin-top:6px;margin-left:6px" onclick="_clearImport()">Cancel</button>`;
   }
   const confirmHtml=_pendingImportCsv&&!phantoms.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:'';
-  box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip \xb7 ${(r.errors||[]).length} errors</div>
+  const delCount=r.deleted||0;
+  const delNote=delCount?` · <b style="color:#b91c1c">${delCount} to delete</b>`:'';
+  box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip${delNote} \xb7 ${(r.errors||[]).length} errors</div>
     ${phantomHtml}${errHtml}${confirmHtml}`;
 }
 async function _createPhantomChurches(names){
@@ -2304,7 +2328,10 @@ RENDER.adminContacts=async function(){
         <button class="btn" style="margin-top:10px" onclick="saveContacts('${c.id}')">Save ${esc(c.name)}</button>
         <p class="note-hint">Leave blank to clear. Numbers are masked until audited reveal.</p>
       </div></div>`;};
-  paint('adminContacts',churches.map(card).join('')||'<p class="note-hint">No churches yet.</p>','Ministry contacts','Tap a church to edit');
+  const grid=churches.length
+    ?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">${churches.map(card).join('')}</div>`
+    :'<p class="note-hint">No churches yet.</p>';
+  paint('adminContacts',grid,'Ministry contacts','Tap a church to edit');
 };
 function toggleContactCard(id){const b=document.getElementById('contactBody_'+id),ch=document.getElementById('contactChev_'+id);if(!b)return;const open=b.style.display!=='none';b.style.display=open?'none':'block';if(ch)ch.style.transform=open?'':'rotate(90deg)';}
 async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
@@ -2321,7 +2348,7 @@ async function _tryRestoreSession(){
     document.getElementById('login').style.display='none';
     document.getElementById('bar').style.display='flex';
     document.getElementById('stage').style.display='block';
-    document.getElementById('tabs').style.display='flex';
+    document.getElementById('tabs').style.display='';  // let CSS media query control visibility
     updateModeUI();buildTabs();_prefetch();STACK=['home'];await gotoTab('home');
   }catch(e){
     TOKEN=null;ACTOR=null;

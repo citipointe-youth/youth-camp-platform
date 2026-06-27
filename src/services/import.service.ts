@@ -25,6 +25,7 @@ export interface ImportResult {
   created: number;
   updated: number;
   skipped: number;
+  deleted: number;
   dryRun: boolean;
   errors: Array<{ row: number; message: string }>;
   warnings: Array<{ row: number; message: string }>;
@@ -136,6 +137,10 @@ export function makeImportService(
 
       const touched = new Map<string, Person>();
       const createdIds = new Set<string>();
+      // seenIds: every person matched or created from the CSV (present in the upload).
+      // Used to compute absent deletions — separate from touched so skipped persons
+      // (updateExisting=false path) are not deleted.
+      const seenIds = new Set<string>();
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]!;
@@ -184,12 +189,21 @@ export function makeImportService(
           const parentRelation = field(row, 'Relation to Child', 'parentRelation') || null;
           const parentPhone = field(row, 'Parent/Guardian Phone Number', 'parentPhone', 'parent_phone') || null;
           const zone = field(row, 'zone', 'Zone') || opts.defaultZone || '';
-          const registrationType = field(row, 'Registration Type', 'registrationType', 'registration_type') || null;
+          // 'Type' is the canonical Elvanto column; fall back to explicit aliases
+          const typeRaw = field(row, 'Type', 'Registration Type', 'registrationType', 'registration_type');
+          const registrationType = typeRaw || null;
+          // 'Type' values 'Classroom'/'Tent' drive accommodation grouping
+          const accommodationKindRaw = typeRaw.toLowerCase();
+          const accommodationKind: Person['accommodationKind'] =
+            accommodationKindRaw === 'classroom' ? 'classroom'
+            : accommodationKindRaw === 'tent' ? 'tent'
+            : null;
           const registrationCostRaw = field(row, 'Cost', 'Registration Cost', 'registrationCost', 'registration_cost') || '';
           const registrationCost = registrationCostRaw
             ? parseFloat(registrationCostRaw.replace(/[^0-9.]/g, '')) || null
             : null;
-          const discountCode = field(row, 'Discount Code', 'discountCode', 'discount_code') || null;
+          // 'Code' is the canonical Elvanto column for discount codes
+          const discountCode = field(row, 'Code', 'Discount Code', 'discountCode', 'discount_code') || null;
 
           // Verbatim submission metadata (kept for byte-for-byte export round-trip).
           const raw = (h: string): string => (row[h] ?? '').trim();
@@ -217,6 +231,7 @@ export function makeImportService(
           const isExisting = match !== undefined && !createdIds.has(match.id);
 
           if (match && isExisting && !opts.updateExisting) {
+            seenIds.add(match.id);
             skipped++;
           } else if (match) {
             const merged: Person = {
@@ -241,6 +256,7 @@ export function makeImportService(
               blueCardExpiry: blueCardExpiry ?? match.blueCardExpiry,
               churchUnlistedNote: churchUnlistedNote ?? match.churchUnlistedNote,
               elvantoMeta: elvantoMeta.dateSubmitted ? elvantoMeta : match.elvantoMeta,
+              accommodationKind: accommodationKind ?? match.accommodationKind,
               registrationType: registrationType ?? match.registrationType,
               registrationCost: registrationCost ?? match.registrationCost,
               discountCode: discountCode ?? match.discountCode,
@@ -256,6 +272,7 @@ export function makeImportService(
             }
             const firstTouch = !touched.has(merged.id);
             touched.set(merged.id, merged);
+            seenIds.add(merged.id);
             if (isExisting && firstTouch) updated++;
           } else {
             const person: Person = {
@@ -289,7 +306,7 @@ export function makeImportService(
               churchId: resolvedChurchId,
               churchName: churchName || resolvedChurchId,
               paymentStatus: 'unpaid',
-              accommodationKind: null,
+              accommodationKind,
               accommodationLabel: null,
               registrationType,
               registrationCost,
@@ -303,6 +320,7 @@ export function makeImportService(
             };
             touched.set(person.id, person);
             createdIds.add(person.id);
+            seenIds.add(person.id);
             const p = poolByNameChurch.get(nck);
             if (p) p.push(person);
             else poolByNameChurch.set(nck, [person]);
@@ -314,11 +332,16 @@ export function makeImportService(
         }
       }
 
-      if (!opts.dryRun && touched.size > 0) {
-        await personRepo.saveMany([...touched.values()]);
+      // Anyone in the DB but not in the uploaded CSV is removed (the upload is authoritative).
+      const absentIds = allPersons.map((p) => p.id).filter((id) => !seenIds.has(id));
+      const deleted = absentIds.length;
+
+      if (!opts.dryRun) {
+        if (touched.size > 0) await personRepo.saveMany([...touched.values()]);
+        for (const id of absentIds) await personRepo.delete(id);
       }
 
-      return { created, updated, skipped, dryRun: opts.dryRun, errors, warnings, churchesCreated, phantomChurches };
+      return { created, updated, skipped, deleted, dryRun: opts.dryRun, errors, warnings, churchesCreated, phantomChurches };
     },
   };
 }

@@ -117,7 +117,7 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
     expect(all[0]!.grade).toBe(12);
   });
 
-  it('updates the phone-matching existing twin (not the other) on re-import', async () => {
+  it('updates the phone-matching twin and deletes the absent twin on re-import', async () => {
     await h.svc.importCsv(actor('admin'), {
       csvData:
         'First Name,Last Name,Church,Mobile,Grade\n' +
@@ -125,16 +125,15 @@ describe('ImportService.importCsv — same-name disambiguation by phone', () => 
         'Sam,Lee,Victory,0400 222 222,9',
     });
     const res = await h.svc.importCsv(actor('admin'), {
+      // Only 0400 222 222 in the CSV — 0400 111 111 is absent and should be deleted
       csvData: 'First Name,Last Name,Church,Mobile,Grade\nSam,Lee,Victory,0400 222 222,12',
       updateExisting: true,
     });
-    expect(res).toMatchObject({ created: 0, updated: 1 });
+    // The absent twin (0400 111 111) is deleted; deleted count reflects it
+    expect(res).toMatchObject({ created: 0, updated: 1, deleted: 1 });
     const all = await h.personRepo.findAll();
-    expect(all).toHaveLength(2);
-    const twin1 = all.find((c) => (c.mobile ?? '').replace(/\D/g, '') === '0400111111');
-    const twin2 = all.find((c) => (c.mobile ?? '').replace(/\D/g, '') === '0400222222');
-    expect(twin1!.grade).toBe(9); // untouched
-    expect(twin2!.grade).toBe(12); // the phone-matched twin updated
+    expect(all).toHaveLength(1);
+    expect(all[0]!.grade).toBe(12); // the phone-matched twin updated
   });
 });
 
