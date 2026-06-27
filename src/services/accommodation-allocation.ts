@@ -32,7 +32,6 @@ interface ChurchTally {
 function tallyChurches(occupants: readonly AllocationOccupant[]): Map<string, ChurchTally> {
   const by = new Map<string, ChurchTally>();
   for (const o of occupants) {
-    if (o.kind === 'leader') continue;          // groups are campers only
     if (o.lifecycle === 'cancelled') continue;
     let c = by.get(o.churchId);
     if (!c) {

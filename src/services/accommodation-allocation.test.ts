@@ -33,16 +33,16 @@ describe('computeGroups (75% eligibility)', () => {
     expect(computeGroups(people)).toEqual([]);
   });
 
-  it('ignores leaders and cancelled people in the classroom counts', () => {
+  it('includes leaders but ignores cancelled people in the classroom counts', () => {
     const people = [
-      occ({ churchId: 'c3', kind: 'leader' }),
+      occ({ churchId: 'c3', kind: 'leader' }),       // included — leader counts toward pool
       occ({ churchId: 'c3', lifecycle: 'cancelled' }),
       occ({ churchId: 'c3', gender: 'male' }),
     ];
     const groups = computeGroups(people);
     expect(groups).toHaveLength(1);
     expect(groups[0]!.key).toBe('c3|male');
-    expect(groups[0]!.n).toBe(1);
+    expect(groups[0]!.n).toBe(2);                     // leader + student
     expect(groups[0]!.gender).toBe('male');
   });
 });
