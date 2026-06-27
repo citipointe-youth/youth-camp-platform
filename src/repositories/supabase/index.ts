@@ -1,7 +1,8 @@
 export { SupabaseUserRepository } from './supabase.users';
 export { SupabaseChurchRepository } from './supabase.churches';
 export { SupabasePersonRepository } from './supabase.people';
-export { SupabaseAccommodationRepository } from './supabase.accommodation';
+export { SupabaseClassroomRepository } from './supabase.classroom';
+export { SupabaseAllocationRepository } from './supabase.allocation';
 export { SupabaseZoneRepository } from './supabase.zones';
 export { SupabaseGroupRepository } from './supabase.groups';
 export { SupabaseNoteRepository } from './supabase.notes';
