@@ -910,7 +910,7 @@ function personRow(s){
   const dot=flag?`<span style="width:8px;height:8px;border-radius:50%;background:#e11d48;display:inline-block;margin-left:6px"></span>`:'';
   const tags=[];
   if(isL)tags.push(s.blueCardCollected?'<span class="pill ok">✓ Blue card</span>':'<span class="pill warn">No blue card</span>');
-  if(s.medical)tags.push(`<span class="pill info">⚕ ${esc(s.medical)}</span>`);
+  if(s.medicalConditions&&s.medicalConditions.length)tags.push(`<span class="pill info">⚕ ${esc(s.medicalConditions.join(', '))}</span>`);
   if(!tags.length)tags.push('<span class="pill ok">All good</span>');
   const tag=isL?'<span class="lead-tag">LEADER</span>':`<span class="gradepill">Gr ${s.grade}</span>`;
   return `<div class="row" onclick="openPerson('${s.id}')"><div class="av ${esc(s.gender)}">${initials(s.firstName+' '+s.lastName)}</div>
@@ -926,9 +926,11 @@ async function openPerson(id){
     <div style="color:#cfe0ff;font-size:.82rem">${esc(s.churchName)} · ${esc(s.zone)} Zone · ${isL?'Leader (18+)':'Grade '+s.grade}</div></div>
     <div class="card">
       <div class="kv2"><span class="k">Accommodation</span><span class="v">${esc(accDisplay(s))}</span></div>
-      ${isL?'':`<div class="kv2"><span class="k">Dietary</span><span class="v">${esc(s.dietary||'—')}</span></div>
-      <div class="kv2"><span class="k">Medical</span><span class="v">${esc(s.medical||'—')}</span></div>
-      <div class="kv2"><span class="k">Parent</span><span class="v">${esc(s.parentName||'—')}</span></div>`}
+      ${isL?'':`<div class="kv2"><span class="k">Dietary</span><span class="v">${esc((s.dietaryRequirements||[]).join(', ')||'—')}</span></div>
+      <div class="kv2"><span class="k">Medical</span><span class="v">${esc((s.medicalConditions||[]).join(', ')||'—')}</span></div>
+      <div class="kv2"><span class="k">Parent</span><span class="v">${esc(s.parentGuardianName||'—')}</span></div>
+      ${s.registrationType?`<div class="kv2"><span class="k">Reg type</span><span class="v">${esc(s.registrationType)}</span></div>`:''}
+      ${s.registrationCost!=null?`<div class="kv2"><span class="k">Paid</span><span class="v">$${s.registrationCost.toLocaleString()}</span></div>`:''}`}
       ${isL?`<div class="kv2"><span class="k">Blue card (WWC)</span><span class="v">${s.blueCardCollected?'<span class="pill ok">✓ Collected</span>':'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
     </div>
     ${isL?`<div class="card"><div class="lbl" style="margin-top:0">Blue card (WWC)</div>
@@ -1257,22 +1259,22 @@ RENDER.budget=async function(){
   paint('budget',`${selHtml}<div id="budgetBody"></div>`,'Budget & costings','Camper fees by accommodation');
   drawBudget();
 };
-function budgetAmount(r,price){return price[r.accommodationKind]||0;}
 function drawBudget(){
-  const regs=window._budgetRegs||[],price=window._budgetPrice||{tent:140,classroom:120};
+  const regs=window._budgetRegs||[];
   const scope=sel('budChurch')||'all';
   const campers=(scope==='all'?regs:regs.filter(r=>r.churchId===scope)).filter(r=>r.kind==='camper');
-  const cats=[{key:'tent',label:'△ Tent'},{key:'classroom',label:'⌂ Classroom'}];
-  let total=0;
-  const rows=cats.map(t=>{const grp=campers.filter(r=>r.accommodationKind===t.key);const amt=grp.reduce((s,r)=>s+budgetAmount(r,price),0);total+=amt;
-    return `<div class="card"><div class="rowsb"><div><div style="font-weight:600">${t.label}</div><div class="sub">${grp.length} ${grp.length===1?'camper':'campers'} · $${price[t.key]||0} ea</div></div><b style="font-size:1.05rem">$${amt.toLocaleString()}</b></div></div>`;
-  }).join('');
-  const unset=campers.filter(r=>r.accommodationKind!=='tent'&&r.accommodationKind!=='classroom').length;
+  const withCost=campers.filter(r=>r.registrationCost!=null);
+  const noCost=campers.length-withCost.length;
+  const total=withCost.reduce((s,r)=>s+(r.registrationCost||0),0);
+  // Group by registration type
+  const byType={};
+  withCost.forEach(r=>{const t=r.registrationType||'Standard';byType[t]=(byType[t]||{count:0,sum:0});byType[t].count++;byType[t].sum+=(r.registrationCost||0);});
+  const typeRows=Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0])).map(([t,v])=>`<div class="card"><div class="rowsb"><div><div style="font-weight:600">${esc(t)}</div><div class="sub">${v.count} ${v.count===1?'camper':'campers'}</div></div><b style="font-size:1.05rem">$${v.sum.toLocaleString()}</b></div></div>`).join('');
   const head=`<div class="card" style="background:linear-gradient(135deg,#9333ea,#1e1b4b);color:#fff;border:none">
     <div class="lbl" style="color:#d8b4fe;margin:0">Fees${scope==='all'?' · all ministries':''}</div>
     <div style="font-size:2rem;font-weight:800">$${total.toLocaleString()}</div>
-    <div style="font-size:.8rem;color:#cfe0ff">${campers.length} campers${unset?' · '+unset+' without accommodation set':''}</div></div>`;
-  const box=document.getElementById('budgetBody');if(box)box.innerHTML=head+`<h3 class="sec">By accommodation</h3>`+rows;
+    <div style="font-size:.8rem;color:#cfe0ff">${withCost.length} campers${noCost?' · '+noCost+' without cost recorded':''}</div></div>`;
+  const box=document.getElementById('budgetBody');if(box)box.innerHTML=head+(typeRows?`<h3 class="sec">By registration type</h3>`+typeRows:'');
 }
 
 /* ===== ACCOMMODATION ALLOCATIONS (director/admin) =====
@@ -2074,14 +2076,15 @@ function dataApply(){
     else if(f.grade){if(r.kind==='leader'||String(r.grade??'')!==f.grade)return false;}
     return true;
   });
-  const hdr=['Name','Church','Gender','Grade','Mobile','Medical','Dietary','Other','Blue card'];
+  const hdr=['Name','Church','Gender','Grade','Reg type','Cost','Discount code','Mobile','Medical','Dietary','Other','Blue card'];
   const td=v=>`<td style="border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(v||'—')}</td>`;
   const body=rows.map(r=>{
     const grade=r.kind==='leader'?'Leader':(r.grade??'—');
-    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.mobile)}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
+    const cost=r.registrationCost!=null?'$'+r.registrationCost.toLocaleString():'—';
+    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.registrationType)}${td(cost)}${td(r.discountCode)}${td(r.mobile)}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
   }).join('');
   const t=document.getElementById('dataTbl');
-  if(t)t.innerHTML=`<thead><tr>${hdr.map(h=>`<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted)">${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="9" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
+  if(t)t.innerHTML=`<thead><tr>${hdr.map(h=>`<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted)">${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="12" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
   const c=document.getElementById('dataCount');if(c)c.textContent=`${rows.length} of ${(_dataCache||[]).length} registrants`;
 }
 async function dataExport(filtered){

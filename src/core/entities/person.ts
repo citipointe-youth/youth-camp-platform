@@ -96,6 +96,9 @@ export interface Person {
   paymentStatus: PaymentStatus;
   accommodationKind?: AccommodationKind | null;
   accommodationLabel?: string | null;
+  registrationType?: string | null;
+  registrationCost?: number | null;
+  discountCode?: string | null;
 
   // ----- lifecycle (the unification core) -----
   lifecycle: PersonLifecycle;

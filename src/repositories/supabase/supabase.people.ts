@@ -87,6 +87,9 @@ function toPerson(
     paymentStatus: row['payment_status'] as Person['paymentStatus'],
     accommodationKind: (row['accommodation_kind'] as Person['accommodationKind']) ?? null,
     accommodationLabel: (row['accommodation_label'] as string | null) ?? null,
+    registrationType: (row['registration_type'] as string | null) ?? null,
+    registrationCost: (row['registration_cost'] as number | null) ?? null,
+    discountCode: (row['discount_code'] as string | null) ?? null,
     lifecycle: row['lifecycle'] as Person['lifecycle'],
     atCamp: row['at_camp'] as boolean,
     checkInHistory: checkIns,
@@ -274,6 +277,9 @@ function personColumns(p: Person): Record<string, unknown> {
     payment_status: p.paymentStatus,
     accommodation_kind: p.accommodationKind ?? null,
     accommodation_label: p.accommodationLabel ?? null,
+    registration_type: p.registrationType ?? null,
+    registration_cost: p.registrationCost ?? null,
+    discount_code: p.discountCode ?? null,
     lifecycle: p.lifecycle,
     at_camp: p.atCamp,
     created_at: p.createdAt,
@@ -288,7 +294,8 @@ const PERSON_UPDATE_COLS = [
   'postcode', 'state', 'medical_conditions', 'dietary_requirements', 'other_medications',
   'parent_guardian_name', 'parent_phone', 'parent_relation', 'blue_card_number',
   'blue_card_expiry', 'consents', 'payment_status', 'accommodation_kind',
-  'accommodation_label', 'lifecycle', 'at_camp', 'updated_at',
+  'accommodation_label', 'registration_type', 'registration_cost', 'discount_code',
+  'lifecycle', 'at_camp', 'updated_at',
 ] as const;
 
 /** Delete + reinsert a person's history child rows (authoritative replace). */

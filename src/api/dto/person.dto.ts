@@ -39,6 +39,9 @@ export interface RegistrantDto {
   consentMedical: boolean;
   consentMedia: boolean;
   consentSupervision: boolean;
+  registrationType: string | null;
+  registrationCost: number | null;
+  discountCode: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,6 +128,9 @@ export function toRegistrantDto(p: Person): RegistrantDto {
     consentMedical: p.consents.medical?.granted ?? false,
     consentMedia: p.consents.media?.granted ?? false,
     consentSupervision: p.consents.supervision?.granted ?? false,
+    registrationType: p.registrationType ?? null,
+    registrationCost: p.registrationCost ?? null,
+    discountCode: p.discountCode ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

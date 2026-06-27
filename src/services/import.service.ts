@@ -184,6 +184,12 @@ export function makeImportService(
           const parentRelation = field(row, 'Relation to Child', 'parentRelation') || null;
           const parentPhone = field(row, 'Parent/Guardian Phone Number', 'parentPhone', 'parent_phone') || null;
           const zone = field(row, 'zone', 'Zone') || opts.defaultZone || '';
+          const registrationType = field(row, 'Registration Type', 'registrationType', 'registration_type') || null;
+          const registrationCostRaw = field(row, 'Cost', 'Registration Cost', 'registrationCost', 'registration_cost') || '';
+          const registrationCost = registrationCostRaw
+            ? parseFloat(registrationCostRaw.replace(/[^0-9.]/g, '')) || null
+            : null;
+          const discountCode = field(row, 'Discount Code', 'discountCode', 'discount_code') || null;
 
           // Verbatim submission metadata (kept for byte-for-byte export round-trip).
           const raw = (h: string): string => (row[h] ?? '').trim();
@@ -235,6 +241,9 @@ export function makeImportService(
               blueCardExpiry: blueCardExpiry ?? match.blueCardExpiry,
               churchUnlistedNote: churchUnlistedNote ?? match.churchUnlistedNote,
               elvantoMeta: elvantoMeta.dateSubmitted ? elvantoMeta : match.elvantoMeta,
+              registrationType: registrationType ?? match.registrationType,
+              registrationCost: registrationCost ?? match.registrationCost,
+              discountCode: discountCode ?? match.discountCode,
               consents,
               parentGuardianName: parentName ?? match.parentGuardianName,
               parentRelation: parentRelation ?? match.parentRelation,
@@ -282,6 +291,9 @@ export function makeImportService(
               paymentStatus: 'unpaid',
               accommodationKind: null,
               accommodationLabel: null,
+              registrationType,
+              registrationCost,
+              discountCode,
               lifecycle: 'registered',
               atCamp: false,
               checkInHistory: [],
