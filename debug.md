@@ -193,7 +193,7 @@ service. **Bugs are almost always in a service.**
 | Supabase repos | `src/repositories/supabase/*` | prod-only data round-trip issues |
 | Types / Zod schemas / errors | `src/core/*` | validation rejects valid input |
 
-Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 219+ pass). Note the two
+Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 202 pass). Note the two
 deploy-only gotchas in CLAUDE.md (CommonJS tsconfig; anchored `/data/` gitignore) — neither is
 caught by tsc/vitest. Schema migrations `008`–`010` (field removals + nullable note camper) are
 applied to prod; `src/repositories/supabase/*` must not reference the dropped columns.
@@ -220,7 +220,7 @@ applied to prod; `src/repositories/supabase/*` must not reference the dropped co
 | Search / reveal contact | SPA `runSearch` (1198) `reveal` (1215); backend `search.service` |
 | First-aid medical watch / casualty card | SPA `loadMedicalWatch` (1129) `openCasualtyCard` (1156) `revealMedicare` (1183); backend `person.service.listMedicalWatch` |
 | Notices not showing / urgent popup | SPA `RENDER.notifs` (1218); `renderHomeAtCamp` (713) |
-| Accommodation allocation (rooms/auto-fill/unallocated/single-gender) | SPA `RENDER.accom`/`addAlloc`/`removeAlloc`/`drawAccom` (~1278); backend `accommodation.service` + `accommodation-allocation.ts` (75% eligibility, `validateAllocations`) |
+| Accommodation allocation (rooms/auto-fill/unallocated/single-gender) | SPA `RENDER.accom`/`addAlloc`/`removeAlloc`/`drawAccom` (~1278); backend `accommodation.service` + `accommodation-allocation.ts` (75% eligibility, `validateAllocations`). Classroom pools include **both students and leaders** (tent pools keep students/leaders separate). |
 | Budget numbers wrong | SPA `RENDER.budget` (~1249) — prices from `SETTINGS.tentPrice/classroomPrice` (set in admin Settings), not blocks |
 | Church can't / shouldn't see allocated room | SPA `renderHomeAtCamp` church tile — gated `campMode==='at-camp' && !PREVIEW_MODE`; backend `GET /accommodation/church-rooms/:churchId` |
 | Pre-camp registrant edits / scoping | SPA `RENDER.people` (841) `scopeRegs` (878) `markReg` (925) |
