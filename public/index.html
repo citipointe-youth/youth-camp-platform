@@ -1776,52 +1776,35 @@ async function _rFaqEdit(){const el=document.getElementById('stage');const y=el?
 async function _rSched(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rSched();if(el)el.scrollTop=y;}
 async function _rContacts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rContacts();if(el)el.scrollTop=y;}
 
-/* ===== ADMIN ACCOMMODATION ===== */
+/* ===== ADMIN ACCOMMODATION (classroom rooms) ===== */
 RENDER.adminAccom=async function(){
-  // Backend model is accommodation blocks (tent/classroom spaces with capacity + price).
-  const blocks=await api('/accommodation/blocks');
-  window._adminBlocks=blocks||[];
-  const hdr=`<div style="display:flex;gap:6px;padding:4px 0 6px;border-bottom:2px solid var(--line);font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase">
-    <span style="width:22px">&nbsp;</span><span style="flex:3">Name</span>
-    <span style="flex:1;min-width:48px;max-width:70px">Cap</span>
-    <span style="flex:1;min-width:48px;max-width:70px">Price</span>
-    <span style="flex:1;min-width:48px;max-width:70px">Taken</span>
-    <span style="width:68px">&nbsp;</span></div>`;
-  const blockCards=(blocks||[]).map(b=>`
+  const rooms=await api('/accommodation/classrooms');
+  window._adminRooms=rooms||[];
+  const rows=(rooms||[]).map(rm=>`
     <div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)">
-      <span style="width:22px;text-align:center;font-size:.85rem;flex:none">${b.kind==='tent'?'△':'⌂'}</span>
-      <input class="fld" id="bn_${b.id}" value="${esc(b.name)}" placeholder="Name" style="flex:3;min-width:0">
-      <input class="fld" id="bc_${b.id}" type="number" inputmode="numeric" min="0" value="${b.capacity}" placeholder="Cap" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
-      <input class="fld" id="bp_${b.id}" type="number" inputmode="numeric" min="0" value="${b.price}" placeholder="$" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
-      <input class="fld" id="bt_${b.id}" type="number" inputmode="numeric" min="0" value="${b.baseTaken||0}" placeholder="0" style="flex:1;min-width:48px;max-width:70px;padding:6px 4px">
-      <button class="btn sm" onclick="saveBlock('${b.id}')" style="flex:none;padding:5px 10px">✓</button>
-      <button class="btn red sm" onclick="delBlock('${b.id}')" style="flex:none;padding:5px 8px">✕</button>
-    </div>`).join('')||'<p class="note-hint">No spaces yet.</p>';
-  paint('adminAccom',`<div class="infobox">Define the camp's accommodation spaces — tents &amp; classroom blocks with capacity and price. Per-church spot allocation is on the Accommodation allocations page.</div>
-    <div class="card">${(blocks||[]).length?hdr:''}${blockCards}</div>
-    <div class="card"><div class="lbl" style="margin-top:0">Add a space</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
-      <div><label style="font-size:.72rem">Type</label><select id="nbKind"><option value="tent">Tent △</option><option value="classroom">Classroom ⌂</option></select></div>
-      <div style="flex:2;min-width:110px"><label style="font-size:.72rem">Name</label><input class="fld" id="nbName" placeholder="e.g. Block 2"></div>
-      <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Cap</label><input class="fld" id="nbCap" type="number" inputmode="numeric" min="0" value="40"></div>
-      <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Price $</label><input class="fld" id="nbPrice" type="number" inputmode="numeric" min="0" value="120"></div>
-      <button class="btn" onclick="addBlock()" style="flex:none;align-self:flex-end">Add</button>
-    </div></div>`,'Accommodation setup','Tent &amp; classroom spaces');
+      <span style="width:22px;text-align:center;flex:none">⌂</span>
+      <input class="fld" id="rn_${rm.id}" value="${esc(rm.name)}" placeholder="Name" style="flex:3;min-width:0">
+      <input class="fld" id="rc_${rm.id}" type="number" inputmode="numeric" min="0" value="${rm.capacity}" placeholder="Cap" style="flex:1;min-width:48px;max-width:80px;padding:6px 4px">
+      <button class="btn sm" onclick="saveRoom('${rm.id}')" style="flex:none;padding:5px 10px">✓</button>
+      <button class="btn red sm" onclick="delRoom('${rm.id}')" style="flex:none;padding:5px 8px">✕</button>
+    </div>`).join('')||'<p class="note-hint">No classroom rooms yet.</p>';
+  paint('adminAccom',`<div class="infobox">Classroom rooms have a name &amp; capacity. Tent City is auto-distributed (7 per tent) — no setup needed. Prices are set in Camp settings.</div>
+    <div class="card"><h3 class="sec" style="margin-top:0">Classroom rooms</h3>${rows}</div>
+    <div class="card"><div class="lbl" style="margin-top:0">Add a room</div>
+      <div style="display:flex;gap:6px;align-items:flex-end">
+        <div style="flex:2;min-width:110px"><label style="font-size:.72rem">Name</label><input class="fld" id="nrName" placeholder="e.g. Room 5"></div>
+        <div style="flex:1;min-width:60px"><label style="font-size:.72rem">Cap</label><input class="fld" id="nrCap" type="number" inputmode="numeric" min="0" value="8"></div>
+        <button class="btn" onclick="addRoom()" style="flex:none;align-self:flex-end">Add</button>
+      </div></div>`,'Accommodation setup','Classroom rooms');
 };
-async function saveBlock(id){
-  const el=document.getElementById('stage');const scrollY=el?el.scrollTop:0;
-  try{await api('/accommodation/blocks/'+id,{method:'PATCH',body:{name:val('bn_'+id),capacity:Number(val('bc_'+id))||0,price:Number(val('bp_'+id))||0,baseTaken:Number(val('bt_'+id))||0}});toast('Saved ✓');
-  await RENDER.adminAccom();if(el)el.scrollTop=scrollY;}catch(e){toast(e.message);}
-}
-async function delBlock(id){if(!confirm('Delete this space?'))return;try{await api('/accommodation/blocks/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminAccom();}catch(e){toast(e.message);}}
-async function addBlock(){if(!val('nbName')){toast('Enter a name');return;}
-  const name=val('nbName').trim();
-  const dup=(window._adminBlocks||[]).find(b=>b.name.toLowerCase()===name.toLowerCase());
-  if(dup){toast('A space named "'+name+'" already exists');return;}
-  const el=document.getElementById('stage');const scrollY=el?el.scrollTop:0;
-  try{await api('/accommodation/blocks',{method:'POST',body:{kind:sel('nbKind'),name,capacity:Number(val('nbCap'))||0,price:Number(val('nbPrice'))||0}});toast('Space added ✓');
-  await RENDER.adminAccom();if(el)el.scrollTop=scrollY;}catch(e){toast(e.message);}
-}
+async function saveRoom(id){const el=document.getElementById('stage');const y=el?el.scrollTop:0;
+  try{await api('/accommodation/classrooms/'+id,{method:'PATCH',body:{name:val('rn_'+id),capacity:Number(val('rc_'+id))||0}});toast('Saved ✓');await RENDER.adminAccom();if(el)el.scrollTop=y;}catch(e){toast(e.message);}}
+async function delRoom(id){if(!confirm('Delete this room? Its allocations will be cleared.'))return;
+  try{await api('/accommodation/classrooms/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminAccom();}catch(e){toast(e.message);}}
+async function addRoom(){if(!val('nrName')){toast('Enter a room name');return;}
+  const name=val('nrName').trim();
+  if((window._adminRooms||[]).some(r=>r.name.toLowerCase()===name.toLowerCase())){toast('A room named "'+name+'" already exists');return;}
+  try{await api('/accommodation/classrooms',{method:'POST',body:{name,capacity:Number(val('nrCap'))||0}});toast('Room added ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN FAQ (pre-camp) ===== */
 RENDER.adminFaq=async function(){
@@ -1930,6 +1913,10 @@ RENDER.adminSettings=async function(){
     <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" type="date" value="${esc(s.endDate||'')}" onchange="renderCheckinDaysPreview()">
     <label>At-camp check-in days (auto-generated)</label>
     <div id="stDaysPreview" class="sub" style="background:#f5f3ff;border-radius:10px;padding:9px 11px;font-size:.8rem;color:#5b21b6"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <div style="flex:1"><label>△ Tent price ($/person)</label><input class="fld" id="stTent" type="number" inputmode="numeric" min="0" value="${esc(s.tentPrice??0)}"></div>
+      <div style="flex:1"><label>⌂ Classroom price ($/person)</label><input class="fld" id="stClass" type="number" inputmode="numeric" min="0" value="${esc(s.classroomPrice??0)}"></div>
+    </div>
     <button class="btn" style="margin-top:12px" onclick="saveSettings()">Save camp settings</button>
     <p class="note-hint">Setting the start date pre-fills the end date to the 4th day; you can adjust it. Check-in days are generated from the date range automatically — one Morning and one Afternoon session per day.</p></div>`,'Camp settings','Dates &amp; details');
   renderCheckinDaysPreview();
@@ -1949,7 +1936,7 @@ function onStartDateChange(){
 async function saveSettings(){
   try{
     const days=_datesBetween(val('stStart'),val('stEnd'));
-    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days}});
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days,tentPrice:Number(val('stTent'))||0,classroomPrice:Number(val('stClass'))||0}});
     SETTINGS=await api('/settings',{noCache:true});SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
     toast('Settings saved ✓');
   }catch(e){toast(e.message);}
