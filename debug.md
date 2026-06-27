@@ -93,7 +93,8 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `scopeRegs / drawPeople / personRow` | 878 / 879 / 892 |
 | `openPerson / markReg` | 906 / 925 |
 | `RENDER.help` | 929 |
-| `RENDER.budget / RENDER.accom` | 1235 / 1268 |
+| `RENDER.budget` (prices from `SETTINGS.tentPrice/classroomPrice`) | ~1249 |
+| `RENDER.accom` — classroom **rooms** + allocation map. Helpers: `accomChurches`/`accomGroups` (75% eligibility), `addAlloc` (auto-fill, single-gender guard), `removeAlloc` (cascade), `drawAccom`, `tentDist` (7/tent). | ~1278 |
 | `RENDER.data` (director/admin data view) | 1958 |
 
 > **`RENDER.codes` (registration code / self-register) was DELETED** — self-registration is gone
@@ -129,7 +130,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `switchMode` | 1631 |
 | `RENDER.adminAccounts` — **rewritten**: one row per login (leadership + churches) with icon actions | 1649 |
 | ⮑ `aRoleChange` 1698, `addAcct` 1702, `editLeaderName/saveLeaderName` 1708/1715, `editChurchName/saveChurchName` 1719/1726, `editUsername/saveUsername` 1728/1733, `changePassword/savePassword` 1735/1741, `delAcct/delChurch` 1743/1745, `addChurch` 1747 | — |
-| `RENDER.adminAccom` (+ saveBlock/delBlock/addBlock) | 1753 / 1773–1775 |
+| `RENDER.adminAccom` — classroom **rooms** mgmt (+ `saveRoom`/`delRoom`/`addRoom`); tent setup removed (auto-distributed). Prices moved to `RENDER.adminSettings`. | ~1779 |
 | `RENDER.adminFaq / adminFaqEdit` | 1778 / 1791 |
 | `RENDER.adminRecords` | ~1808 | **Redirects to `adminData`** — all export/close-out content merged there. |
 | `RENDER.adminCloseOut` (+ `doNewYear`) | ~1830 / ~1855 | Back button → `adminData`. |
@@ -186,7 +187,7 @@ service. **Bugs are almost always in a service.**
 | CSV import | `src/services/import.service.ts`, `church-import.service.ts` | import dropping/duplicating rows, dry-run. Churches match/create by **name** (no `code`). |
 | Reset / new-year / defaults / **mode** | `src/services/admin.service.ts` | wipe behaviour, snapshot restore, mode switch |
 | Accounts / churches | `src/services/account.service.ts` | login, account CRUD, sole-admin guard |
-| Accommodation | `src/services/accommodation*.ts` | blocks/reservations/held, lock |
+| Accommodation | `src/services/accommodation.service.ts` + `accommodation-allocation.ts` (pure: groups/validation/tents) | classroom rooms CRUD, allocation map, 75% eligibility, single-gender/capacity validation, lock, church-rooms. **No blocks/reservations** (removed). |
 | Search / contact reveal | `src/services/search.service.ts` | search results, reveal audit |
 | Audit / export | `src/services/audit-export.service.ts` | export CSV, lastExportedAt |
 | Supabase repos | `src/repositories/supabase/*` | prod-only data round-trip issues |
@@ -219,7 +220,9 @@ applied to prod; `src/repositories/supabase/*` must not reference the dropped co
 | Search / reveal contact | SPA `runSearch` (1198) `reveal` (1215); backend `search.service` |
 | First-aid medical watch / casualty card | SPA `loadMedicalWatch` (1129) `openCasualtyCard` (1156) `revealMedicare` (1183); backend `person.service.listMedicalWatch` |
 | Notices not showing / urgent popup | SPA `RENDER.notifs` (1218); `renderHomeAtCamp` (713) |
-| Accommodation / budget numbers | SPA `RENDER.accom` (1268) `RENDER.budget` (1235); backend `accommodation*` |
+| Accommodation allocation (rooms/auto-fill/unallocated/single-gender) | SPA `RENDER.accom`/`addAlloc`/`removeAlloc`/`drawAccom` (~1278); backend `accommodation.service` + `accommodation-allocation.ts` (75% eligibility, `validateAllocations`) |
+| Budget numbers wrong | SPA `RENDER.budget` (~1249) — prices from `SETTINGS.tentPrice/classroomPrice` (set in admin Settings), not blocks |
+| Church can't / shouldn't see allocated room | SPA `renderHomeAtCamp` church tile — gated `campMode==='at-camp' && !PREVIEW_MODE`; backend `GET /accommodation/church-rooms/:churchId` |
 | Pre-camp registrant edits / scoping | SPA `RENDER.people` (841) `scopeRegs` (878) `markReg` (925) |
 | Testimony won't save / "no specific student" | SPA `RENDER.testimonies` (1556); backend `note.service` (`camperId` optional) + `notes.camper_id` nullable |
 | Account: can't rename / change password | SPA `RENDER.adminAccounts` (1649) row actions; backend `POST /accounts/users/password` + `account.service` |
