@@ -40,19 +40,23 @@ check "expected vs actual" before touching code.
 
 ---
 
-> **Improvement Initiative Phase 1 (2026-06-29) — read this before trusting line numbers below.**
+> **Improvement Initiative Phases 1–7 (deployed 2026-06-28) — read this before trusting line numbers below.**
 > The SPA grew substantially. Key structural changes (grep the symbol, don't trust offsets):
 > - **Single nav source:** `navModel(role,mode)` → `{tabs,extras}`; `navSidebar(role,mode)`;
 >   `buildTabs` and `_renderWideNav` BOTH derive from these. "Wrong/empty tab or sidebar" → `navModel`.
 > - **Budget rebuilt:** `RENDER.budget`/`drawBudget`/`computeBudgetClient`/`exportBudget`/`_budToggle`
 >   (mirror of pure `src/services/budget.ts`). "Budget number wrong" → `budget.ts` first (it's tested),
 >   then `computeBudgetClient`. Prices are per-registrant `registrationCost`, NOT settings.
-> - **Accommodation split (PC-10):** `accomChurches`/`accomGroups` (+ `_accomGenderGroups`,
+> - **Accommodation split (PC-10/C-1):** `accomChurches`/`accomGroups` (+ `_accomGenderGroups`,
 >   `_bracketOfGrade`) mirror backend `computeGroups`; pool >50 splits into `…|gender|7-9` / `|10-12`.
+>   Requires migration 013 (`bracket` column on `classroom_allocations`).
 > - **Icons:** SVG-only; `ic/icSm/icLg/icXl`, `emptyState`. "Blank icon" → key missing from `ICONS`.
+>   **⚠ TDZ gotcha:** `ACC_LABEL` (uses `icSm`) must be declared AFTER `const ICONS`. If `ACC_LABEL`
+>   appears before `ICONS` in the script, the whole script crashes silently at boot → white screen after
+>   login. Fixed 2026-06-30: `ACC_LABEL` moved to immediately after the `ICONS` closing brace.
 > - **Type scale / breakpoints:** `:root --t-*` tokens; root font scales at 768/1280; breakpoints
 >   540/768/900/980/1280. "Text too small/large" or "doesn't scale" → these.
-> - **sw.js `camp-v4`**, `API_RE` now includes `/export`.
+> - **sw.js `camp-v7`**, `API_RE` now includes `/export`.
 
 ## Frontend — `public/index.html` (single ~2,260-line SPA)
 
@@ -173,12 +177,14 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `admin` | Home · My Youth · **Data** · Notices · **Admin** | Home · Check-in · Search · **Admin** |
 | `firstAid` | Search · Records · Schedule (**same in both modes**; Search is the landing — Phase 4) | Search · Records · Schedule |
 
-**Desktop wide sidebar** (`_renderWideNav`, line ~567) — only **admin** and **director** get items
-(`zoneLeader` gets wide layout but empty sidebar). Items are **mode-conditional**:
-- **admin at-camp:** Home, Check-in, Search, Notes, Notices, Accounts, Settings, Accommodation, Schedule, Data & Reset & Exports, Setup Wizard
-- **admin pre-camp:** Home, My Youth, Accounts, Settings, Accommodation, Schedule, Data, Reset & Exports, Setup Wizard
-- **director at-camp:** Home, Check-in, Search, Notes, Notices, Import Students, Records & Exports
-- **director pre-camp:** Home, My Youth, Import Students, Records & Exports
+**Desktop wide sidebar** (`_renderWideNav`) — all roles get the sidebar at ≥980px; items from `navSidebar(role,mode)` = `navModel` tabs + extras (admin at-camp uses a dedicated order). Items are **mode-conditional**:
+- **admin at-camp:** Home, Check In, Search, Notices, Accommodation Allocations, Admin Settings
+- **admin pre-camp:** Home, My Youth, Data, Notices, Admin, Budget & Costings, Accommodation Allocations
+- **director at-camp:** Home, Check-in, Search, Notices, Notes
+- **director pre-camp:** Home, My Youth, Data, Help, Notices, Budget & Costings, Accommodation Allocations
+- **church / zoneLeader at-camp:** Home, Check-in, Search, Notices
+- **church / zoneLeader pre-camp:** Home, My Youth, Help, Notices
+- **firstAid (all modes):** Search, Records, Schedule
 - Bottom tabs hidden (`#tabs{display:none}`) at ≥980px; sidebar is the sole nav.
 
 (Full capability/scope matrix is in CLAUDE.md → "Roles". firstAid = read-only, attendance-only,
@@ -209,10 +215,10 @@ service. **Bugs are almost always in a service.**
 | Supabase repos | `src/repositories/supabase/*` | prod-only data round-trip issues |
 | Types / Zod schemas / errors | `src/core/*` | validation rejects valid input |
 
-Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 202 pass). Note the two
+Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 261 pass). Note the two
 deploy-only gotchas in CLAUDE.md (CommonJS tsconfig; anchored `/data/` gitignore) — neither is
-caught by tsc/vitest. Schema migrations `008`–`010` (field removals + nullable note camper) are
-applied to prod; `src/repositories/supabase/*` must not reference the dropped columns.
+caught by tsc/vitest. Schema migrations `008`–`013` applied to prod; `src/repositories/supabase/*`
+must not reference dropped columns. Migration `013` adds `bracket text` to `classroom_allocations`.
 
 ---
 
@@ -220,6 +226,7 @@ applied to prod; `src/repositories/supabase/*` must not reference the dropped co
 
 | Symptom | Go to |
 |---|---|
+| **White screen after login (header visible, content blank)** | SPA `ACC_LABEL` TDZ crash at boot — `ACC_LABEL` must appear after `const ICONS` in the script (fixed 2026-06-30). If it reappears, check script init order. |
 | Blank / wrong icon | SPA `ICONS` (394) |
 | Wrong tab highlighted | SPA `TAB_OF` (505) |
 | Tab missing/extra for a role or mode | SPA `buildTabs` (605) / `_renderWideNav` (567) — check grid above |
@@ -246,7 +253,7 @@ applied to prod; `src/repositories/supabase/*` must not reference the dropped co
 | First/last camp day has wrong check-in sessions | `checkin-sessions.buildSessions` (AC-1): day1 PM-only, last AM-only. Tested in `checkin-sessions.test.ts`. |
 | "Signed out" filter / record missing on Notes | `RENDER.notes`/`drawNotes` — synthesised from camper `signOutHistory` (atCamp:false). |
 | FAQ showing in at-camp | `RENDER.faq` guards `CAMP_MODE==='at-camp'`→home; no at-camp home FAQ tile; Help only a pre-camp tab in `navModel` (PC-7). |
-| Compliance export downloads broken / serves HTML | `sw.js` `API_RE` must include `/export` (fixed `camp-v4`). |
+| Compliance export downloads broken / serves HTML | `sw.js` `API_RE` must include `/export` (fixed since `camp-v4`; current cache is `camp-v7`). |
 | Church can't / shouldn't see allocated room | SPA `renderHomeAtCamp` church tile — gated `campMode==='at-camp' && !PREVIEW_MODE`; backend `GET /accommodation/church-rooms/:churchId` |
 | Pre-camp registrant edits / scoping | SPA `RENDER.people` (841) `scopeRegs` (878) `markReg` (925) |
 | Testimony won't save / "no specific student" | SPA `RENDER.testimonies` (1556); backend `note.service` (`camperId` optional) + `notes.camper_id` nullable |

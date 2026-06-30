@@ -581,7 +581,6 @@ const GRADES=[7,8,9,10,11,12];
 // (which renamed 'Green'→'Black'). A stale 'Green' here let a director send a zone notice no
 // church/leader could ever receive, and hid the real 'Black' zone from the notice composer.
 const ZONES=['Yellow','Blue','Black','Red'];
-const ACC_LABEL={tent:icSm('tent')+' All tents',classroom:icSm('classroom')+' All classrooms',mixed:icSm('tent')+icSm('classroom')+' Mixed'};
 
 /* ===== UTILS ===== */
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -622,6 +621,8 @@ download:'<path d="M12 3v12M7 11l5 5 5-5"/><path d="M5 21h14"/>',
 diamond:'<path d="M12 2 22 12 12 22 2 12Z"/>',
 plus:'<path d="M12 5v14M5 12h14"/>'
 };
+// ACC_LABEL must come AFTER ICONS (icSm references ICONS; hoisting doesn't help const TDZ).
+const ACC_LABEL={tent:icSm('tent')+' All tents',classroom:icSm('classroom')+' All classrooms',mixed:icSm('tent')+icSm('classroom')+' Mixed'};
 /* ic(n,cls): default 20px inline icon (sized by CSS context). Size helpers mirror CMS's
    icN/icS/icLg/icEmpty so callers can pick a size without ad-hoc CSS:
    icSm 16px · ic 20px (default) · icLg 32px · icXl 48px (empty states). */
