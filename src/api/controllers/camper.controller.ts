@@ -15,11 +15,18 @@ export function makeCamperController(services: CamperControllerServices) {
   return {
     async list(req: HttpRequest) {
       if (!req.ctx) throw new UnauthorizedError();
-      const people = await person.listCampers(req.ctx.actor, {
+      const opts = {
         zone: req.query['zone'],
         churchId: req.query['churchId'],
         q: req.query['q'],
-      });
+      };
+      // `scope=all` returns everyone registered (any lifecycle) the actor may see — used by the
+      // first-aid "All Students" screen so not-yet-arrived registrants are still listed. The
+      // default keeps the at-camp behaviour (arrived campers only). Both paths are role-scoped.
+      const people =
+        req.query['scope'] === 'all'
+          ? await person.list(req.ctx.actor, opts)
+          : await person.listCampers(req.ctx.actor, opts);
       return people.map(toCamperDto);
     },
 

@@ -318,17 +318,34 @@ textarea{min-height:84px;resize:vertical;}
 .statband{display:flex;gap:8px;margin-bottom:12px;}
 .statband .s{flex:1;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 8px;text-align:center;}
 .statband .s b{display:block;font-size:var(--t-h1);color:var(--navy);line-height:1.1;font-weight:800;}.statband .s span{font-size:var(--t-2xs);color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+/* 4-up accommodation tiles (home): a 2×2 grid on phone so the longer labels stay readable. */
+.statband-4{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+/* Gender filter buttons (first-aid All Students). */
+.fa-seg{display:flex;gap:6px;margin-bottom:10px;}
+.fa-seg button{flex:1;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:8px;font-weight:700;font-family:inherit;font-size:var(--t-sm);cursor:pointer;}
+.fa-seg button.on{background:var(--chip);border-color:var(--blue);color:var(--blue);}
+@media(min-width:540px){.statband-4{grid-template-columns:repeat(4,1fr);}}
+/* ── Reusable help tooltip (?) — works on hover (desktop) and tap (mobile via .open) ──
+   Use helpTip('plain text') in any markup. Written for leaders who didn't build the app. */
+.htip{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--blue);background:var(--chip);color:var(--blue);font-size:11px;font-weight:800;line-height:1;cursor:pointer;position:relative;padding:0;font-family:inherit;vertical-align:middle;flex:0 0 auto;}
+.htip-pop{position:absolute;z-index:200;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:max-content;max-width:240px;background:#1e1b4b;color:#fff;border-radius:10px;padding:9px 11px;font-size:.74rem;line-height:1.45;font-weight:500;text-transform:none;letter-spacing:normal;text-align:left;box-shadow:0 10px 28px rgba(20,16,60,.32);opacity:0;visibility:hidden;transition:opacity .12s;white-space:normal;}
+.htip-pop::before{content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#1e1b4b;}
+.htip:hover .htip-pop,.htip.open .htip-pop{opacity:1;visibility:visible;}
+/* Keep the bubble on-screen near the right edge (e.g. icon at end of a heading row). */
+.htip.tip-left .htip-pop{left:auto;right:0;transform:none;}
+.htip.tip-left .htip-pop::before{left:auto;right:6px;transform:none;}
 .selrow{display:flex;gap:8px;margin-bottom:12px;}.selrow>div{flex:1;}.selrow label{margin-top:0;}
 .lead-tag{font-size:var(--t-micro);font-weight:800;background:var(--chip);color:#6d28d9;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
 .gradepill{font-size:var(--t-micro);font-weight:800;background:#eef2f8;color:#475569;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
 .err{background:#fde2e1;color:#7f1d1d;border-radius:10px;padding:9px 12px;font-size:var(--t-sm);margin-top:8px;display:none;}
-#login{position:absolute;inset:0;background:radial-gradient(140% 100% at 50% 0%,#9333ea 0%,#4f46e5 40%,#0d0a1e 80%);display:flex;flex-direction:column;justify-content:center;padding:28px;z-index:60;}
-#login h1{color:#fff;font-size:1.85rem;text-align:center;margin-bottom:5px;letter-spacing:-.03em;font-weight:800;}
-#login p{color:#e9d5ff;text-align:center;font-size:var(--t-sm);margin-bottom:22px;font-weight:500;}
-#login .card{background:rgba(255,255,255,.97);border-radius:20px;}
+/* Login is white-background / purple-text to match the in-app theme (was dark gradient). */
+#login{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;justify-content:center;padding:28px;z-index:60;}
+#login h1{color:var(--violet);font-size:1.85rem;text-align:center;margin-bottom:5px;letter-spacing:-.03em;font-weight:800;}
+#login p{color:var(--purple);text-align:center;font-size:var(--t-sm);margin-bottom:22px;font-weight:600;}
+#login .card{background:#fff;border:1px solid var(--line);box-shadow:0 14px 40px rgba(124,58,237,.12);border-radius:20px;}
 .quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.quick button{flex:1;min-width:44%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:12px;padding:9px 8px;font-size:var(--t-xs);cursor:pointer;font-weight:600;font-family:inherit;transition:background .12s;}
-.quick button:active{background:rgba(255,255,255,.22);}
+.quick button{flex:1;min-width:44%;border:1px solid var(--line);background:var(--chip);color:var(--violet-d,#6d28d9);border-radius:12px;padding:9px 8px;font-size:var(--t-xs);cursor:pointer;font-weight:700;font-family:inherit;transition:background .12s;}
+.quick button:active{background:var(--lav,#ede9fe);}
 /* ── At-camp preview banner ── */
 #previewBanner{display:none;background:linear-gradient(90deg,#92400e,#b45309);color:#fff;
   padding:max(8px,env(safe-area-inset-top)) 14px 8px;font-size:var(--t-xs);font-weight:700;
@@ -398,13 +415,22 @@ textarea{min-height:84px;resize:vertical;}
      full-width because it sits OUTSIDE the grid container. */
   .wide-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;align-items:start;}
   .wide-cards>*{margin-bottom:0;}
-  /* An expanded Budget church spans the full width so its CAMPERS/LEADERS detail stays readable. */
-  .wide-cards>.budchurch.open{grid-column:1 / -1;}
+  /* Bug-9: an expanded Budget church stays in its own column (a narrow dropdown) rather than
+     stretching to fill the page width. */
 }
 @media(min-width:1280px){
   html{font-size:18px;}              /* A1: laptop root bump → all rem text grows again */
   /* one more column for the densest lists on a wide laptop */
   .wide-cards{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));}
+}
+/* Bug-5: a phone in LANDSCAPE is wide (≥768px) but short, so the width-based root-font bumps
+   above (17/18px) made text — especially the My Youth snapshot — far too big. On a short
+   landscape viewport, hold the root font at the phone size and cap the big snapshot numbers.
+   Tablets/laptops (height >600px) are unaffected. Placed last so it overrides the bumps. */
+@media(orientation:landscape) and (max-height:600px){
+  html{font-size:15px;}
+  .snap .bignum,.hero .big{font-size:var(--t-h2);}
+  .gradebars{height:64px;}
 }
 </style>
 </head>
@@ -431,6 +457,7 @@ textarea{min-height:84px;resize:vertical;}
     <section class="screen" id="student"></section>
     <section class="screen" id="checkin"></section>
     <section class="screen" id="search"></section>
+    <section class="screen" id="allstudents"></section>
     <section class="screen" id="records"></section>
     <section class="screen" id="notifs"></section>
     <section class="screen" id="compose"></section>
@@ -644,6 +671,13 @@ let tT;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2400);}
 function modal(html){document.getElementById('sheet').innerHTML=html;document.getElementById('modal').classList.add('show');}
 function closeModal(){document.getElementById('modal').classList.remove('show');}
+/* helpTip(text[,opts]) — a small "?" bubble explaining a feature in plain language for a leader
+   who didn't design the app. Shows on hover (desktop) and on tap (mobile). `opts.left` anchors the
+   bubble to the right edge so it doesn't run off-screen when the icon ends a heading row. */
+function helpTip(text,opts){const o=opts||{};return `<button type="button" class="htip${o.left?' tip-left':''}" aria-label="Help: ${esc(text)}" onclick="_toggleTip(event,this)">?<span class="htip-pop">${esc(text)}</span></button>`;}
+function _toggleTip(e,btn){e.stopPropagation();const open=btn.classList.contains('open');document.querySelectorAll('.htip.open').forEach(t=>t.classList.remove('open'));if(!open)btn.classList.add('open');}
+// Tapping anywhere else closes any open tooltip.
+document.addEventListener('click',e=>{if(!e.target.closest('.htip'))document.querySelectorAll('.htip.open').forEach(t=>t.classList.remove('open'));});
 function dayLong(d){try{return new Date(d+'T12:00:00Z').toLocaleDateString(undefined,{weekday:'long',timeZone:'UTC'});}catch{return d;}}
 function timeFmt(iso){try{return new Date(iso).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}catch{return iso;}}
 function dtFmt(iso){try{return new Date(iso).toLocaleString();}catch{return iso;}}
@@ -745,7 +779,7 @@ const TAB_OF={home:'home',people:'people',student:'people',help:'help',
   admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
   adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
   adminChurchImport:'admin',adminRecords:'admin',adminCloseOut:'admin',adminWizard:'admin',
-  checkin:'checkin',search:'search',records:'records',notifs:'notifs',compose:'notifs',
+  checkin:'checkin',search:'search',allstudents:'allstudents',records:'records',notifs:'notifs',compose:'notifs',
   data:'data',
   camper:'home',myyouth:'home',firstday:'home',schedule:'schedule',devotional:'home',faq:'home',notes:'home',testimonies:'home',budget:'home',accom:'home',import:'home'};
 
@@ -828,7 +862,7 @@ function navModel(role,mode){
   if(role==='firstAid'){
     // Phase 4: Search is the home (finding a student is the whole job); Records = the first-aider's
     // logged actions; Schedule kept (owner). Medical Watch removed.
-    return {tabs:[T('search','search','Search'),T('records','note','Records'),T('schedule','clock','Schedule')],extras:[]};
+    return {tabs:[T('search','search','Search'),T('allstudents','users','All Students'),T('records','note','Records'),T('schedule','clock','Schedule')],extras:[]};
   }
   if(mode==='pre-camp'){
     if(role==='church'||role==='zoneLeader')
@@ -936,10 +970,16 @@ RENDER.home=async function renderHome(){
   const s=SETTINGS,isWide=['director','admin'].includes(ACTOR.role);
   let body=`<div class="hero"><div class="k">${esc((s&&s.campName)||h.campName)}</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
     <div class="cd"><div class="big">${h.daysToGo??'—'}</div><div class="meta">days to go<br>${esc(h.startDate||'')}${s&&s.endDate?' – '+esc(s.endDate):''}</div></div></div>`;
-  body+=`<div class="statband">
-    <div class="s"><b>${h.totalCampers||0}</b><span>Campers</span></div>
-    <div class="s"><b>${h.totalLeaders||0}</b><span>Leaders</span></div>
-    <div class="s"><b style="color:${h.noBlueCardCount?'#b91c1c':'#15803d'}">${h.noBlueCardCount||0}</b><span>Ldr blue card</span></div>
+  // Bug-2: registrations split by who (Student/Leader) × where they sleep (Tent/Classroom).
+  // Replaces the old Campers/Leaders/Ldr-blue-card band. Counts come from the already-loaded
+  // /registrants (`regs`), so they reflect this login's scope (own church / zone / all).
+  const _acc=(k,a)=>(regs||[]).filter(r=>r.kind===k&&r.accommodationKind===a).length;
+  body+=`<div class="rowsb" style="margin-bottom:6px"><span class="lbl" style="margin:0">Registrations by accommodation</span>${helpTip('Your registered people, split by who they are (Student or Leader) and where they sleep (Tent or Classroom). The tent or classroom choice comes from the registration import.',{left:true})}</div>
+  <div class="statband statband-4">
+    <div class="s"><b>${_acc('camper','tent')}</b><span>Student (Tent)</span></div>
+    <div class="s"><b>${_acc('leader','tent')}</b><span>Leader (Tent)</span></div>
+    <div class="s"><b>${_acc('camper','classroom')}</b><span>Student (Classroom)</span></div>
+    <div class="s"><b>${_acc('leader','classroom')}</b><span>Leader (Classroom)</span></div>
   </div>`;
   if(isWide)body+=`<div class="card tap" onclick="go('budget')"><div class="rowsb"><div><div style="font-weight:600">Budget &amp; costings</div><div class="sub">Camper fees by accommodation</div></div><span class="pill info">View ›</span></div></div>`;
   if(isWide)body+=`<div class="card tap" onclick="go('accom')"><div class="rowsb"><div><div style="font-weight:600">Accommodation allocations</div><div class="sub">Spaces &amp; per-church spot allocation</div></div><span class="pill info">View ›</span></div></div>`;
@@ -963,14 +1003,9 @@ RENDER.home=async function renderHome(){
       </div>`).join('');
       body+=`<div class="card" style="padding:8px 12px">${hdr}${rows}</div>`;
     }
-  }else{
-    const mine=(regs||[]).filter(r=>r.kind==='camper');
-    const tent=mine.filter(r=>r.accommodationKind==='tent').length,cls=mine.filter(r=>r.accommodationKind==='classroom').length;
-    body+=`<h3 class="sec">Accommodation registrations</h3>`;
-    body+=`<div class="card"><div class="rowsb"><b>${icSm('tent')} Tent</b><span class="pill info">${tent} registered</span></div>
-      <div class="rowsb" style="margin-top:8px"><b>${icSm('classroom')} Classroom</b><span class="pill info">${cls} registered</span></div>
-      <div class="sub" style="font-size:.74rem;margin-top:8px">Your group's tent vs classroom split. Specific locations are assigned by the camp office.</div></div>`;
   }
+  // Bug-2 follow-up: the church/zoneLeader "Accommodation registrations" card was removed —
+  // the 4-tile band at the top of the home screen now covers tent vs classroom for every role.
   // At-camp preview entry card — shown in pre-camp to all roles
   body+=`<div class="card tap" style="margin-top:18px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:1.5px solid #fcd34d" onclick="enterPreview()">
     <div class="rowsb">
@@ -983,7 +1018,7 @@ RENDER.home=async function renderHome(){
   </div>`;
   // Notices — latest 3 (feed already loaded in parallel above; expiry handled server-side)
   {const notices=(feed||[]).slice(0,3);
-    body+=`<div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3><span class="sub" style="font-size:.72rem">Latest 3 · tap to open</span></div>
+    body+=`<div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3></div>
     <div id="homeNotices" style="margin-top:10px">${notices.length?notices.map(noticeCard).join(''):'<p class="note-hint">All caught up — no notices right now.</p>'}</div>`;
   }
   paint('home',body,'My Church Hub',isWide?'All churches':(ACTOR.churchName?esc(ACTOR.churchName):esc(ACTOR.displayName)));
@@ -1027,7 +1062,7 @@ async function renderHomeAtCamp(){
   ${myDayHtml}
   <div class="tiles">${tiles.join('')}</div>
   <div id="homePulse"></div>
-  <div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3><span class="sub" style="font-size:.72rem">Latest 3 · tap to open</span></div>
+  <div class="rowsb" style="margin-top:18px"><h3 class="sec" style="margin:0">Notices</h3></div>
   <div id="homeNotices" style="margin-top:10px">${noticesHtml}</div>`;
   paint('home','','Home',d.greetingName||ACTOR.displayName);
   document.getElementById('home').innerHTML=html;
@@ -1188,9 +1223,19 @@ function personRow(s){
     <div class="sub">${esc(accDisplay(s))}${_isWideRole()?' · '+esc(s.churchName):''}</div>
     <div class="pills" style="margin-top:5px">${tags.join('')}</div></div><span class="chev">›</span></div>`;
 }
-async function openPerson(id){
-  const s=await api('/registrants/'+id);const isL=s.kind==='leader';
-  const out=isL&&!s.blueCardCollected;
+function openPerson(id){
+  // Bug-4: render from the already-loaded /registrants list (ALLREG) instead of a fresh network
+  // fetch. The list and single-record DTOs are identical (toRegistrantDto), so this paints
+  // INSTANTLY — removing the ~1-1.5s blank delay that made a tap feel dead and caused the
+  // double-open (two taps each started a fetch and each pushed a 'student' entry onto STACK).
+  const s=(ALLREG||[]).find(r=>r.id===id);
+  if(s){_paintPerson(s);return;}
+  // Fallback only if the record isn't in the loaded list (rare).
+  api('/registrants/'+id).then(p=>{(ALLREG=ALLREG||[]).push(p);_paintPerson(p);}).catch(e=>toast(e.message));
+}
+const _BLUE_CARD_HELP='A Blue Card (Working With Children Check) is the government clearance every adult leader must hold to work with youth. "Outstanding" means we have not recorded this leader\'s card yet — collect it before camp.';
+function _paintPerson(s){
+  const isL=s.kind==='leader';
   const body=`<div class="detail-hd"><div class="av-lg">${initials(s.firstName+' '+s.lastName)}</div>
     <h2>${esc(s.firstName+' '+s.lastName)}</h2>
     <div style="color:#cfe0ff;font-size:.82rem">${esc(s.churchName)} · ${esc(s.zone)} Zone · ${isL?'Leader (18+)':'Grade '+s.grade}</div></div>
@@ -1201,15 +1246,15 @@ async function openPerson(id){
       <div class="kv2"><span class="k">Parent</span><span class="v">${esc(s.parentGuardianName||'—')}</span></div>
       ${s.registrationType?`<div class="kv2"><span class="k">Reg type</span><span class="v">${esc(s.registrationType)}</span></div>`:''}
       ${s.registrationCost!=null?`<div class="kv2"><span class="k">Paid</span><span class="v">$${s.registrationCost.toLocaleString()}</span></div>`:''}`}
-      ${isL?`<div class="kv2"><span class="k">Blue card (WWC)</span><span class="v">${s.blueCardCollected?`<span class="pill ok">${icSm('check')} Collected</span>`:'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
+      ${isL?`<div class="kv2"><span class="k">Blue card (WWC) ${helpTip(_BLUE_CARD_HELP)}</span><span class="v">${s.blueCardCollected?`<span class="pill ok">${icSm('check')} Collected</span>`:'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
     </div>
-    ${isL?`<div class="card"><div class="lbl" style="margin-top:0">Blue card (WWC)</div>
+    ${isL?`<div class="card"><div class="lbl" style="margin-top:0">Blue card (WWC) ${helpTip(_BLUE_CARD_HELP)}</div>
       ${s.blueCardCollected?'<p class="note-hint">Blue card collected</p>':(['director','admin'].includes(ACTOR.role)?`<button class="btn alt" onclick="markReg('${s.id}',{blueCardCollected:true})">Mark blue card collected</button>`:'<p class="note-hint">Not yet collected — a director or admin can mark this.</p>')}
     </div>`:''}`;
   paint('student',body,isL?'Leader':'Camper',esc(s.churchName));
   if(STACK[STACK.length-1]!=='student')STACK.push('student');
 }
-async function markReg(id,patch){try{await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated');await openPerson(id);}catch(e){toast(e.message);}}
+async function markReg(id,patch){try{const u=await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated');if(ALLREG){const i=ALLREG.findIndex(r=>r.id===id);if(i>=0)ALLREG[i]=u;else ALLREG.push(u);}_paintPerson(u);}catch(e){toast(e.message);}}
 
 /* CODES */
 /* HELP / FAQ pre-camp */
@@ -1434,15 +1479,55 @@ let faT;function runFaSearch(v){clearTimeout(faT);faT=setTimeout(async()=>{
   const box=document.getElementById('results');if(!box)return;
   if(!v.trim()){box.innerHTML='<p class="note-hint">Type a name to find any student.</p>';return;}
   try{const res=await api('/search?q='+encodeURIComponent(v));
-    box.innerHTML=res.length?res.map(r=>{const c=r.camper||{};
-      const hasMed=(c.medicalConditions||[]).length>0||c.otherMedications||(c.dietaryRequirements||[]).some(d=>_ALLERGY_RE.test(d));
-      return `<div class="row" onclick="openStudentInfo('${c.id}')">
-        ${_faBubble(c)}
-        <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}${hasMed?' <span class="pill" style="background:var(--alert-bg);color:var(--alert-ink);border:1px solid var(--alert-bd)">medical</span>':''}</div>
-        <div class="sub" style="color:var(--ink-2)">${esc(c.churchName)} · ${esc(c.zone)} Zone · ${c.atCamp?'On site':'Not on site'}</div></div>
-        <span style="color:var(--lav-2)">${ic('chevron')}</span></div>`;}).join(''):'<p class="note-hint">No student matches.</p>';
+    box.innerHTML=res.length?res.map(r=>faResultRow(r.camper||{})).join(''):'<p class="note-hint">No student matches.</p>';
   }catch(e){toast(e.message);}
 },200);}
+// Shared first-aid person row (search + All Students). FA1: anyone NOT currently on site
+// (signed out, departed, or not yet arrived) gets a red warning flag, while still being findable.
+function faResultRow(c){
+  const hasMed=(c.medicalConditions||[]).length>0||c.otherMedications||(c.dietaryRequirements||[]).some(d=>_ALLERGY_RE.test(d));
+  const offSite=!c.atCamp;
+  const flag=offSite?` <span class="pill" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca">${icSm('alert')} Not on site</span>`:'';
+  const grade=c.grade?` · Yr ${c.grade}`:(c.kind==='leader'?' · Leader':'');
+  return `<div class="row" onclick="openStudentInfo('${c.id}')">
+    ${_faBubble(c)}
+    <div style="flex:1;min-width:0"><div class="nm">${esc((c.firstName||'')+' '+(c.lastName||''))}${hasMed?' <span class="pill" style="background:var(--alert-bg);color:var(--alert-ink);border:1px solid var(--alert-bd)">medical</span>':''}${flag}</div>
+    <div class="sub" style="color:var(--ink-2)">${esc(c.churchName||'')} · ${esc(c.zone||'')} Zone · ${offSite?'<span style="color:var(--danger);font-weight:700">signed out / not on site</span>':'on site'}${grade}</div></div>
+    <span style="color:var(--lav-2)">${ic('chevron')}</span></div>`;
+}
+/* FA2: All Students — first-aider picks a church, then filters by gender (buttons) and grade
+   (dropdown). Lists students AND leaders for that church (anyone registered, any presence state);
+   tapping opens the same Student Info card. Data = /campers?scope=all (camp-wide, role-scoped). */
+let _asGender='all';
+RENDER.allstudents=async function(){
+  let all;try{all=await api('/campers?scope=all');}catch(e){paint('allstudents','<p class="note-hint">'+esc(e.message)+'</p>','All Students','First Aid');return;}
+  all=(all||[]).filter(c=>c.lifecycle!=='cancelled');
+  window._allStu=all;
+  const cmap={};all.forEach(c=>{if(c.churchId)cmap[c.churchId]=c.churchName;});
+  const churches=Object.entries(cmap).map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+  const grades=[...new Set(all.map(c=>c.grade).filter(g=>g!=null))].sort((a,b)=>a-b);
+  _asGender='all';
+  const churchSel=`<div><label>Church ${helpTip('Pick a church to see everyone registered from it — students and leaders. People not currently on site are flagged in red.')}</label><select id="asChurch" onchange="drawAllStudents()"><option value="">Choose a church…</option>${churches.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>`;
+  const gradeSel=`<div><label>Grade</label><select id="asGrade" onchange="drawAllStudents()"><option value="all">All grades</option>${grades.map(g=>`<option value="${g}">Yr ${g}</option>`).join('')}</select></div>`;
+  const genderBtns=`<div class="fa-seg" id="asGender">
+    <button class="on" data-g="all" onclick="_asSetGender('all')">All</button>
+    <button data-g="male" onclick="_asSetGender('male')">Guys</button>
+    <button data-g="female" onclick="_asSetGender('female')">Girls</button></div>`;
+  paint('allstudents',`<div class="selrow">${churchSel}</div>${genderBtns}<div class="selrow">${gradeSel}</div>
+    <div id="asList"><p class="note-hint">Choose a church to see its students and leaders.</p></div>`,'All Students','First Aid');
+};
+function _asSetGender(g){_asGender=g;document.querySelectorAll('#asGender button').forEach(b=>b.classList.toggle('on',b.dataset.g===g));drawAllStudents();}
+function drawAllStudents(){
+  const box=document.getElementById('asList');if(!box)return;
+  const cid=sel('asChurch')||'';
+  if(!cid){box.innerHTML='<p class="note-hint">Choose a church to see its students and leaders.</p>';return;}
+  const gr=sel('asGrade')||'all';
+  let list=(window._allStu||[]).filter(c=>c.churchId===cid);
+  if(_asGender!=='all')list=list.filter(c=>c.gender===_asGender);
+  if(gr!=='all')list=list.filter(c=>String(c.grade)===gr);
+  list.sort((a,b)=>(a.lastName||'').localeCompare(b.lastName||'')||(a.firstName||'').localeCompare(b.firstName||''));
+  box.innerHTML=list.length?list.map(faResultRow).join(''):'<p class="note-hint">No one matches these filters.</p>';
+}
 let _currentStudent=null;
 async function openStudentInfo(id){
   let c;try{c=await api('/campers/'+id);}catch(e){toast(e.message);return;}
@@ -1618,7 +1703,7 @@ RENDER.notifs=async function(){
   const canSend=['zoneLeader','director','admin'].includes(ACTOR.role);
   const canDelete=['zoneLeader','director','admin'].includes(ACTOR.role);
   paint('notifs',`${canSend?`<button class="btn" onclick="go('compose')">${ic('edit')} Send a notice</button>`:`<p class="note-hint">Church accounts receive notices; zone leaders &amp; directors send.</p>`}
-    ${feed.length?'':`<p class="note-hint">No ${CAMP_MODE==='pre-camp'?'pre-camp':'camp'} notices yet. Leaders &amp; directors can post camp, zone or church updates here.</p>`}${feed.map(n=>`<div class="ncard ${n.priority==='urgent'?'urgent':n.scope==='zone'?'zone':''}">
+    ${feed.length?'':`<p class="note-hint">No ${CAMP_MODE==='pre-camp'?'pre-camp':'camp'} notices yet. Directors and Zone Leaders can post camp, zone or church updates here.</p>`}${feed.map(n=>`<div class="ncard ${n.priority==='urgent'?'urgent':n.scope==='zone'?'zone':''}">
       <div class="ntop"><span class="ntag">${n.scope==='camp'?icSm('diamond')+' Camp-wide':n.scope==='church'?'Church':esc(n.zone||'')+' Zone'}</span>
       ${n.priority==='urgent'?'<span class="ntag" style="background:#fdecec;color:#b91c1c">Urgent</span>':''}
       <span class="ntime">${timeFmt(n.createdAt)}</span></div>
@@ -1683,7 +1768,7 @@ RENDER.budget=async function(){
 function drawBudget(){
   const scope=sel('budChurch')||'all';
   const rep=computeBudgetClient(window._budgetRegs,scope);
-  const head=`<div class="hero" style="margin-bottom:14px"><div class="k">Total registration fees</div>
+  const head=`<div class="hero" style="margin-bottom:14px"><div class="k">Total registration fees ${helpTip('This adds up the fee recorded for each registered person (from the registration import), grouped by church and by whether they are a camper or a leader. If someone has no fee recorded they are still counted and flagged as “Cost not recorded” ($0), so the total always matches the people on the list.',{left:true})}</div>
     <div class="big" style="font-size:var(--t-xl);margin-top:6px">${_money(rep.grandTotal)}</div>
     <div class="cd" style="margin-top:8px"><div class="meta">${rep.camperCount} campers · ${rep.leaderCount} leaders · ${rep.churchCount} ${rep.churchCount===1?'church':'churches'}</div></div></div>`;
   const catRow=(r)=>`<div class="rowsb budcat${r.unrecorded?' budcat-warn':''}" style="padding:5px 0">
@@ -1835,14 +1920,18 @@ function drawAccom(){
       +`<table style="width:100%;border-collapse:collapse;font-size:.82rem;table-layout:fixed"><tr style="color:var(--muted)"><th style="${numTh};width:16%">Students</th><th style="${numTh};width:16%">Leaders</th><th style="${midTh};width:36%">Ministry</th><th style="${numTh};width:16%">Student Tents</th><th style="${numTh};width:16%">Leader Tents</th></tr>${rows}</table>`;
   };
   // Double the gap between the male and female sections (~18px → ~40px).
+  // Bug-11: a help icon on the FIRST Tent City heading explains the automatic tent logic to a
+  // leader who didn't build the app.
+  const tentHelp=helpTip('How tents fill automatically: everyone whose registration says “tent” is grouped by their church and gender, then split into tents of up to 7 people. Students and leaders are always in separate tents. The counts update as registrations change — you do not assign tents by hand.',{left:true});
   const tentBlocks=[tentTable('m','Male'),tentTable('f','Female')].filter(Boolean);
+  if(tentBlocks.length)tentBlocks[0]=tentBlocks[0].replace('</h3>',' '+tentHelp+'</h3>');
   const tentHtml=tentBlocks.map((b,i)=>`<div style="margin-top:${i===0?18:40}px">${b}</div>`).join('');
   const box=document.getElementById('accomBody');if(!box)return;
   // A7/PC-12: room cards reflow as wrapping narrow tiles (matches the accommodation-setup
   // tile pattern), 1→N columns by width, instead of a single fixed column.
   const roomGrid=rooms.length?`<div class="accom-rooms">${roomCards}</div>`:roomCards;
-  box.innerHTML=`<h3 class="sec" style="margin-top:2px">Classroom rooms</h3>${roomGrid}
-    <h3 class="sec">Not in a classroom allocation</h3>${table}
+  box.innerHTML=`<h3 class="sec" style="margin-top:2px">Classroom rooms ${helpTip('Classroom sleeping rooms you set up (each with a capacity). A church group can be placed in a classroom only when at least 75% of that church\'s campers chose classroom. Rooms hold one gender at a time, and the app auto-fills a room to its capacity — any leftover people show as “to allocate elsewhere”.',{left:true})}</h3>${roomGrid}
+    <h3 class="sec">Not in a classroom allocation ${helpTip('Groups listed here still need a classroom spot, or aren\'t eligible for one. “Under 75%” means too few of that church\'s campers chose classroom, so they go to tents instead.',{left:true})}</h3>${table}
     ${tentHtml||'<p class="note-hint" style="margin-top:14px">Tent City auto-distribution appears once registrants have a tent accommodation kind set.</p>'}`;
 }
 RENDER.compose=function(){
@@ -2245,11 +2334,11 @@ RENDER.adminAccounts=async function(){
   const acctTile=o=>`<div class="tile" style="align-items:stretch;text-align:left;padding:12px;min-height:unset;cursor:default;gap:0">
       <div style="font-weight:700;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">${o.title}</div>
       <div style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px">${o.sub}</div>
-      <div style="display:flex;gap:5px;margin-top:auto;flex-wrap:wrap">
-        <button class="iconbtn" title="Rename" aria-label="Rename" onclick="${o.onName}">${ic('edit')}</button>
-        <button class="iconbtn" title="Change username" aria-label="Change username" onclick="${o.onUser}">${ic('at')}</button>
-        <button class="iconbtn" title="Change password" aria-label="Change password" onclick="${o.onPass}">${ic('key')}</button>
-        <button class="iconbtn danger" title="Delete" aria-label="Delete" onclick="${o.onDel}">${ic('trash')}</button>
+      <div style="display:flex;gap:4px;margin-top:auto;flex-wrap:nowrap">
+        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Rename" aria-label="Rename" onclick="${o.onName}">${ic('edit')}</button>
+        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Change username" aria-label="Change username" onclick="${o.onUser}">${ic('at')}</button>
+        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Change password" aria-label="Change password" onclick="${o.onPass}">${ic('key')}</button>
+        <button class="iconbtn danger" style="flex:1 1 0;min-width:0" title="Delete" aria-label="Delete" onclick="${o.onDel}">${ic('trash')}</button>
       </div></div>`;
   const tileGrid=items=>items.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:4px">${items.join('')}</div>`:'<p class="note-hint">None yet.</p>';
   const lr=tileGrid(leaders.map(u=>acctTile({
@@ -2269,7 +2358,8 @@ RENDER.adminAccounts=async function(){
   const roleOpts=`<option value="director">Director</option><option value="zoneLeader">Zone leader</option><option value="firstAid">First aid</option>`;
   paint('adminAccounts',`
     <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>${lr}</div>
-    <div class="card"><div class="lbl" style="margin-top:0">Churches</div>${cr}</div>
+    <div class="card"><div class="rowsb" style="align-items:center"><div class="lbl" style="margin-top:0">Churches</div>
+      <button class="btn ghost sm" onclick="bulkChurchUpdate()">${icSm('key')} Bulk Church Update</button></div>${cr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add leadership account</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Name</label><input class="fld" id="aName" placeholder="Full name" style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="aE" placeholder="e.g. yr10leaders" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
@@ -2290,7 +2380,9 @@ function aRoleChange(){
   const zw=document.getElementById('aZoneWrap');if(zw)zw.style.display=r==='zoneLeader'?'block':'none';
 }
 async function addAcct(){const role=sel('aR');const nm=val('aName').trim();const sp=nm.indexOf(' ');
-  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?(nm.slice(sp+1).trim()||firstName):firstName;
+  // Bug-8: a one-word account name (e.g. a first-aid post) keeps an EMPTY last name rather than
+  // duplicating the single word — so it doesn't show up as "FirstAid FirstAid".
+  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?nm.slice(sp+1).trim():'';
   const body={firstName,lastName,username:val('aE'),password:val('aP'),role};
   if(role==='zoneLeader')body.zone=sel('aZ');
   if(!firstName||!val('aE')){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
@@ -2305,7 +2397,8 @@ function editLeaderName(id){const u=_findUser(id);
     <button class="btn" style="margin-top:10px" onclick="saveLeaderName('${id}','${u.role}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveLeaderName(id,role){const nm=val('enName').trim();const sp=nm.indexOf(' ');
-  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?(nm.slice(sp+1).trim()||firstName):firstName;
+  // Bug-8: keep an empty last name for a one-word account name (no duplicated surname).
+  const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?nm.slice(sp+1).trim():'';
   const body={firstName,lastName,status:sel('enS')};
   if(role==='zoneLeader')body.zone=sel('enZ');
   if(!firstName){toast('Enter a name');return;}
@@ -2344,6 +2437,55 @@ async function addChurch(){if(!val('ncName')||!val('ncUser')){toast('Enter churc
   const name=val('ncName');
   const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:val('ncPass')};
   try{await api('/accounts/churches',{method:'POST',body});toast('Church created');await _rAccts();}catch(e){toast(e.message);}}
+
+/* Bug-7: Bulk Church Update — one form listing every church with its login username (pre-filled)
+   and a password field. Save applies all changed usernames + any entered passwords at once;
+   a blank password leaves that church's password unchanged. */
+function bulkChurchUpdate(){
+  const churches=(window._allChurches||[]);const users=(window._allUsers||[]);
+  const rows=churches.map(c=>{
+    const cu=users.find(u=>u.role==='church'&&u.churchId===c.id);
+    if(!cu)return `<div style="padding:8px 0;border-top:1px solid var(--line)"><div style="font-weight:700;font-size:.82rem;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div><div class="sub" style="color:var(--danger)">No login account — add one first.</div></div>`;
+    return `<div style="padding:8px 0;border-top:1px solid var(--line)">
+      <div style="font-weight:700;font-size:.82rem;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div>
+      <div style="display:flex;gap:6px">
+        <input class="fld" data-bcu="${cu.id}" data-cur="${esc(cu.username||'')}" value="${esc(cu.username||'')}" placeholder="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="flex:1;margin:0">
+        <input class="fld" data-bcp="${cu.id}" type="text" placeholder="new password (blank = keep)" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" style="flex:1;margin:0">
+      </div></div>`;
+  }).join('');
+  modal(`<h3>Bulk Church Update</h3>
+    <p class="sub" style="margin:2px 0 6px">Update usernames and passwords for several churches at once. The username is pre-filled — edit any you want to change. Leave a password blank to keep the current one.</p>
+    <div style="max-height:54vh;overflow:auto;margin:4px 0 10px">${rows||'<p class="note-hint">No churches yet.</p>'}</div>
+    <button class="btn" onclick="saveBulkChurch()">Save all</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+}
+async function saveBulkChurch(){
+  const userInputs=[...document.querySelectorAll('#sheet [data-bcu]')];
+  const passById={};document.querySelectorAll('#sheet [data-bcp]').forEach(p=>passById[p.getAttribute('data-bcp')]=p.value);
+  // Validate everything first so one bad row never leaves a half-applied batch.
+  const jobs=[];
+  for(const inp of userInputs){
+    const id=inp.getAttribute('data-bcu');const cur=inp.getAttribute('data-cur')||'';
+    const uname=inp.value.trim();const pass=(passById[id]||'').trim();
+    if(uname!==cur){
+      if(!/^[A-Za-z0-9._-]{2,40}$/.test(uname)){toast('Invalid username: '+(uname||'(empty)'));return;}
+      jobs.push({type:'username',id,username:uname});
+    }
+    if(pass){
+      if(pass.length<6){toast('Passwords must be 6+ characters');return;}
+      jobs.push({type:'password',id,password:pass});
+    }
+  }
+  if(!jobs.length){toast('No changes to save');return;}
+  let unC=0,pwC=0;
+  try{
+    for(const j of jobs){
+      if(j.type==='username'){await api('/accounts/users/'+j.id,{method:'PATCH',body:{username:j.username}});unC++;}
+      else{await api('/accounts/users/password',{method:'POST',body:{userId:j.id,password:j.password}});pwC++;}
+    }
+    closeModal();toast(`Saved · ${unC} username${unC===1?'':'s'}, ${pwC} password${pwC===1?'':'s'}`);await _rAccts();
+  }catch(e){toast(e.message);await _rAccts();}
+}
 
 // Scroll-preserving re-loaders — capture scrollTop before re-render, restore after.
 // PC-5: these MUST re-render via the matching RENDER.* function. They previously called

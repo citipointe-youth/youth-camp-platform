@@ -8,7 +8,9 @@ const usernameField = z.string().min(2).max(40).regex(/^[A-Za-z0-9._-]+$/, 'User
 
 export const CreateUserSchema = z.object({
   firstName: z.string().min(1),
-  lastName: z.string().min(1),
+  // A first-aid (or other) account may be a single word with no surname — allow an empty
+  // last name rather than forcing a duplicated/placeholder one.
+  lastName: z.string().default(''),
   username: usernameField,
   mobile: z.string().optional(),
   role: z.enum(USER_ROLES),
@@ -23,7 +25,7 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
 export const UpdateUserSchema = z.object({
   firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional(),
+  lastName: z.string().optional(),
   username: usernameField.optional(),
   mobile: z.string().optional(),
   role: z.enum(USER_ROLES).optional(),

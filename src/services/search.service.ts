@@ -3,7 +3,7 @@ import type { Person } from '../core/entities/person';
 import type { Church, ChurchContact } from '../core/entities/church';
 import type { Actor } from '../core/entities/user';
 import { assertCan } from './access-control';
-import { isCamper } from '../core/entities/person';
+import { isCamper, isRegistrant } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
 import { NotFoundError } from '../core/errors/app-error';
 import { maskPhone } from '../utils/mask';
@@ -96,7 +96,15 @@ export function makeSearchService(
     async search(actor, q) {
       assertCan(actor, 'camper:read');
       const persons = await personRepo.search(q);
-      const scoped = persons.filter((p) => isCamper(p) && canAccessPerson(actor, p));
+      // First-aiders must be able to find ANYONE who is registered — including people who have
+      // not yet arrived, or who have signed out/departed — so a medical lookup never fails because
+      // of presence state. The SPA red-flags anyone not currently on site. Other roles keep the
+      // existing "arrived campers only" search scope.
+      const scoped = persons.filter((p) => {
+        if (!canAccessPerson(actor, p)) return false;
+        if (isCamper(p)) return true;
+        return actor.role === 'firstAid' && isRegistrant(p);
+      });
 
       const results: SearchResult[] = [];
       for (const person of scoped) {
@@ -109,7 +117,9 @@ export function makeSearchService(
     async resolveContacts(actor, camperId) {
       assertCan(actor, 'camper:read');
       const person = await personRepo.findById(camperId);
-      if (!person || !isCamper(person)) throw new NotFoundError('Camper not found');
+      // Any accessible registered person (not just arrived campers) — so the first-aid card can
+      // show the ministry-leader contacts for someone who hasn't checked in yet.
+      if (!person) throw new NotFoundError('Camper not found');
       if (!canAccessPerson(actor, person)) {
         throw new NotFoundError('Camper not found');
       }
