@@ -372,7 +372,9 @@ textarea{min-height:84px;resize:vertical;}
    earlier markup rebuild left these selectors as #header/#main, which matched nothing,
    so the desktop grid silently never activated (app stayed a 460px phone column). */
 @media(min-width:980px){
-  #app{max-width:1600px;margin:0 auto;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"header header" "widenav main";height:100dvh;}
+  /* Full-width on large screens (owner: no centred bars on a 1080p display) — the cap
+     and auto-margins were leaving ~160px gutters each side at 1920px. */
+  #app{max-width:none;margin:0;width:100%;display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"header header" "widenav main";height:100dvh;}
   #bar{grid-area:header;background:#fff;border-bottom:1px solid var(--line);color:var(--ink);padding:10px 20px;flex-wrap:nowrap;row-gap:0;}
   #bar .ttl{flex:0 0 auto;}
   #bar .ttl .s{display:none;}
@@ -1795,7 +1797,7 @@ function drawAccom(){
     const used=entries.reduce((s,e)=>s+e.n,0);const rem=rm.capacity-used;
     const roomGender=entries.length?gByKey[entries[0].key].gender:null;
     const addable=roomGender?availGroups.filter(g=>g.gender===roomGender):availGroups;
-    const chips=entries.map(e=>{const g=gByKey[e.key];return `<div class="rowsb" style="align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-top:6px"><span style="font-size:.85rem">${esc(g.church)} — ${g.label} (${e.n})</span><button class="btn ghost sm" onclick="removeAlloc('${rm.id}','${e.key}')">Remove</button></div>`;}).join('');
+    const chips=entries.map(e=>{const g=gByKey[e.key];return `<div class="rowsb" style="align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-top:6px"><span style="font-size:.7rem;line-height:1.3">${esc(g.church)} — ${g.label} (${e.n})</span><button class="btn ghost sm" onclick="removeAlloc('${rm.id}','${e.key}')">Remove</button></div>`;}).join('');
     const addSel=(rem>0&&addable.length)?`<select onchange="addAlloc('${rm.id}',this.value);this.value=''" style="width:100%;margin-top:8px"><option value="">+ Add ministry…</option>${addable.map(g=>`<option value="${g.key}">${esc(g.church)} — ${g.label} (${g.avail} left)</option>`).join('')}</select>`:(rem<=0?`<div class="sub" style="margin-top:8px">Room full.</div>`:`<div class="sub" style="margin-top:8px">${roomGender?'No more '+(roomGender==='male'?'Guys':'Girls')+' groups to add.':'All eligible groups are allocated.'}</div>`);
     const tone=used?'ok':'info';const lbl=used+'/'+rm.capacity;
     return `<div class="card"><div class="rowsb"><div style="font-weight:600">${icSm('classroom')} ${esc(rm.name)} <span class="sub">· cap ${rm.capacity}</span></div><span class="pill ${tone}">${lbl}</span></div>${chips}${addSel}</div>`;
@@ -1810,15 +1812,28 @@ function drawAccom(){
     ${out.map(r=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${r[2]}</td><td><span class="sub">${esc(r[3])}</span></td></tr>`).join('')}
   </table>`:'<p class="note-hint">Everyone is allocated</p>';
   const td=tentDist(regs);
+  // Tent City table (PC-11 owner rework): Ministry centred between the headcount columns
+  // (Students / Leaders, left) and the tent-count columns (Student Tents / Leader Tents,
+  // right); vertical divider lines stop the numbers blurring together; a centred "Totals:"
+  // line sits under a bigger, black, centred heading.
   const tentTable=(gk,label)=>{
     const churchesG=Object.values(td).filter(c=>c[gk].stu+c[gk].ld>0);
-    // PC-11: total student tents / leader tents for this gender (tents are per-church 7-buckets,
-    // students & leaders separate — sum the per-church tent counts).
-    let totStuTents=0,totLdTents=0;
-    const rows=churchesG.map(c=>{const g=c[gk];const st=Math.ceil(g.stu/7),lt=Math.ceil(g.ld/7);totStuTents+=st;totLdTents+=lt;return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:center">${g.stu}</td><td style="text-align:center">${g.ld}</td><td style="text-align:center">${st}</td><td style="text-align:center">${lt}</td></tr>`;}).join('');
+    let totStu=0,totLd=0,totStuTents=0,totLdTents=0;
+    const numTd='text-align:center;padding:8px 6px;font-weight:600';
+    const midTd='text-align:center;padding:8px 6px;font-weight:700;border-left:1px solid var(--line);border-right:1px solid var(--line)';
+    const rows=churchesG.map(c=>{const g=c[gk];const st=Math.ceil(g.stu/7),lt=Math.ceil(g.ld/7);
+      totStu+=g.stu;totLd+=g.ld;totStuTents+=st;totLdTents+=lt;
+      return `<tr style="border-top:1px solid var(--line)"><td style="${numTd}">${g.stu}</td><td style="${numTd}">${g.ld}</td><td style="${midTd}">${esc(c.name)}</td><td style="${numTd}">${st}</td><td style="${numTd}">${lt}</td></tr>`;}).join('');
     if(!rows)return '';
-    return `<h3 class="sec" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span>Tent City — ${label}</span><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:700">${totStuTents} student ${totStuTents===1?'tent':'tents'} · ${totLdTents} leader ${totLdTents===1?'tent':'tents'}</span></h3><table style="width:100%;border-collapse:collapse;font-size:.8rem"><tr style="text-align:left;color:var(--muted)"><th style="padding:6px 4px">Ministry</th><th style="text-align:center">Students</th><th style="text-align:center">Leaders</th><th style="text-align:center">Student tents</th><th style="text-align:center">Leader tents</th></tr>${rows}</table>`;};
-  const tentHtml=tentTable('m','Male')+tentTable('f','Female');
+    const numTh='text-align:center;padding:7px 6px';
+    const midTh='text-align:center;padding:7px 6px;border-left:1px solid var(--line);border-right:1px solid var(--line)';
+    return `<h3 style="text-align:center;font-size:var(--t-h2);font-weight:800;color:#000;margin:0 0 4px">Tent City — ${label}</h3>`
+      +`<div style="text-align:center;font-size:var(--t-sm);font-weight:700;color:#000;margin-bottom:12px">Totals: ${totStu} ${totStu===1?'student':'students'} · ${totLd} ${totLd===1?'leader':'leaders'} · ${totStuTents} student ${totStuTents===1?'tent':'tents'} · ${totLdTents} leader ${totLdTents===1?'tent':'tents'}</div>`
+      +`<table style="width:100%;border-collapse:collapse;font-size:.82rem;table-layout:fixed"><tr style="color:var(--muted)"><th style="${numTh};width:16%">Students</th><th style="${numTh};width:16%">Leaders</th><th style="${midTh};width:36%">Ministry</th><th style="${numTh};width:16%">Student Tents</th><th style="${numTh};width:16%">Leader Tents</th></tr>${rows}</table>`;
+  };
+  // Double the gap between the male and female sections (~18px → ~40px).
+  const tentBlocks=[tentTable('m','Male'),tentTable('f','Female')].filter(Boolean);
+  const tentHtml=tentBlocks.map((b,i)=>`<div style="margin-top:${i===0?18:40}px">${b}</div>`).join('');
   const box=document.getElementById('accomBody');if(!box)return;
   // A7/PC-12: room cards reflow as wrapping narrow tiles (matches the accommodation-setup
   // tile pattern), 1→N columns by width, instead of a single fixed column.
@@ -2376,10 +2391,11 @@ async function addRoom(){if(!val('nrName')){toast('Enter a room name');return;}
 /* ===== ADMIN FAQ (pre-camp) ===== */
 RENDER.adminFaq=async function(){
   const faqs=await api('/faq');
-  paint('adminFaq',faqs.map(f=>`<div class="card"><label>Question</label><input class="fld" id="fq_${f.id}" value="${esc(f.question)}">
-    <label>Answer</label><textarea id="fa_${f.id}">${esc(f.answer)}</textarea>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveFaqPre('${f.id}')">Save</button>
-    <button class="btn red sm" style="flex:1" onclick="delFaqPre('${f.id}')">Delete</button></div></div>`).join('')+
+  paint('adminFaq',faqs.map(f=>`<div class="card" style="padding:11px 13px">
+    <div class="rowsb" style="margin-bottom:5px"><label style="margin:0">Question</label>
+      <div style="display:flex;gap:6px;flex:none"><button class="btn sm" onclick="saveFaqPre('${f.id}')">Save</button><button class="btn red sm" onclick="delFaqPre('${f.id}')">Delete</button></div></div>
+    <input class="fld" id="fq_${f.id}" value="${esc(f.question)}">
+    <label>Answer</label><textarea id="fa_${f.id}" style="min-height:52px">${esc(f.answer)}</textarea></div>`).join('')+
     `<div class="card"><div class="lbl" style="margin-top:0">Add FAQ</div><input class="fld" id="nfq" placeholder="Question"><textarea id="nfa" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqPre()">Add FAQ</button></div>`,'FAQ','Edit answers');
 };
 async function saveFaqPre(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_'+id),answer:val('fa_'+id)}});toast('Saved');await _rFaq();}catch(e){toast(e.message);}}
@@ -2389,10 +2405,11 @@ async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + 
 /* ===== ADMIN FAQ (at-camp) ===== */
 RENDER.adminFaqEdit=async function(){
   const items=await api('/faq');
-  paint('adminFaqEdit',items.map(f=>`<div class="card">
-    <label>Question</label><input class="fld" id="fq_q_${f.id}" value="${esc(f.question)}">
-    <label>Answer</label><textarea id="fq_a_${f.id}">${esc(f.answer)}</textarea>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveFaqAt('${f.id}')">Save</button><button class="btn red sm" onclick="delFaqAt('${f.id}')">Delete</button></div></div>`).join('')+
+  paint('adminFaqEdit',items.map(f=>`<div class="card" style="padding:11px 13px">
+    <div class="rowsb" style="margin-bottom:5px"><label style="margin:0">Question</label>
+      <div style="display:flex;gap:6px;flex:none"><button class="btn sm" onclick="saveFaqAt('${f.id}')">Save</button><button class="btn red sm" onclick="delFaqAt('${f.id}')">Delete</button></div></div>
+    <input class="fld" id="fq_q_${f.id}" value="${esc(f.question)}">
+    <label>Answer</label><textarea id="fq_a_${f.id}" style="min-height:52px">${esc(f.answer)}</textarea></div>`).join('')+
     `<div class="card"><div class="h3" style="margin-top:0">Add FAQ</div><input class="fld" id="fqNewQ" placeholder="Question"><textarea id="fqNewA" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqAt()">Add FAQ</button></div>`,'FAQ','Edit all answers');
 };
 async function saveFaqAt(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_q_'+id),answer:val('fq_a_'+id)}});toast('Saved');await _rFaqEdit();}catch(e){toast(e.message);}}
@@ -2786,12 +2803,12 @@ RENDER.adminDevos=async function(){
   const blocks=await Promise.all(days.map(async d=>{
     const dv=await api('/devotional/'+d).catch(()=>null);
     const wk=dayLong(d);
-    return `<div class="card"><div class="h3" style="margin-top:0">${wk} · ${d}</div>
-      <textarea id="dv_v_${d}" placeholder="Verse">${esc(dv?.verse||'')}</textarea>
+    return `<div class="card" style="padding:11px 13px"><div class="h3" style="margin-top:0">${wk} · ${d}</div>
+      <textarea id="dv_v_${d}" placeholder="Verse" style="min-height:48px">${esc(dv?.verse||'')}</textarea>
       <input class="fld" id="dv_r_${d}" placeholder="Reference" style="margin-top:8px" value="${esc(dv?.reference||'')}">
-      <textarea id="dv_f_${d}" placeholder="Reflection" style="margin-top:8px">${esc(dv?.reflection||'')}</textarea>
-      <textarea id="dv_p_${d}" placeholder="Prayer" style="margin-top:8px">${esc(dv?.prayer||'')}</textarea>
-      <button class="btn" onclick="saveDevo('${d}')">Save ${wk}</button></div>`;
+      <textarea id="dv_f_${d}" placeholder="Reflection" style="margin-top:8px;min-height:60px">${esc(dv?.reflection||'')}</textarea>
+      <textarea id="dv_p_${d}" placeholder="Prayer" style="margin-top:8px;min-height:48px">${esc(dv?.prayer||'')}</textarea>
+      <button class="btn sm" style="margin-top:10px" onclick="saveDevo('${d}')">Save ${wk}</button></div>`;
   }));
   paint('adminDevos',blocks.join(''),'Devotionals','Edit each camp day');
 };
@@ -2799,10 +2816,13 @@ async function saveDevo(d){try{await api('/devotional',{method:'POST',body:{day:
 
 /* ===== ADMIN SCHEDULE ===== */
 // One editable table row (Time + Activity). Index r keeps input ids unique per day.
-function _schedRow(d,r,t,n){return `<div style="display:grid;grid-template-columns:92px 1fr;gap:6px;margin-bottom:6px">`
-  +`<input class="fld" type="time" id="sr_t_${d}_${r}" value="${esc(t||'')}">`
-  +`<input class="fld" id="sr_n_${d}_${r}" placeholder="Activity" value="${esc(n||'')}"></div>`;}
-const SCHED_MIN_ROWS=10;
+// Inputs are addressed by CLASS within each .sched-row (not index-based ids), so a row can be
+// deleted from the middle without renumbering the rest — saveSchedDay reads the live rows.
+function _schedRow(d,r,t,n){return `<div class="sched-row" style="display:grid;grid-template-columns:92px 1fr auto;gap:6px;margin-bottom:6px;align-items:center">`
+  +`<input class="fld sr-t" type="time" value="${esc(t||'')}">`
+  +`<input class="fld sr-n" placeholder="Activity" value="${esc(n||'')}">`
+  +`<button class="iconbtn danger" type="button" title="Delete row" onclick="this.closest('.sched-row').remove()">${icSm('trash')}</button></div>`;}
+const SCHED_MIN_ROWS=7;
 RENDER.adminSchedEdit=async function(){
   const days=SETTINGS?.checkInDays||[];
   if(!days.length){paint('adminSchedEdit','<p class="note-hint">Set the camp dates first (Camp settings).</p>','Schedule','');return;}
@@ -2812,7 +2832,7 @@ RENDER.adminSchedEdit=async function(){
     const n=Math.max(SCHED_MIN_ROWS,items.length);
     let rows='';for(let r=0;r<n;r++){const it=items[r]||{};rows+=_schedRow(d,r,it.startTime,it.title);}
     return `<div class="card"><div class="h3" style="margin-top:0">${dayLong(d)} <span style="color:var(--muted);font-weight:600">· ${d}</span></div>
-      <div style="display:grid;grid-template-columns:92px 1fr;gap:6px;font-size:.6rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px"><span>Time</span><span>Activity</span></div>
+      <div style="display:grid;grid-template-columns:92px 1fr auto;gap:6px;font-size:.6rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px"><span>Time</span><span>Activity</span><span style="width:32px"></span></div>
       <div id="schedRows_${d}">${rows}</div>
       <div style="display:flex;gap:6px;margin-top:8px">
         <button class="btn ghost sm" style="flex:1" onclick="addSchedRow('${d}')">+ Add row</button>
@@ -2827,7 +2847,7 @@ function addSchedRow(d){const wrap=document.getElementById('schedRows_'+d);if(!w
 async function saveSchedDay(d){
   const wrap=document.getElementById('schedRows_'+d);if(!wrap)return;
   const entries=[];
-  for(let r=0;r<wrap.children.length;r++){const t=val('sr_t_'+d+'_'+r),n=val('sr_n_'+d+'_'+r);if(t&&n)entries.push({startTime:t,title:n});}
+  for(const row of Array.from(wrap.children)){const t=(row.querySelector('.sr-t')||{}).value||'',n=(row.querySelector('.sr-n')||{}).value||'';if(t&&n)entries.push({startTime:t,title:n});}
   try{
     const existing=await api('/schedule?day='+d,{noCache:true}).catch(()=>[]);
     for(const it of (existing||[])){await api('/schedule/'+it.id,{method:'DELETE'});}
