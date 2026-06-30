@@ -1829,8 +1829,8 @@ function drawAccom(){
     const midTh='text-align:center;padding:7px 6px;border-left:1px solid var(--line);border-right:1px solid var(--line)';
     return `<h3 style="text-align:center;font-size:var(--t-h2);font-weight:800;color:#000;margin:0 0 4px">Tent City — ${label}</h3>`
       +`<div style="text-align:center;font-size:var(--t-sm);color:#000;margin-bottom:12px;line-height:1.55">`
-        +`<div>${totStu} students <span style="color:var(--muted);margin:0 6px">Total Regos</span> ${totLd} Leaders</div>`
-        +`<div>${totStuTents} students <span style="color:var(--muted);margin:0 6px">Total Tents</span> ${totLdTents} Leaders</div>`
+        +`<div>Students Total: ${totStu} Regos in ${totStuTents} Tents</div>`
+        +`<div>Leaders Total: ${totLd} Regos in ${totLdTents} Tents</div>`
       +`</div>`
       +`<table style="width:100%;border-collapse:collapse;font-size:.82rem;table-layout:fixed"><tr style="color:var(--muted)"><th style="${numTh};width:16%">Students</th><th style="${numTh};width:16%">Leaders</th><th style="${midTh};width:36%">Ministry</th><th style="${numTh};width:16%">Student Tents</th><th style="${numTh};width:16%">Leader Tents</th></tr>${rows}</table>`;
   };
