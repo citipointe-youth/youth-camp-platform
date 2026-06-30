@@ -57,8 +57,10 @@ function camper(over: Partial<Person> = {}): Person {
 function settings(): CampSettings {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: DATE, endDate: '2026-07-05',
-    timezone: 'UTC', checkInDays: [DATE],
+    // DATE is an INTERIOR day so it keeps both AM and PM sessions under AC-1
+    // (first day is PM-only, last day AM-only). See checkin-sessions.buildSessions.
+    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-06-30', endDate: '2026-07-05',
+    timezone: 'UTC', checkInDays: ['2026-06-30', DATE, '2026-07-02'],
     accommodationLocked: false, tentPrice: 80, classroomPrice: 120, campMode: 'at-camp', createdAt: now, updatedAt: now,
   };
 }
@@ -88,6 +90,19 @@ describe('at-camp dashboard — D1 current session = latest started', () => {
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.currentSession?.id).toBe(AM);
     expect(res.nextSession?.id).toBe(PM);
+  });
+
+  // H-2: the 12:00–13:00 window. The shared currentSession helper switches AM→PM at
+  // 12:00 (PM_FROM), so 12:30 must resolve to PM — matching checkin.service. The old
+  // bespoke calc used the PM startTime (13:00) and returned AM here, so a leader tapping
+  // Check-in landed on PM while the dashboard counted "due" against AM for that hour.
+  it('resolves PM as current at 12:30, matching checkin.service (H-2)', async () => {
+    pinClock('2026-07-01T12:30:00Z');
+    const h = await build();
+    const res = await h.svc.home(actor('admin'), settings());
+    if (res.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(res.currentSession?.id).toBe(PM);
+    expect(res.nextSession).toBeNull(); // nothing after PM today
   });
 });
 

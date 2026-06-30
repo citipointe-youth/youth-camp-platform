@@ -31,7 +31,19 @@ In Supabase → Table Editor, confirm these tables exist:
   reservations, accommodation_blocks, zones, groups, notes,
   notifications, schedule_items, devotionals, faqs, settings, defaults
 
-## 6. After new-year rollover
-After running POST /admin/new-year, restored church/zone accounts have no password.
-Go to Admin → Accounts and set a new password for each church/zone account before
-telling leaders to log in.
+## 6. After new-year rollover  (R9 — RESOLVED 2026-06-30)
+POST /admin/new-year now generates a **temporary password** for every restored
+church/zone account (the admin account keeps its own real password). You do NOT need to
+set passwords by hand any more.
+
+- The temp passwords are shown in the **rollover confirmation modal** immediately after
+  close-out — copy them then.
+- If that modal is dismissed, they are **retained for the next compliance export**: run
+  Admin → Records & Export → Download audit workbook; the "Temp Passwords" tab lists
+  username + temp password. They are included **once** and then cleared from settings.
+- Share each temp password securely with its church/zone leader. Leaders log in with it
+  and should set their own password (Admin → Accounts can also reset any account).
+
+Note: the temp passwords live in plaintext in `settings.lastTempPasswords` only between
+rollover and the first export-or-view, then are wiped. Treat the audit workbook (which
+carries them) as sensitive.

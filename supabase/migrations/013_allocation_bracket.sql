@@ -1,0 +1,11 @@
+-- 013: PC-10 split-allocation persistence fix (C-1).
+--
+-- A church×gender classroom pool over the split threshold (50) divides into 7-9 / 10-12
+-- sub-pools whose group key is 3-part (`churchId|gender|bracket`). The allocation table
+-- only stored churchId + gender, so the bracket was dropped on save and split-pool
+-- allocations silently vanished on reload. Add a nullable bracket column so the 3-part
+-- key round-trips. null/absent = a non-split pool (unchanged behaviour).
+--
+-- Backward-compatible & idempotent: existing rows get bracket = null, which rowsToMap
+-- rebuilds as the original 2-part key. Safe to apply before or with the deploy.
+alter table classroom_allocations add column if not exists bracket text;

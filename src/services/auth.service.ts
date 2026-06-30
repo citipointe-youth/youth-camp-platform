@@ -26,6 +26,25 @@ if (process.env['NODE_ENV'] === 'production' && SESSION_SECRET === INSECURE_FALL
   );
 }
 
+/**
+ * B-2 (Phase 5): fail-fast on an insecure production secret. Called from the single
+ * composition path `createAppInstance()` so a misconfigured deploy refuses to start
+ * (server → exit 1; serverless → cold-start init rejects → 500) instead of serving with
+ * forgeable tokens. No-op outside production, and a no-op when a real secret is set — so a
+ * correct deploy (which already sets SESSION_SECRET) is unaffected. Re-reads the env at call
+ * time so tests can set/unset it around startup.
+ */
+export function assertSessionSecret(): void {
+  if (process.env['NODE_ENV'] !== 'production') return;
+  const secret = process.env['SESSION_SECRET'];
+  if (!secret || secret === INSECURE_FALLBACK) {
+    throw new Error(
+      '[SECURITY] Refusing to start: SESSION_SECRET is not set (or equals the insecure dev fallback) ' +
+      'in production. Session tokens would be forgeable. Set a 32+ byte SESSION_SECRET and redeploy.',
+    );
+  }
+}
+
 function signSession(actor: Actor, expiresAt: number): string {
   const payload = Buffer.from(JSON.stringify({ userId: actor.id, expiresAt, actor })).toString('base64url');
   const sig = createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');

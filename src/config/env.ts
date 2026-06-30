@@ -8,7 +8,9 @@ export const env = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  JWT_SECRET: process.env['JWT_SECRET'] ?? 'camp-platform-dev-secret-change-in-prod',
+  // NOTE: session signing uses SESSION_SECRET, read directly in auth.service.ts — NOT a
+  // JWT_SECRET here. A stale JWT_SECRET key was removed (it was never read, so setting it
+  // in a deployment gave a false sense of having secured sessions). Set SESSION_SECRET.
   DATA_DIR: process.env['DATA_DIR'] ?? './data',
 } as const;
 

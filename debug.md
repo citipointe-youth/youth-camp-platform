@@ -40,6 +40,20 @@ check "expected vs actual" before touching code.
 
 ---
 
+> **Improvement Initiative Phase 1 (2026-06-29) — read this before trusting line numbers below.**
+> The SPA grew substantially. Key structural changes (grep the symbol, don't trust offsets):
+> - **Single nav source:** `navModel(role,mode)` → `{tabs,extras}`; `navSidebar(role,mode)`;
+>   `buildTabs` and `_renderWideNav` BOTH derive from these. "Wrong/empty tab or sidebar" → `navModel`.
+> - **Budget rebuilt:** `RENDER.budget`/`drawBudget`/`computeBudgetClient`/`exportBudget`/`_budToggle`
+>   (mirror of pure `src/services/budget.ts`). "Budget number wrong" → `budget.ts` first (it's tested),
+>   then `computeBudgetClient`. Prices are per-registrant `registrationCost`, NOT settings.
+> - **Accommodation split (PC-10):** `accomChurches`/`accomGroups` (+ `_accomGenderGroups`,
+>   `_bracketOfGrade`) mirror backend `computeGroups`; pool >50 splits into `…|gender|7-9` / `|10-12`.
+> - **Icons:** SVG-only; `ic/icSm/icLg/icXl`, `emptyState`. "Blank icon" → key missing from `ICONS`.
+> - **Type scale / breakpoints:** `:root --t-*` tokens; root font scales at 768/1280; breakpoints
+>   540/768/900/980/1280. "Text too small/large" or "doesn't scale" → these.
+> - **sw.js `camp-v4`**, `API_RE` now includes `/export`.
+
 ## Frontend — `public/index.html` (single ~2,260-line SPA)
 
 This one file is the only real navigation cost in the repo. Map below (line numbers are a
@@ -80,7 +94,8 @@ Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (
 | `buildTabs` | 605 | Bottom-nav tabs per role × mode. **Missing/extra tab = here.** |
 
 ### Home (dispatch at `RENDER.home`, line 629)
-`RENDER.home` → firstAid? `renderHomeFirstAid` (1112). Else re-fetches `/settings` **only when
+`RENDER.home` → firstAid? **redirects to `gotoTab('search')`** (Phase 4: firstAid landing is Search,
+not a Home tab; `gotoTab` also maps home→search for firstAid). Else re-fetches `/settings` **only when
 not in PREVIEW_MODE** (picks up admin mode switch live; the guard fixed "preview won't load"),
 then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (inline) vs
 `renderHomeAtCamp` (713).
@@ -106,10 +121,11 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `RENDER.checkin` | 981 | Daily session check-in. `_ciLabel` 936, `CHECKIN_QUEUE` 946, `drainQueue` 956, `_optimisticState` 975, `rowHtml` 1013. **Sessions = `settings.checkInDays`×AM/PM** (id `${day}~am`), NOT schedule — see backend `checkin-sessions.ts`. The status path `encodeURIComponent`s the id (the `~` delimiter replaced `#`, which broke the URL → "Endpoint not found"). |
 | `_performCheck / confirmCheckOut / doCheck` | 1052 / 1062 / 1086 | Optimistic flip + undo (`undoCheck` 1075) |
 | `notePrompt` | 1087 | Check-in notes |
-| `renderHomeFirstAid` | 1112 | firstAid home |
-| `loadMedicalWatch` | 1129 | Medical-watch list |
-| `renderSearchFirstAid` | 1140 | |
-| `openCasualtyCard / revealMedicare` | 1156 / 1183 | `revealMedicare` uses `_currentCasualtyCard` (no re-fetch) |
+| **FIRST AID (Phase 4)** `renderSearchFirstAid / runFaSearch` | ~1375 | firstAid home = student search (no Medical Watch). `_ALLERGY_RE` flags allergy-type dietary items. |
+| `openStudentInfo` | ~1391 | "Student Info" (renamed from casualty card). Re-ranked: alert→consent→**leader contacts** (`GET /search/contacts/:id`)→Medicare→dietary→Log→recent logs→parent (bottom). `faRevealLeader` reveals a leader number. |
+| `openFirstAidLog / saveFirstAidLog` | ~1490 | Log-action form → `POST /notes {category:'firstaid'}` (4-line body). |
+| `RENDER.records / drawFaRecords / faRecSeg` | ~1505 | First-aid records tab (`GET /notes/firstaid`); Today/All + per-student filter. `_faParse` splits the 4-line body. |
+| `revealMedicare` | ~1480 | Uses `_currentStudent` (no re-fetch); POSTs the audit reveal. |
 | `RENDER.search / runSearch / reveal` | 1193 / 1198 / 1215 | Contact search + reveal |
 | `RENDER.notifs / deleteNotice` | 1218 / 1230 | Notices |
 | `RENDER.compose / sendNotif` | 1302 / 1317 | Send notice (zoneLeader/director/admin) |
@@ -155,7 +171,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `zoneLeader` | Home · My Youth · Help · Notices | Home · Check-in · Search · Notices |
 | `director` | Home · My Youth · **Data** · Help · Notices | Home · Check-in · Search · Notices |
 | `admin` | Home · My Youth · **Data** · Notices · **Admin** | Home · Check-in · Search · **Admin** |
-| `firstAid` | Home · Search · Schedule (**same in both modes**) | Home · Search · Schedule |
+| `firstAid` | Search · Records · Schedule (**same in both modes**; Search is the landing — Phase 4) | Search · Records · Schedule |
 
 **Desktop wide sidebar** (`_renderWideNav`, line ~567) — only **admin** and **director** get items
 (`zoneLeader` gets wide layout but empty sidebar). Items are **mode-conditional**:
@@ -218,10 +234,19 @@ applied to prod; `src/repositories/supabase/*` must not reference the dropped co
 | Check-in tap doesn't stick / undo broken | SPA `CHECKIN_QUEUE` (946) `drainQueue` (956) `_performCheck` (1052) `undoCheck` (1075) |
 | Sign-in/out wrong (atCamp/lifecycle) | SPA `signOut/InConfirm` (1485/1509); backend `person.service.signEvent` + presence invariants in CLAUDE.md |
 | Search / reveal contact | SPA `runSearch` (1198) `reveal` (1215); backend `search.service` |
-| First-aid medical watch / casualty card | SPA `loadMedicalWatch` (1129) `openCasualtyCard` (1156) `revealMedicare` (1183); backend `person.service.listMedicalWatch` |
+| First-aid student lookup / Student Info card | SPA `renderSearchFirstAid`/`openStudentInfo`/`revealMedicare`; leader contacts via `GET /search/contacts/:id` (`search.service.resolveContacts`). (Medical Watch + `/campers/medical` removed from the first-aid path in Phase 4; `listMedicalWatch` still serves other roles.) |
+| First-aid records (log an action / Records tab / Notes "First-aid" filter) | SPA `openFirstAidLog`/`saveFirstAidLog`, `RENDER.records`/`drawFaRecords`, `drawNotes` firstaid branch. Backend `note.service.add` (category-scoped: `note:write:firstaid`) + `recentFirstAid` (`note:read:firstaid`, `canAccessPerson`-scoped) → `GET /notes/firstaid`. Body = 4 lines Problem/Treatment/First-aider/Brought by (`_faParse`). No migration. |
 | Notices not showing / urgent popup | SPA `RENDER.notifs` (1218); `renderHomeAtCamp` (713) |
 | Accommodation allocation (rooms/auto-fill/unallocated/single-gender) | SPA `RENDER.accom`/`addAlloc`/`removeAlloc`/`drawAccom` (~1278); backend `accommodation.service` + `accommodation-allocation.ts` (75% eligibility, `validateAllocations`). Classroom pools include **both students and leaders** (tent pools keep students/leaders separate). |
-| Budget numbers wrong | SPA `RENDER.budget` (~1249) — prices from `SETTINGS.tentPrice/classroomPrice` (set in admin Settings), not blocks |
+| Budget numbers wrong | Pure `src/services/budget.ts` (`computeBudget`, tested) → SPA `computeBudgetClient`/`drawBudget`. Costs = per-registrant `registrationCost` (NOT settings prices, which are deprecated). Grand total must == Σ all line totals. Null cost = "Cost not recorded" ($0, flagged). |
+| Budget grand total ≠ sum of rows | the reconciliation invariant — check `computeBudget`/`computeBudgetClient` line-total math; covered by `budget.test.ts`. |
+| Church/zoneLeader desktop sidebar empty, or admin at-camp sidebar wrong | `navModel`/`navSidebar` (single source) — NOT `_renderWideNav`'s old per-role lists (deleted). |
+| Bottom tabs ≠ sidebar items | both derive from `navModel` now; fix it there (D3). |
+| Accommodation group counts wrong / no 7-9·10-12 split | `accomGroups`/`_accomGenderGroups` (SPA) + `computeGroups`/`groupsForGender` (backend, tested). Split triggers at pool >50; leaders halved (ceil→7-9). SPA now includes leaders in the pool (was camper-only). |
+| First/last camp day has wrong check-in sessions | `checkin-sessions.buildSessions` (AC-1): day1 PM-only, last AM-only. Tested in `checkin-sessions.test.ts`. |
+| "Signed out" filter / record missing on Notes | `RENDER.notes`/`drawNotes` — synthesised from camper `signOutHistory` (atCamp:false). |
+| FAQ showing in at-camp | `RENDER.faq` guards `CAMP_MODE==='at-camp'`→home; no at-camp home FAQ tile; Help only a pre-camp tab in `navModel` (PC-7). |
+| Compliance export downloads broken / serves HTML | `sw.js` `API_RE` must include `/export` (fixed `camp-v4`). |
 | Church can't / shouldn't see allocated room | SPA `renderHomeAtCamp` church tile — gated `campMode==='at-camp' && !PREVIEW_MODE`; backend `GET /accommodation/church-rooms/:churchId` |
 | Pre-camp registrant edits / scoping | SPA `RENDER.people` (841) `scopeRegs` (878) `markReg` (925) |
 | Testimony won't save / "no specific student" | SPA `RENDER.testimonies` (1556); backend `note.service` (`camperId` optional) + `notes.camper_id` nullable |

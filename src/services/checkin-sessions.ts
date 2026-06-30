@@ -37,8 +37,18 @@ export function sessionFor(day: string, sfx: 'am' | 'pm'): CheckInSession {
   return { id: `${day}~${sfx}`, label: `${weekdayShort(day)} ${p.label}`, day, startTime: p.startTime, location: null };
 }
 
+// AC-1: youth arrive at lunch on the first day and depart at lunch on the last day, so
+// the first camp day generates a PM session only and the last camp day an AM session only.
+// Interior days keep both AM and PM. A single-day camp is treated as an arrival day → PM only
+// (the first-day rule wins over the last-day rule when they coincide).
 export function buildSessions(checkInDays: readonly string[]): CheckInSession[] {
-  return [...checkInDays].sort().flatMap((d) => CHECKIN_PERIODS.map((p) => sessionFor(d, p.sfx)));
+  const days = [...checkInDays].sort();
+  const last = days.length - 1;
+  return days.flatMap((d, i) => {
+    if (i === 0) return [sessionFor(d, 'pm')];
+    if (i === last) return [sessionFor(d, 'am')];
+    return CHECKIN_PERIODS.map((p) => sessionFor(d, p.sfx));
+  });
 }
 
 export function parseSessionId(id: string): { day: string; sfx: 'am' | 'pm' } | null {

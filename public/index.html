@@ -18,77 +18,155 @@
 <style>
 :root{
 /* palette */
---navy:#1e1b4b;--blue:#4f46e5;--blue2:#818cf8;--purple:#9333ea;--violet:#7c3aed;--teal:#06b6d4;--amber:#f59e0b;--rose:#e11d48;--green:#16a34a;--paper:#f5f4ff;--card:#fff;--ink:#1e1a3a;--muted:#6b7280;--line:#e4e2f5;--chip:#ede9fe;
-/* design tokens */
---s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--r-sm:10px;--r:14px;--r-lg:20px;
---shadow-sm:0 4px 12px rgba(30,27,75,.07);--shadow:0 10px 24px rgba(30,27,75,.10);
---ok:#16a34a;--warn:#b45309;--danger:#b91c1c;--info:#4f46e5;}
+--navy:#1e1b4b;--blue:#4f46e5;--blue2:#818cf8;--purple:#9333ea;--violet:#7c3aed;--teal:#06b6d4;--rose:#e11d48;--paper:#f5f4ff;--card:#fff;--ink:#1e1a3a;--muted:#6b7280;--line:#e4e2f5;--chip:#ede9fe;
+/* indigo tints (C3) — previously scattered as raw hex; tokenised so the palette is one source of truth */
+--violet-d:#5b21b6;--violet-dd:#3730a3;--tint:#f5f3ff;--tint-2:#ede9fe;--lav:#ddd6fe;--lav-2:#c4b5fd;
+/* gender accents (C3 + AC-4) — bubble/bar colours: male blue, female pink */
+--male:#1d4ed8;--male-bg:#dbeafe;--female:#db2777;--female-bg:#fce7f3;
+/* spacing scale (C5) — L-1 (Phase 5): dropped the genuinely-unused steps (--s1/--s5/--s6/--s7,
+   --r-lg); the remaining tokens are referenced in live styles. */
+--s2:8px;--s3:12px;--s4:16px;--r-sm:10px;--r:14px;
+--shadow-sm:0 4px 12px rgba(30,27,75,.07);
+/* L-1: --ok was an unused duplicate of --green (itself removed); --warn/--danger/--info are used. */
+--warn:#b45309;--danger:#b91c1c;--info:#4f46e5;
+/* Phase 4 (first-aid UX): darker secondary ink for legibility (replaces --muted for body-level
+   secondary text on the first-aid screens) + SOFTENED alert/consent surfaces (calm, not alarming). */
+--ink-2:#4b4868;
+--alert-bg:#fff8ed;--alert-bd:#fcd9a6;--alert-ink:#9a5b15;
+--consent-ok-bg:#f1faf3;--consent-ok-bd:#bfe6c8;--consent-ok-ink:#1f7a43;
+--consent-no-bg:#fdf3f3;--consent-no-bd:#f0c9c9;--consent-no-ink:#9b3232;
+/* ── Fluid type scale (A1) ──────────────────────────────────────────────
+   All sizes are rem against the ROOT (html) element, which scales 16→17→18px
+   at 768/1280 (see the html/@media rules below). So every tokenised size grows
+   proportionally phone→tablet→laptop — this is the headline responsive lever.
+   Values preserve the current phone sizes; the file's ~33 accreted literals are
+   mapped to the nearest step (≤~1px deltas — flagged for on-device review).
+   --pad is the fluid screen gutter; it steps up at 540/768 (see .screen). */
+--t-display:2.8rem;  /* hero marquee number (cluster: 2.8) */
+--t-xl:2.2rem;       /* large stat / budget grand total (cluster: 2.2) */
+--t-h1:1.4rem;       /* hero h2 / detail header (cluster: 1.3–1.4) */
+--t-h2:1.2rem;       /* prominent headers (cluster: 1.2–1.25) */
+--t-h3:1.05rem;      /* card / modal h3 (cluster: 1.05–1.1) */
+--t-lg:1rem;         /* prominent body, search input, bar title (cluster: 1.0) */
+--t-body:.9rem;      /* default body (cluster: .9–.94) */
+--t-sm:.84rem;       /* secondary text (cluster: .8–.88) */
+--t-xs:.74rem;       /* captions / hints / labels (cluster: .72–.78) */
+--t-2xs:.68rem;      /* small labels (cluster: .64–.7) — M-2: nudged up toward the 11px floor */
+--t-micro:.7rem;     /* uppercase tracking badges — M-2: raised .58→.7rem (≈9.3→11.2px @16px root)
+                        so the smallest text clears the ~11px legibility floor (was below it) */
+--pad:14px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;height:100dvh;}
-body{font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;height:100dvh;overflow:hidden;}
+/* A1: explicit root size (= the previous implicit 16px), scaled up at tablet/laptop so
+   every rem-based size grows proportionally. This is the core fluid-type mechanism. */
+html{font-size:16px;}
+body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;height:100dvh;overflow:hidden;}
 /* height:100dvh on body+app (not 100% of the layout viewport): on mobile the layout
    viewport can be shorter than the visual viewport when the URL bar is hidden, which
    left a strip of dark body background BELOW the bottom nav ("nav not at the bottom").
    Anchoring both to the dynamic viewport makes #tabs sit flush at the bottom. */
 .app{width:100%;max-width:460px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.5);}
-.bar{background:linear-gradient(135deg,var(--violet),var(--navy));color:#fff;padding:max(14px,env(safe-area-inset-top)) 14px 6px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px;flex:none;z-index:20;}
-.bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.12);font-size:1.1rem;flex:none;cursor:pointer;align-self:center;}
+/* Header bar is WHITE at every width (owner: match the desktop/web header on phone too).
+   Previously this was a violet→navy gradient on phone and only turned white at ≥980px; now
+   the base bar is white with dark text and a hairline bottom border, and the badges/sign-out
+   are restyled to read on white. The ≥980px block keeps only the wide-specific tweaks
+   (subtitle hidden, no wrap). The purple camp identity still lives in the hero cards. */
+.bar{background:#fff;color:var(--ink);border-bottom:1px solid var(--line);padding:max(14px,env(safe-area-inset-top)) 14px 6px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px;flex:none;z-index:20;}
+.bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:var(--chip);color:var(--violet-d);font-size:var(--t-h3);flex:none;cursor:pointer;align-self:center;}
 .bar.canback .bk{display:grid;}
 /* Title + subtitle share one line ("My Church Hub — All churches"); the subtitle
    truncates first, the title stays whole. */
 .bar .ttl{flex:1 0 calc(100% - 41px);min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden;}
-.bar .ttl .t{font-weight:700;font-size:1rem;white-space:nowrap;flex:none;}
-.bar .ttl .s{font-size:.72rem;color:#c4b5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.bar .ttl .t{font-weight:700;font-size:var(--t-lg);white-space:nowrap;flex:none;color:var(--navy);}
+.bar .ttl .s{font-size:var(--t-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .bar .ttl .s:not(:empty)::before{content:"— ";opacity:.7;}
 /* Badges/sign-out: smaller and dropped to the bottom of the bar so they don't
    crowd the title's vertical space. */
 .bar-actions{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto;}
-.mode-badge{font-size:.56rem;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.04em;}
-.role-badge{font-size:.56rem;font-weight:800;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:2px 8px;white-space:nowrap;flex:none;letter-spacing:.03em;}
-.sign-out{padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.15);font-size:.66rem;font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid rgba(255,255,255,.2);}
+.mode-badge{font-size:var(--t-micro);font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.04em;}
+.role-badge{font-size:var(--t-micro);font-weight:800;background:var(--chip);color:var(--violet-d);border:1px solid var(--lav);border-radius:999px;padding:2px 8px;white-space:nowrap;flex:none;letter-spacing:.03em;}
+.sign-out{padding:3px 10px;border-radius:999px;background:#fff;color:var(--ink);font-size:var(--t-2xs);font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid var(--line);}
 .stage{flex:1;position:relative;overflow:hidden;}
-.screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;display:none;}
+.screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--pad) var(--pad) 26px;display:none;}
 .screen.active{display:block;animation:rise .25s ease;}
 @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .tabs{display:flex;background:#fff;border-top:1px solid var(--line);flex:none;padding:4px 6px calc(4px + env(safe-area-inset-bottom));gap:2px;z-index:20;}
-.tab{flex:1;text-align:center;padding:7px 4px 6px;font-size:.72rem;color:var(--muted);cursor:pointer;border:none;background:none;position:relative;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:12px;transition:background .15s,color .15s;}
+.tab{flex:1;text-align:center;padding:7px 4px 6px;font-size:var(--t-xs);color:var(--muted);cursor:pointer;border:none;background:none;position:relative;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:12px;transition:background .15s,color .15s;}
 .tab .ic{display:block;transition:transform .15s;}
-.tab.on{color:var(--blue);font-weight:700;background:#ede9fe;}
+.tab.on{color:var(--blue);font-weight:700;background:var(--chip);}
 .tab.on .ic{transform:scale(1.08);}
-.tab .tb{position:absolute;top:4px;right:50%;transform:translateX(16px);background:var(--rose);color:#fff;font-size:.6rem;font-weight:800;border-radius:999px;min-width:16px;height:16px;padding:0 4px;display:none;place-items:center;}
+.tab .tb{position:absolute;top:4px;right:50%;transform:translateX(16px);background:var(--rose);color:#fff;font-size:var(--t-micro);font-weight:800;border-radius:999px;min-width:16px;height:16px;padding:0 4px;display:none;place-items:center;}
 .hero{background:radial-gradient(130% 130% at 0% 0%,#9333ea,#1e1b4b 72%);color:#fff;border-radius:22px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden;}
 .hero:after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;background:rgba(255,255,255,.06);border-radius:50%;}
 .hero:before{content:"";position:absolute;left:-20px;bottom:-30px;width:100px;height:100px;background:rgba(124,58,237,.3);border-radius:50%;}
-.hero .k{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:#d8b4fe;font-weight:700;}
-.hero h2{font-size:1.4rem;margin:5px 0 2px;font-weight:800;}
+.hero .k{font-size:var(--t-2xs);letter-spacing:.16em;text-transform:uppercase;color:#d8b4fe;font-weight:700;}
+.hero h2{font-size:var(--t-h1);margin:5px 0 2px;font-weight:800;}
 .hero .cd{display:flex;gap:12px;align-items:flex-end;margin-top:12px;}
-.hero .big{font-size:2.8rem;font-weight:800;line-height:.9;}.hero .cd .meta{font-size:.8rem;color:#e9d5ff;padding-bottom:4px;}
-.nownext{background:linear-gradient(135deg,#5b21b6,#1e1b4b);color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;}
-.nownext .now{font-weight:800;}.nownext .nx{font-size:.82rem;color:#ddd6fe;margin-top:2px;}
-.notice{display:flex;gap:10px;align-items:flex-start;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:14px;padding:12px 14px;margin-bottom:12px;cursor:pointer;transition:background .12s;}
-.notice:active{background:#ede9fe;}
+.hero .big{font-size:var(--t-display);font-weight:800;line-height:.9;}.hero .cd .meta{font-size:var(--t-sm);color:#e9d5ff;padding-bottom:4px;}
+.nownext{background:linear-gradient(135deg,var(--violet-d),#1e1b4b);color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;}
+.nownext .now{font-weight:800;}.nownext .nx{font-size:var(--t-sm);color:var(--lav);margin-top:2px;}
+.notice{display:flex;gap:10px;align-items:flex-start;background:var(--tint);border:1px solid var(--lav);border-radius:14px;padding:12px 14px;margin-bottom:12px;cursor:pointer;transition:background .12s;}
+.notice:active{background:var(--chip);}
 .notice.urg{background:#fef2f2;border-color:#fecaca;}
-.notice .nico{font-size:1rem;line-height:1.35;flex:none;}
-.notice .nt{font-weight:700;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.notice .ns{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.notice .ndis{flex:none;margin-left:6px;border:none;background:transparent;color:var(--muted);font-size:1.25rem;line-height:1;cursor:pointer;padding:0 2px;}
+.notice .nico{font-size:var(--t-lg);line-height:1.35;flex:none;}
+.notice .nt{font-weight:700;font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.notice .ns{font-size:var(--t-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.notice .ndis{flex:none;margin-left:6px;border:none;background:transparent;color:var(--muted);font-size:var(--t-h2);line-height:1;cursor:pointer;padding:0 2px;}
 .notice .ndis:active{color:#111;}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(30,27,75,.06);}
 .card.tap{cursor:pointer;transition:transform .12s,box-shadow .12s;}.card.tap:active{transform:scale(.985);box-shadow:none;}
 .rowsb{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.lbl{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 0 9px;}
-.h3{font-size:.74rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px;}
-h3.sec{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 2px 9px;}
-.bar7{height:9px;border-radius:999px;background:#ede9fe;overflow:hidden;margin:9px 0 8px;}.bar7>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--violet),var(--blue2));}
-.pill{font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;letter-spacing:.02em;}
-.pill.ok{background:#dcfce7;color:#15803d;}.pill.warn{background:#fee2e2;color:#b91c1c;}.pill.amb{background:#fef3c7;color:#92400e;}.pill.info{background:#ede9fe;color:#5b21b6;}
+.lbl{font-size:var(--t-xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 0 9px;}
+.h3{font-size:var(--t-xs);font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px;}
+h3.sec{font-size:var(--t-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 2px 9px;}
+.bar7{height:9px;border-radius:999px;background:var(--chip);overflow:hidden;margin:9px 0 8px;}.bar7>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--violet),var(--blue2));}
+.pill{font-size:var(--t-2xs);font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;letter-spacing:.02em;}
+.pill.ok{background:#dcfce7;color:#15803d;}.pill.warn{background:#fee2e2;color:#b91c1c;}.pill.amb{background:#fef3c7;color:#92400e;}.pill.info{background:var(--chip);color:var(--violet-d);}
 .pills{display:flex;gap:7px;flex-wrap:wrap;}
-.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:4px;grid-auto-rows:1fr;}
+/* A4: fluid tile grid — auto-fill gives a continuous 2→3→4 column progression as the
+   container widens (min tile 132px), instead of a single 2→3 jump at 980px. */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:11px;margin-bottom:4px;grid-auto-rows:1fr;}
 .tile{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 10px;min-height:92px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 2px 8px rgba(30,27,75,.06);position:relative;}
-.tile:active{transform:scale(.95);box-shadow:none;}.tile .ic{font-size:1.65rem;display:block;color:var(--purple);}.tile .l{font-size:.76rem;font-weight:700;margin-top:7px;color:#1e1a3a;}
+.tile:active{transform:scale(.95);box-shadow:none;}.tile .ic{font-size:1.65rem;display:block;color:var(--purple);}.tile .l{font-size:var(--t-xs);font-weight:700;margin-top:7px;color:#1e1a3a;}
 .tile .sub{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-/* SVG icon system (3.1) */
+/* SVG icon system (3.1) + size helpers (C1/C4) */
 .ic-svg{width:20px;height:20px;display:inline-block;vertical-align:middle;flex:none;stroke:currentColor;}
+.ic-svg.ic-sm{width:16px;height:16px;}
+.ic-svg.ic-lg{width:32px;height:32px;}
+.ic-svg.ic-xl{width:48px;height:48px;}
+.ic-svg.cwhite{stroke:#fff;color:#fff;width:16px;height:16px;}
+/* Empty-state component (C4): consistent icon + message across lists */
+.emptyst{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 16px;color:var(--muted);text-align:center;}
+.emptyst .ic-svg{color:var(--lav-2);}
+.emptyst-msg{font-size:var(--t-sm);font-weight:600;max-width:30ch;}
+/* Budget collapsible church rows (H/§5, L3 expander) */
+.budchurch-body{max-height:0;overflow:hidden;transition:max-height .26s ease;}
+.budchurch.open .budchurch-body{max-height:1200px;}
+.budchurch .budchev{display:inline-block;transition:transform .2s;color:var(--lav-2);}
+.budchurch.open .budchev{transform:rotate(90deg);}
+.budcat-l{font-size:var(--t-sm);font-weight:600;}
+.budcat-warn .budcat-l{color:var(--warn);}
+.budcat-warn .ic-svg{color:var(--warn);}
+/* A7/PC-12: classroom-allocation room cards as wrapping narrow tiles */
+.accom-rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;align-items:start;}
+.accom-rooms>.card{margin-bottom:0;}
+/* ── Accessibility & micro-interactions (E1/E4/L1) ── */
+/* E1: visible focus ring on every interactive element (keyboard only via :focus-visible). */
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,
+.tile:focus-visible,.row:focus-visible,.tab:focus-visible,.wide-nav-item:focus-visible,.iconbtn:focus-visible,.card.tap:focus-visible{
+  outline:2px solid var(--blue);outline-offset:2px;border-radius:8px;}
+/* E2 / M-1 (Phase 5): the iconbtn rule lives in ONE place now (below, with the visual chrome).
+   The 32×32 visual box keeps a ≥44px HIT AREA via a transparent ::before, instead of the old
+   contradictory pair (min-44 here vs width-32 below, which rendered a 44px box and ignored the
+   intended compact look). */
+/* L1: tactile press feedback on tappable surfaces (reduced-motion aware below). */
+.tile:active,.row:active,.wide-nav-item:active,.budchurch-hd:active{transform:scale(.985);}
+/* E4: honour prefers-reduced-motion — disable transitions/animations/transforms. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
+  .screen.active{animation:none;}
+  .tile:active,.row:active,.card.tap:active,.btn:active,.budchurch .budchev{transform:none;}
+}
 .tile .ic-svg{width:26px;height:26px;}
 .tab .ic-svg{width:21px;height:21px;}
 .notice .nico .ic-svg{width:18px;height:18px;}
@@ -98,47 +176,99 @@ h3.sec{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppe
 .acct-row{display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid var(--line);}
 .acct-row:first-child{border-top:none;}
 .acct-actions{display:flex;gap:5px;flex:none;}
-.iconbtn{background:#f1f0ff;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;color:var(--blue);padding:0;}
+/* M-1: single source for .iconbtn — 32×32 visual chrome, ≥44px tappable via the ::before slop. */
+.iconbtn{background:#f1f0ff;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;color:var(--blue);padding:0;position:relative;}
+.iconbtn::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
 .iconbtn .ic-svg{width:17px;height:17px;}
 .iconbtn:active{background:#e0ddff;}
 .iconbtn.danger{color:var(--danger);background:#fef2f2;border-color:#fecaca;}
-.acct-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.72rem;color:var(--muted);background:#f5f3ff;border-radius:10px;padding:9px 11px;margin-bottom:10px;}
+.acct-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:var(--t-xs);color:var(--muted);background:var(--tint);border-radius:10px;padding:9px 11px;margin-bottom:10px;}
 .acct-legend span{display:inline-flex;align-items:center;gap:5px;}
 .acct-legend .ic-svg{width:15px;height:15px;}
-.tile .b{position:absolute;top:7px;right:8px;background:var(--rose);color:#fff;font-size:.58rem;font-weight:800;border-radius:999px;padding:2px 6px;}
+.tile .b{position:absolute;top:7px;right:8px;background:var(--rose);color:#fff;font-size:var(--t-micro);font-weight:800;border-radius:999px;padding:2px 6px;}
 .row{display:flex;align-items:center;gap:11px;padding:11px 13px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:background .12s;}
-.row:active{background:#f5f3ff;}
+.row:active{background:var(--tint);}
 .row.checked{background:#f0fdf4;border-color:#bbf7d0;}
-.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:700;color:#5b21b6;background:#ede9fe;flex:none;}
-.av.male{background:#dbeafe;color:#1d4ed8;}.av.female{background:#fce7f3;color:#be185d;}
-.nm{font-weight:700;font-size:.9rem;color:var(--ink);}.sub{font-size:.73rem;color:var(--muted);}
-.chev{color:#c4b5fd;font-size:1.1rem;font-weight:700;}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:var(--t-sm);font-weight:700;color:var(--violet-d);background:var(--chip);flex:none;}
+.av.male{background:var(--male-bg);color:var(--male);}.av.female{background:var(--female-bg);color:#be185d;}
+.nm{font-weight:700;font-size:var(--t-body);color:var(--ink);}.sub{font-size:var(--t-xs);color:var(--muted);}
+.chev{color:var(--lav-2);font-size:var(--t-h3);font-weight:700;}
 .search{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--blue);border-radius:14px;padding:11px 13px;margin-bottom:12px;box-shadow:0 0 0 3px rgba(79,70,229,.08);}
-.search input{border:none;outline:none;font-size:1rem;flex:1;background:none;font-family:inherit;}
+.search input{border:none;outline:none;font-size:var(--t-lg);flex:1;background:none;font-family:inherit;}
 .faq-item{background:#fff;border:1px solid var(--line);border-radius:13px;margin-bottom:8px;overflow:hidden;}
-.faq-item .q{padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;font-size:.9rem;gap:10px;}
-.faq-item .q .pm{color:var(--blue);font-size:1.2rem;transition:transform .2s;flex:none;}
-.faq-item .a{max-height:0;overflow:hidden;transition:max-height .25s ease;font-size:.86rem;color:#475569;padding:0 14px;}
+.faq-item .q{padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;font-size:var(--t-body);gap:10px;}
+.faq-item .q .pm{color:var(--blue);font-size:var(--t-h2);transition:transform .2s;flex:none;}
+.faq-item .a{max-height:0;overflow:hidden;transition:max-height .25s ease;font-size:var(--t-sm);color:#475569;padding:0 14px;}
 .faq-item.open .a{max-height:360px;padding:0 14px 13px;}.faq-item.open .q .pm{transform:rotate(45deg);}
 .findcard{background:#f8fbff;border:1.5px solid #dbe6ff;border-radius:14px;padding:13px;margin-bottom:10px;}
-.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #dbe6ff;font-size:.86rem;gap:10px;}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #dbe6ff;font-size:var(--t-sm);gap:10px;}
 .kv:last-of-type{border:none;}.kv .k{color:var(--muted);}.kv .v{font-weight:600;text-align:right;}
-.kv2{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:.9rem;gap:10px;}
+.kv2{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:var(--t-body);gap:10px;}
 .kv2:last-child{border:none;}.kv2 .k{color:var(--muted);}.kv2 .v{font-weight:600;text-align:right;}
-.med{background:#fde2e1;color:#b91c1c;border-radius:8px;padding:4px 9px;font-size:.76rem;font-weight:600;display:inline-block;margin:5px 0;}
-.seg{display:flex;background:#ede9fe;border-radius:14px;padding:4px;gap:4px;margin-bottom:12px;}
-.seg button{flex:1;border:none;background:none;padding:9px 4px;border-radius:10px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s;font-family:inherit;}
+.med{background:#fde2e1;color:#b91c1c;border-radius:8px;padding:4px 9px;font-size:var(--t-xs);font-weight:600;display:inline-block;margin:5px 0;}
+.seg{display:flex;background:var(--chip);border-radius:14px;padding:4px;gap:4px;margin-bottom:12px;}
+.seg button{flex:1;border:none;background:none;padding:9px 4px;border-radius:10px;font-size:var(--t-sm);font-weight:700;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s;font-family:inherit;}
 .seg button.on{background:#fff;color:var(--blue);box-shadow:0 2px 8px rgba(79,70,229,.15);}
 .filters{display:flex;gap:8px;margin-bottom:11px;}
-.filters select{flex:1;font-size:.82rem;padding:8px 10px;}
-.ncard{background:#fff;border:1px solid var(--line);border-left:4px solid #c4b5fd;border-radius:14px;padding:12px 14px;margin-bottom:9px;}
+.filters select{flex:1;font-size:var(--t-sm);padding:8px 10px;}
+.ncard{background:#fff;border:1px solid var(--line);border-left:4px solid var(--lav-2);border-radius:14px;padding:12px 14px;margin-bottom:9px;}
 .ncard.urgent{border-left-color:var(--rose);}.ncard.zone{border-left-color:var(--teal);}
-.ntag{font-size:.62rem;font-weight:800;text-transform:uppercase;padding:2px 9px;border-radius:999px;background:#ede9fe;color:#5b21b6;letter-spacing:.03em;}
-.ntime{margin-left:auto;font-size:.7rem;color:#94a3b8;}.ntop{display:flex;gap:7px;align-items:center;margin-bottom:4px;}
-.ntitle{font-weight:700;font-size:.92rem;}.nbody{font-size:.84rem;color:#475569;margin-top:2px;}.nfrom{font-size:.72rem;color:#94a3b8;margin-top:5px;}
-.noteitem{background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:10px 12px;margin-bottom:7px;font-size:.86rem;}
-.noteitem .meta{font-size:.7rem;color:#94a3b8;margin-top:3px;}
-.note-hint{font-size:.74rem;color:var(--muted);text-align:center;margin-top:10px;}
+.ntag{font-size:var(--t-micro);font-weight:800;text-transform:uppercase;padding:2px 9px;border-radius:999px;background:var(--chip);color:var(--violet-d);letter-spacing:.03em;}
+.ntime{margin-left:auto;font-size:var(--t-2xs);color:#94a3b8;}.ntop{display:flex;gap:7px;align-items:center;margin-bottom:4px;}
+.ntitle{font-weight:700;font-size:var(--t-body);}.nbody{font-size:var(--t-sm);color:#475569;margin-top:2px;}.nfrom{font-size:var(--t-xs);color:#94a3b8;margin-top:5px;}
+.noteitem{background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:10px 12px;margin-bottom:7px;font-size:var(--t-sm);}
+.noteitem .meta{font-size:var(--t-2xs);color:#94a3b8;margin-top:3px;}
+.note-hint{font-size:var(--t-xs);color:var(--muted);text-align:center;margin-top:10px;}
+/* ── Phase 4 — First-aid screens (Student Info / Records / log action) ──────────
+   Calm, legible, token-only. Softened medical alert + consent (no alarm red/green);
+   ministry-leader contacts are the focus; parent sits quietly at the bottom. */
+.fa-id{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.fa-bubble{width:50px;height:50px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:var(--t-h3);}
+.fa-bubble.male{background:var(--male-bg);color:var(--male);}
+.fa-bubble.female{background:var(--female-bg);color:var(--female);}
+.fa-id h2{font-size:var(--t-h1);font-weight:800;line-height:1.15;}
+.fa-id .meta{font-size:var(--t-xs);color:var(--ink-2);margin-top:2px;}
+.fa-status{display:inline-flex;align-items:center;gap:4px;font-size:var(--t-2xs);font-weight:800;padding:3px 9px;border-radius:999px;margin-top:5px;}
+.fa-status.on{background:var(--consent-ok-bg);color:var(--consent-ok-ink);border:1px solid var(--consent-ok-bd);}
+.fa-status.off{background:var(--alert-bg);color:var(--alert-ink);border:1px solid var(--alert-bd);}
+.fa-alert{border:1px solid var(--alert-bd);background:var(--alert-bg);border-radius:var(--r);padding:var(--s4);margin-bottom:var(--s3);}
+.fa-alert .ah{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--alert-ink);font-size:var(--t-h3);margin-bottom:var(--s2);}
+.fa-alert .row{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--alert-bd);}
+.fa-alert .row:first-of-type{border-top:none;}
+.fa-alert .tag{font-size:var(--t-2xs);font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--alert-ink);background:#fff;border:1px solid var(--alert-bd);padding:3px 7px;border-radius:6px;flex:none;min-width:72px;text-align:center;}
+.fa-alert .b{font-weight:700;font-size:var(--t-sm);}
+.fa-calm{font-size:var(--t-sm);color:var(--ink-2);font-weight:600;}
+.fa-consent{display:flex;align-items:center;gap:11px;border-radius:var(--r);padding:13px var(--s4);margin-bottom:var(--s3);font-weight:800;}
+.fa-consent .ic-svg{flex:none;}
+.fa-consent.yes{background:var(--consent-ok-bg);border:1px solid var(--consent-ok-bd);color:var(--consent-ok-ink);}
+.fa-consent.no{background:var(--consent-no-bg);border:1px solid var(--consent-no-bd);color:var(--consent-no-ink);}
+.fa-consent .sub{font-weight:600;font-size:var(--t-xs);opacity:.92;}
+.fa-lead{border:1.5px solid var(--lav);background:var(--card);border-radius:var(--r);padding:var(--s4);margin-bottom:var(--s3);box-shadow:var(--shadow-sm);}
+.fa-lead .lh{display:flex;align-items:center;gap:7px;font-size:var(--t-xs);font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--violet-dd);margin-bottom:var(--s2);}
+.fa-lead .who{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.fa-lead .who .nm{font-weight:800;font-size:var(--t-body);}
+.fa-lead .who .ptag{font-size:var(--t-2xs);font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--tint-2);color:var(--violet-dd);}
+.fa-lead .who .ptag.sec{background:var(--paper);color:var(--ink-2);border:1px solid var(--line);}
+.fa-lead .sub{font-size:var(--t-xs);color:var(--ink-2);margin-bottom:8px;}
+/* leader + parent call buttons: clear background, black text, bordered (icon is the affordance) */
+.btn.fa-call{background:none;color:var(--ink);border:1.5px solid var(--lav);width:100%;}
+.btn.fa-parent{background:none;color:var(--ink-2);border:1.5px solid var(--line);width:100%;font-weight:700;}
+.fa-last{margin-top:6px;padding-top:14px;border-top:1px dashed var(--lav);}
+.fa-diet{display:inline-block;font-size:var(--t-xs);font-weight:700;background:var(--tint-2);color:var(--violet-dd);border:1px solid var(--lav);padding:3px 9px;border-radius:999px;margin:2px 3px 2px 0;}
+.fa-recent{background:var(--tint);border:1px solid var(--lav);border-radius:var(--r-sm);padding:11px var(--s3);font-size:var(--t-xs);}
+.fa-recent .r{display:flex;gap:8px;padding:4px 0;}
+.fa-recent .r .tm{color:var(--ink-2);flex:none;min-width:62px;}
+.fa-rec{padding:12px 4px;border-bottom:1px solid var(--line);}
+.fa-rec:last-child{border-bottom:none;}
+.fa-rec .top{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.fa-rec .top .nm{font-weight:800;font-size:var(--t-sm);}
+.fa-rec .top .tm{margin-left:auto;font-size:var(--t-xs);color:var(--ink-2);}
+.fa-rec .ln{font-size:var(--t-sm);margin-top:2px;}
+.fa-rec .ln b{color:var(--alert-ink);font-weight:800;}
+.fa-rec .ln.tx b{color:var(--consent-ok-ink);}
+.fa-form2{display:flex;flex-direction:column;gap:0;}
+.fa-form2 > div{flex:1;}
+@media(min-width:540px){.fa-form2{flex-direction:row;gap:10px;}}
 .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 0;color:var(--muted);gap:12px;}
 .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -147,55 +277,61 @@ h3.sec{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppe
 .sync-dot.pending{background:#fbbf24;animation:pulse 1s infinite;}
 .sync-dot.synced{background:#22c55e;}
 .sync-dot.error{background:#ef4444;}
-.loading .lt{font-size:.78rem;font-weight:600;}
-.callbox{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:13px;font-size:.86rem;color:#166534;margin-bottom:10px;}
-.warnbox{background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:13px;font-size:.84rem;color:#92400e;margin-bottom:10px;}
-.infobox{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:14px;padding:13px;font-size:.84rem;color:#5b21b6;margin-bottom:10px;}
-.toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%) translateY(20px);background:linear-gradient(135deg,#3730a3,#1e1b4b);color:#fff;padding:11px 20px;border-radius:999px;font-size:.86rem;font-weight:700;opacity:0;pointer-events:none;transition:.25s;z-index:40;max-width:90%;text-align:center;box-shadow:0 4px 16px rgba(79,70,229,.35);}
+/* B-1: check-in sync banner — amber while draining, red (tappable) when an online error
+   dropped a tap. Uses status tokens; no new hex. */
+.ci-sync{display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 13px;margin-bottom:10px;font-size:var(--t-sm);font-weight:700;}
+.ci-sync-pending{background:#fef3c7;color:var(--warn);border:1px solid #fcd34d;}
+.ci-sync-fail{background:#fee2e2;color:var(--danger);border:1px solid #fecaca;cursor:pointer;}
+.ci-sync-fail:active{background:#fecaca;}
+.loading .lt{font-size:var(--t-xs);font-weight:600;}
+.callbox{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:13px;font-size:var(--t-sm);color:#166534;margin-bottom:10px;}
+.warnbox{background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:13px;font-size:var(--t-sm);color:#92400e;margin-bottom:10px;}
+.infobox{background:var(--tint);border:1px solid var(--lav);border-radius:14px;padding:13px;font-size:var(--t-sm);color:var(--violet-d);margin-bottom:10px;}
+.toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%) translateY(20px);background:linear-gradient(135deg,var(--violet-dd),#1e1b4b);color:#fff;padding:11px 20px;border-radius:999px;font-size:var(--t-sm);font-weight:700;opacity:0;pointer-events:none;transition:.25s;z-index:40;max-width:90%;text-align:center;box-shadow:0 4px 16px rgba(79,70,229,.35);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .modal{position:absolute;inset:0;background:rgba(14,10,30,.6);display:none;align-items:flex-end;z-index:50;}
 .modal.show{display:flex;}
 .sheet{background:#fff;width:100%;border-radius:24px 24px 0 0;padding:20px 17px max(20px,env(safe-area-inset-bottom));animation:rise .2s;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .sheet::before{content:"";display:block;width:36px;height:4px;background:#e4e2f5;border-radius:2px;margin:0 auto 14px;}
-.sheet h3{font-size:1.08rem;color:var(--navy);margin-bottom:8px;font-weight:800;}
-label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:12px 2px 5px;letter-spacing:.04em;text-transform:uppercase;}
-.fld,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;font-size:.94rem;font-family:inherit;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s;}
+.sheet h3{font-size:var(--t-h3);color:var(--navy);margin-bottom:8px;font-weight:800;}
+label{display:block;font-size:var(--t-xs);font-weight:700;color:var(--muted);margin:12px 2px 5px;letter-spacing:.04em;text-transform:uppercase;}
+.fld,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;font-size:var(--t-body);font-family:inherit;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s;}
 .fld:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,70,229,.1);}
 textarea{min-height:84px;resize:vertical;}
-.btn{display:block;width:100%;background:linear-gradient(135deg,var(--violet),var(--blue));color:#fff;border:none;border-radius:14px;padding:14px;font-size:.94rem;font-weight:700;text-align:center;cursor:pointer;margin-top:8px;letter-spacing:.01em;}
+.btn{display:block;width:100%;background:linear-gradient(135deg,var(--violet),var(--blue));color:#fff;border:none;border-radius:14px;padding:14px;font-size:var(--t-body);font-weight:700;text-align:center;cursor:pointer;margin-top:8px;letter-spacing:.01em;}
 .btn:active{transform:scale(.98);opacity:.92;}.btn.alt{background:#fff;color:var(--blue);border:1.5px solid var(--blue);background:none;}
-.btn.sm{width:auto;padding:8px 13px;margin:0;font-size:.76rem;border-radius:10px;}
-.btn.red{background:linear-gradient(135deg,#e11d48,#9f1239);}.btn.ghost{background:#f1f0ff;color:#3730a3;}
+.btn.sm{width:auto;padding:8px 13px;margin:0;font-size:var(--t-xs);border-radius:10px;}
+.btn.red{background:linear-gradient(135deg,#e11d48,#9f1239);}.btn.ghost{background:#f1f0ff;color:var(--violet-dd);}
 .detail-hd{background:linear-gradient(135deg,#9333ea,#1e1b4b);color:#fff;border-radius:22px;padding:20px 18px;margin-bottom:14px;text-align:center;}
-.detail-hd .av-lg{width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:1.4rem;font-weight:800;margin:0 auto 10px;}
-.detail-hd h2{font-size:1.3rem;}
-.snap .bignum{font-size:2.2rem;font-weight:800;line-height:1;color:var(--navy);}
-.accbadge{font-size:.7rem;font-weight:800;padding:7px 12px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
-.accbadge.tent{background:#dcfce7;color:#15803d;}.accbadge.classroom{background:#ede9fe;color:#5b21b6;}.accbadge.mixed{background:#fef3c7;color:#92400e;}
+.detail-hd .av-lg{width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:var(--t-h1);font-weight:800;margin:0 auto 10px;}
+.detail-hd h2{font-size:var(--t-h1);}
+.snap .bignum{font-size:var(--t-xl);font-weight:800;line-height:1;color:var(--navy);}
+.accbadge{font-size:var(--t-2xs);font-weight:800;padding:7px 12px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.accbadge.tent{background:#dcfce7;color:#15803d;}.accbadge.classroom{background:var(--chip);color:var(--violet-d);}.accbadge.mixed{background:#fef3c7;color:#92400e;}
 .gbar{display:flex;height:16px;border-radius:999px;overflow:hidden;background:#eef2f8;margin:4px 0 6px;}
-.gbar i{display:block;height:100%;}.gbar .m{background:linear-gradient(90deg,#818cf8,#4f46e5);}.gbar .f{background:linear-gradient(90deg,#f472b6,#db2777);}
-.glabels{font-size:.76rem;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;}
+.gbar i{display:block;height:100%;}.gbar .m{background:linear-gradient(90deg,#818cf8,#4f46e5);}.gbar .f{background:linear-gradient(90deg,#f472b6,var(--female));}
+.glabels{font-size:var(--t-xs);color:var(--muted);font-weight:600;display:flex;justify-content:space-between;}
 .gradebars{display:flex;gap:6px;align-items:flex-end;height:92px;padding-top:8px;}
 .gcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;}
-.gcol .gbar-col{width:100%;max-width:30px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#c4b5fd,var(--blue));min-height:4px;}
-.gcol.empty .gbar-col{background:#e6ecf5;}.gcol .n{font-size:.72rem;font-weight:800;color:var(--navy);}.gcol .g{font-size:.62rem;color:var(--muted);font-weight:700;}
+.gcol .gbar-col{width:100%;max-width:30px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,var(--lav-2),var(--blue));min-height:4px;}
+.gcol.empty .gbar-col{background:#e6ecf5;}.gcol .n{font-size:var(--t-xs);font-weight:800;color:var(--navy);}.gcol .g{font-size:var(--t-micro);color:var(--muted);font-weight:700;}
 .statband{display:flex;gap:8px;margin-bottom:12px;}
 .statband .s{flex:1;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 8px;text-align:center;}
-.statband .s b{display:block;font-size:1.4rem;color:var(--navy);line-height:1.1;font-weight:800;}.statband .s span{font-size:.64rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.statband .s b{display:block;font-size:var(--t-h1);color:var(--navy);line-height:1.1;font-weight:800;}.statband .s span{font-size:var(--t-2xs);color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
 .selrow{display:flex;gap:8px;margin-bottom:12px;}.selrow>div{flex:1;}.selrow label{margin-top:0;}
-.lead-tag{font-size:.58rem;font-weight:800;background:#ede9fe;color:#6d28d9;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
-.gradepill{font-size:.6rem;font-weight:800;background:#eef2f8;color:#475569;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
-.err{background:#fde2e1;color:#7f1d1d;border-radius:10px;padding:9px 12px;font-size:.82rem;margin-top:8px;display:none;}
+.lead-tag{font-size:var(--t-micro);font-weight:800;background:var(--chip);color:#6d28d9;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.gradepill{font-size:var(--t-micro);font-weight:800;background:#eef2f8;color:#475569;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+.err{background:#fde2e1;color:#7f1d1d;border-radius:10px;padding:9px 12px;font-size:var(--t-sm);margin-top:8px;display:none;}
 #login{position:absolute;inset:0;background:radial-gradient(140% 100% at 50% 0%,#9333ea 0%,#4f46e5 40%,#0d0a1e 80%);display:flex;flex-direction:column;justify-content:center;padding:28px;z-index:60;}
 #login h1{color:#fff;font-size:1.85rem;text-align:center;margin-bottom:5px;letter-spacing:-.03em;font-weight:800;}
-#login p{color:#e9d5ff;text-align:center;font-size:.88rem;margin-bottom:22px;font-weight:500;}
+#login p{color:#e9d5ff;text-align:center;font-size:var(--t-sm);margin-bottom:22px;font-weight:500;}
 #login .card{background:rgba(255,255,255,.97);border-radius:20px;}
 .quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.quick button{flex:1;min-width:44%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:12px;padding:9px 8px;font-size:.76rem;cursor:pointer;font-weight:600;font-family:inherit;transition:background .12s;}
+.quick button{flex:1;min-width:44%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;border-radius:12px;padding:9px 8px;font-size:var(--t-xs);cursor:pointer;font-weight:600;font-family:inherit;transition:background .12s;}
 .quick button:active{background:rgba(255,255,255,.22);}
 /* ── At-camp preview banner ── */
 #previewBanner{display:none;background:linear-gradient(90deg,#92400e,#b45309);color:#fff;
-  padding:max(8px,env(safe-area-inset-top)) 14px 8px;font-size:.78rem;font-weight:700;
+  padding:max(8px,env(safe-area-inset-top)) 14px 8px;font-size:var(--t-xs);font-weight:700;
   flex:none;z-index:19;align-items:center;gap:10px;}
 #previewBanner.show{display:flex;}
 /* When the preview banner is showing it becomes the topmost element and owns the
@@ -204,11 +340,32 @@ textarea{min-height:84px;resize:vertical;}
 #previewBanner.show + .bar{padding-top:14px;}
 #previewBanner .pb-label{flex:1;letter-spacing:.03em;}
 #previewBanner .pb-exit{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
-  color:#fff;border-radius:999px;padding:4px 12px;font-size:.74rem;font-weight:800;
+  color:#fff;border-radius:999px;padding:4px 12px;font-size:var(--t-xs);font-weight:800;
   cursor:pointer;white-space:nowrap;font-family:inherit;}
 #previewBanner .pb-exit:active{background:rgba(255,255,255,.35);}
 /* Wide-nav element is hidden on phone; shown only inside the 980px breakpoint */
 .wide-nav{display:none;}
+/* ===== Continuous responsive progression (A2/A3/A4) =====
+   Replaces the old single-jump-at-980 behaviour. Below the 980px sidebar threshold the
+   single-column shell now WIDENS with the viewport (was a fixed 460px strip — the owner's
+   "every screen is phone-fixed" complaint) and the gutter grows. Grids that were flex/2-col
+   gain columns progressively. The 980px block below remains the "switch to sidebar nav"
+   point only. Everything here is additive; phone (<540px) is unchanged. */
+@media(min-width:540px){
+  .app{max-width:600px;}
+  :root{--pad:18px;}
+  .statband{flex-wrap:wrap;}
+  .selrow{flex-wrap:wrap;}
+}
+@media(min-width:768px){
+  html{font-size:17px;}              /* A1: bump root → all rem text grows ~6% */
+  .app{max-width:720px;}
+  :root{--pad:22px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}   /* enabled below sidebar too */
+}
+@media(min-width:900px){
+  .app{max-width:820px;}
+}
 /* ===== Wide layout (≥980px) — strictly additive =====
    NOTE: the shell markup uses class="app" / id="bar" / id="stage", so the grid targets
    #app (added to the .app div), #bar (the header), and #stage (the content area). An
@@ -225,18 +382,34 @@ textarea{min-height:84px;resize:vertical;}
   #tabs{display:none;}
   #stage{grid-area:main;padding:0;}
   .wide-nav{grid-area:widenav;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--line);background:#f9f8ff;overflow-y:auto;}
-  .wide-nav-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--ink);text-decoration:none;transition:background .12s;}
-  .wide-nav-item:hover{background:#ede9fe;}
-  .wide-nav-item.on{background:#ddd6fe;color:#5b21b6;font-weight:700;}
+  .wide-nav-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;cursor:pointer;font-size:var(--t-body);font-weight:500;color:var(--ink);text-decoration:none;transition:background .12s;}
+  .wide-nav-item:hover{background:var(--chip);}
+  .wide-nav-item.on{background:var(--lav);color:var(--violet-d);font-weight:700;}
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .tiles{grid-template-columns:repeat(3,1fr);}
+  /* tiles stay fluid (auto-fill, larger min) so the wide main area fills with 4+ columns
+     rather than being capped at 3. */
+  .tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  /* A6 follow-up (Phase 2): dense card lists (My Youth roster, Budget church rows) use the
+     horizontal space on laptop instead of staying a single tall column. Continuous 2-up grid;
+     children's own margin-bottom is folded into the grid gap. Phone/tablet keep the single
+     column (this rule is inside the 980 block). A snapshot/hero placed before .wide-cards stays
+     full-width because it sits OUTSIDE the grid container. */
+  .wide-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;align-items:start;}
+  .wide-cards>*{margin-bottom:0;}
+  /* An expanded Budget church spans the full width so its CAMPERS/LEADERS detail stays readable. */
+  .wide-cards>.budchurch.open{grid-column:1 / -1;}
+}
+@media(min-width:1280px){
+  html{font-size:18px;}              /* A1: laptop root bump → all rem text grows again */
+  /* one more column for the densest lists on a wide laptop */
+  .wide-cards{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));}
 }
 </style>
 </head>
 <body>
 <div class="app" id="app">
   <div id="previewBanner">
-    <span class="pb-label">👁 PREVIEW — at-camp view is read-only</span>
+    <span class="pb-label">${ic('preview')} PREVIEW — at-camp view is read-only</span>
     <button class="pb-exit" onclick="exitPreview()">Exit preview ×</button>
   </div>
   <header class="bar" id="bar" style="display:none">
@@ -256,6 +429,7 @@ textarea{min-height:84px;resize:vertical;}
     <section class="screen" id="student"></section>
     <section class="screen" id="checkin"></section>
     <section class="screen" id="search"></section>
+    <section class="screen" id="records"></section>
     <section class="screen" id="notifs"></section>
     <section class="screen" id="compose"></section>
     <section class="screen" id="camper"></section>
@@ -287,7 +461,7 @@ textarea{min-height:84px;resize:vertical;}
   </div>
   <nav class="tabs" id="tabs" style="display:none"></nav>
   <div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div id="login">
     <h1>My Youth Camp</h1>
     <p>Registration &amp; on-ground management</p>
@@ -332,11 +506,23 @@ function _allCached(...paths){return paths.every(p=>Cache.get(p)!==null);}
 // Map a write path to the cached resources it makes stale. /home aggregates almost
 // everything, so any write drops it.
 function _invalidate(path){
-  if(path.startsWith('/import')){Cache.clear();return;}
+  // B-4 (Phase 5): drop only the resources a write genuinely makes stale. /home is the
+  // aggregate view, so it's ALWAYS cleared — that keeps correctness even as the per-path
+  // mappings are narrowed below.
   Cache.del('/home');
-  if(path.startsWith('/accounts'))Cache.del('/accounts','/registrants');
-  else if(path.startsWith('/settings'))Cache.del('/settings','/schedule','/checkin');
-  else if(path.startsWith('/schedule'))Cache.del('/schedule','/checkin');
+  if(path.startsWith('/import')){
+    // An import rewrites the people set → registrants/campers + the allocation pool +
+    // the check-in roster derive from it. Unrelated caches (faq/devotional/notifications/
+    // schedule) are NOT touched (was a full Cache.clear() — needless re-fetch churn).
+    Cache.del('/registrants','/campers','/accommodation','/checkin');
+  }
+  else if(path.startsWith('/accounts'))Cache.del('/accounts','/registrants');
+  // Check-in SESSIONS derive from settings.checkInDays, so a settings write can change them →
+  // clear /checkin. Schedule is de-linked from check-in (see CLAUDE.md "Daily check-in"), so a
+  // settings write no longer clears /schedule.
+  else if(path.startsWith('/settings'))Cache.del('/settings','/checkin');
+  // A schedule write is independent of check-in (de-linked) → clear only /schedule.
+  else if(path.startsWith('/schedule'))Cache.del('/schedule');
   else if(path.startsWith('/attendance')||path.startsWith('/checkin'))Cache.del('/checkin');
   else if(path.startsWith('/notifications'))Cache.del('/notifications');
   else if(path.startsWith('/notes'))Cache.del('/notes');
@@ -391,8 +577,11 @@ let TOKEN=null,ACTOR=null,SETTINGS=null,CAMP_MODE='pre-camp',STACK=['home'],PREV
 let SESSIONS=[],SEL_SESSION=null,FILTER={gender:'all',grade:'all',church:'all',zone:'all'};
 let LAST_LEADER='';
 const GRADES=[7,8,9,10,11,12];
-const ZONES=['Yellow','Blue','Green','Red'];
-const ACC_LABEL={tent:'△\uFE0F All tents',classroom:'⌂ All classrooms',mixed:'△\uFE0F⌂ Mixed'};
+// Zone names — MUST match backend ZONE_NAMES (src/core/types/enums.ts) and migration 011
+// (which renamed 'Green'→'Black'). A stale 'Green' here let a director send a zone notice no
+// church/leader could ever receive, and hid the real 'Black' zone from the notice composer.
+const ZONES=['Yellow','Blue','Black','Red'];
+const ACC_LABEL={tent:icSm('tent')+' All tents',classroom:icSm('classroom')+' All classrooms',mixed:icSm('tent')+icSm('classroom')+' Mixed'};
 
 /* ===== UTILS ===== */
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -418,9 +607,30 @@ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
 edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 at:'<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
 key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 9-9 3 3"/><path d="m15.5 7.5 2 2"/>',
-trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>'
+trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+/* C1: glyphs added to replace emoji / pictographic / affordance characters */
+preview:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+urgent:'<path d="M12 2a5 5 0 0 0-5 5v4l-2 4h14l-2-4V7a5 5 0 0 0-5-5Z"/><path d="M3 11a8 8 0 0 1 2-5M21 11a8 8 0 0 0-2-5"/><path d="M10 19a2 2 0 0 0 4 0"/>',
+medical:'<path d="M12 3v18M3 12h18" stroke-width="2.4"/>',
+phone:'<path d="M5 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L19 13l2 5v3a2 2 0 0 1-2 2 17 17 0 0 1-16-16 2 2 0 0 1 2-2Z"/>',
+classroom:'<path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/>',
+tent:'<path d="M12 3 3 21h18L12 3Z"/><path d="M12 9 7 21M12 9l5 12"/>',
+close:'<path d="M18 6 6 18M6 6l12 12"/>',
+arrowr:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+arrowl:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
+download:'<path d="M12 3v12M7 11l5 5 5-5"/><path d="M5 21h14"/>',
+diamond:'<path d="M12 2 22 12 12 22 2 12Z"/>',
+plus:'<path d="M12 5v14M5 12h14"/>'
 };
+/* ic(n,cls): default 20px inline icon (sized by CSS context). Size helpers mirror CMS's
+   icN/icS/icLg/icEmpty so callers can pick a size without ad-hoc CSS:
+   icSm 16px · ic 20px (default) · icLg 32px · icXl 48px (empty states). */
 function ic(n,cls){return `<svg class="ic-svg${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
+function icSm(n,cls){return ic(n,'ic-sm'+(cls?' '+cls:''));}
+function icLg(n,cls){return ic(n,'ic-lg'+(cls?' '+cls:''));}
+function icXl(n,cls){return ic(n,'ic-xl'+(cls?' '+cls:''));}
+/* Consistent empty-state component (C4): 48px icon + message. */
+function emptyState(n,msg){return `<div class="emptyst">${icXl(n)}<div class="emptyst-msg">${esc(msg)}</div></div>`;}
 const canReadNotes=()=>ACTOR&&['zoneLeader','director','admin'].includes(ACTOR.role);
 /* Notes ON AN INDIVIDUAL PROFILE: church may see notes for its OWN campers (no
    consolidated list — the Notes tab stays zone/director/admin via canReadNotes()).
@@ -488,7 +698,7 @@ function updateModeUI(){
   else{b.textContent='PRE-CAMP';b.style.background='#9333ea';b.style.color='#fff';}
   if(r&&ACTOR)r.textContent=ACTOR.role==='admin'?'Admin':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?'Zone·'+ACTOR.zone:'Church';
   const db=document.getElementById('dayBadge');
-  if(db){if(CAMP_MODE==='at-camp'){db.style.display='';const day=(SETTINGS&&SETTINGS.campDay)||1;db.innerHTML='DAY '+day+' <span style="opacity:.75">⇄</span>';db.style.background='#4f46e5';db.style.color='#fff';}else db.style.display='none';}
+  if(db){if(CAMP_MODE==='at-camp'){db.style.display='';const day=(SETTINGS&&SETTINGS.campDay)||1;db.innerHTML='DAY '+day+' <span style="opacity:.75">'+icSm('arrowr')+'</span>';db.style.background='#4f46e5';db.style.color='#fff';}else db.style.display='none';}
 }
 /* ===== AT-CAMP PREVIEW ===== */
 function enterPreview(){
@@ -506,6 +716,21 @@ function exitPreview(){
   document.getElementById('previewBanner').classList.remove('show');
   updateModeUI();buildTabs();STACK=['home'];gotoTab('home');
 }
+// B-3: apply a mode change detected from ANOTHER tab (storage event) or on tab re-focus.
+// Mirrors what RENDER.home does on mode change, with the same PREVIEW_MODE guard (a previewing
+// user must never be snapped out). If the current screen no longer exists in the new mode's nav,
+// navigate home so the user isn't stranded on a dead screen.
+function _applyModeChange(mode){
+  if(!ACTOR||PREVIEW_MODE||!mode||mode===CAMP_MODE)return;
+  CAMP_MODE=mode;
+  if(SETTINGS)SETTINGS.campMode=mode;
+  SESSIONS=[];SEL_SESSION=null; // mode-specific data must be refetched
+  updateModeUI();buildTabs();
+  const cur=STACK[STACK.length-1]||'home';
+  const tabs=new Set(navModel(ACTOR.role,CAMP_MODE).tabs.map(t=>t.id));
+  const owner=TAB_OF[cur]||cur;
+  if(!tabs.has(owner)){STACK=['home'];gotoTab('home');}
+}
 
 /* campDay is client-side only — the backend has no campDay field. Per-device view state. */
 function switchDay(){const cur=(SETTINGS&&SETTINGS.campDay)||1;const next=cur===1?2:1;
@@ -517,7 +742,7 @@ const TAB_OF={home:'home',people:'people',student:'people',help:'help',
   admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
   adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
   adminChurchImport:'admin',adminRecords:'admin',adminCloseOut:'admin',adminWizard:'admin',
-  checkin:'checkin',search:'search',notifs:'notifs',compose:'notifs',
+  checkin:'checkin',search:'search',records:'records',notifs:'notifs',compose:'notifs',
   data:'data',
   camper:'home',myyouth:'home',firstday:'home',schedule:'schedule',devotional:'home',faq:'home',notes:'home',testimonies:'home',budget:'home',accom:'home',import:'home'};
 
@@ -558,6 +783,9 @@ async function _navTo(id,arg){
 }
 async function go(id,arg){STACK.push(id);await _navTo(id,arg);}
 async function gotoTab(id){
+  // Phase 4: firstAid has no 'home' tab — its landing is Search. Redirect any home navigation
+  // (incl. the post-login gotoTab('home')) so the role lands on its real first screen.
+  if(id==='home'&&ACTOR&&ACTOR.role==='firstAid')id='search';
   const keepHome=['checkin','search','notifs'];
   STACK=keepHome.includes(id)?['home',id]:[id];
   await _navTo(id);
@@ -571,9 +799,67 @@ function paint(id,html,t,s){
   if(_navId&&_navId!==id&&!STACK.includes(id))return;
   _paint(id,html,t,s);
   const el=document.getElementById(id);
-  if(el){el.innerHTML=html;el.scrollTop=0;}
+  if(el){
+    // D5 (scroll preservation): a SAME-SCREEN re-paint (the screen is already visible and
+    // had content) keeps the current scroll position — opening a dropdown / re-rendering a
+    // filtered list must not jump to top. A fresh navigation (screen not active, or empty)
+    // resets to top. This subsumes the manual save/restore in the _r* re-loaders.
+    const samePaint=el.classList.contains('active')&&el.innerHTML.trim()!==''&&!el.querySelector('.loading');
+    const keepY=samePaint?el.scrollTop:0;
+    el.innerHTML=html;
+    el.scrollTop=keepY;
+  }
   _showScreen(id);
   _renderWideNav(id);
+}
+/* ── Single nav source (D3) ──────────────────────────────────────────────────
+   navModel(role, mode) is the ONE source of truth for navigation. It returns:
+     { tabs:[{id,icon,label}], extras:[{id,icon,label}] }
+   - `tabs`   = the bottom-nav set for this role×mode (matches debug.md "Role × mode").
+   - `extras` = extra items shown only in the desktop sidebar (admin/director sub-screens).
+   Both buildTabs() (bottom nav) and _renderWideNav() (sidebar) derive from this, so the two
+   can never drift apart again (fixes the empty church/zoneLeader sidebar — CH-1/D1 — and the
+   broken admin at-camp sidebar — AC-5/D2). The sidebar list = tabs ++ extras, in order. */
+function navModel(role,mode){
+  const T=(id,icon,label)=>({id,icon,label});
+  if(role==='firstAid'){
+    // Phase 4: Search is the home (finding a student is the whole job); Records = the first-aider's
+    // logged actions; Schedule kept (owner). Medical Watch removed.
+    return {tabs:[T('search','search','Search'),T('records','note','Records'),T('schedule','clock','Schedule')],extras:[]};
+  }
+  if(mode==='pre-camp'){
+    if(role==='church'||role==='zoneLeader')
+      return {tabs:[T('home','home','Home'),T('people','users','My Youth'),T('help','help','Help'),T('notifs','bell','Notices')],extras:[]};
+    if(role==='director')
+      return {tabs:[T('home','home','Home'),T('people','users','My Youth'),T('data','note','Data'),T('help','help','Help'),T('notifs','bell','Notices')],
+              extras:[T('budget','star','Budget & Costings'),T('accom','classroom','Accommodation Allocations')]};
+    /* admin pre-camp */
+    return {tabs:[T('home','home','Home'),T('people','users','My Youth'),T('data','note','Data'),T('notifs','bell','Notices'),T('admin','gear','Admin')],
+            extras:[T('budget','star','Budget & Costings'),T('accom','classroom','Accommodation Allocations')]};
+  }
+  /* at-camp */
+  if(role==='church'||role==='zoneLeader')
+    return {tabs:[T('home','home','Home'),T('checkin','check','Check-in'),T('search','search','Search'),T('notifs','bell','Notices')],extras:[]};
+  if(role==='director')
+    return {tabs:[T('home','home','Home'),T('checkin','check','Check-in'),T('search','search','Search'),T('notifs','bell','Notices')],
+            extras:[T('notes','note','Notes')]};
+  /* admin at-camp — D2/AC-5: exactly these 6 in the sidebar, in this order.
+     Bottom tabs keep Admin (not Notices) to fit 4 slots; the sidebar shows the full 6. */
+  return {tabs:[T('home','home','Home'),T('checkin','check','Check-in'),T('search','search','Search'),T('admin','gear','Admin')],
+          extras:[T('notifs','bell','Notices'),T('accom','classroom','Accommodation Allocations')]};
+}
+/* Sidebar order for admin at-camp must be exactly:
+   Home, Check In, Search, Notices, Accommodation Allocations, Admin Settings (D2).
+   tabs=[Home,Check-in,Search,Admin] ++ extras=[Notices,Accommodation] would mis-order, so the
+   sidebar uses a dedicated order for that one case below. */
+function navSidebar(role,mode){
+  const m=navModel(role,mode);
+  if(role==='admin'&&mode==='at-camp'){
+    const T=(id,icon,label)=>({id,icon,label});
+    return [T('home','home','Home'),T('checkin','check','Check In'),T('search','search','Search'),
+            T('notifs','bell','Notices'),T('accom','classroom','Accommodation Allocations'),T('admin','gear','Admin Settings')];
+  }
+  return [...m.tabs,...m.extras];
 }
 function _renderWideNav(activeId){
   let nav=document.getElementById('wideNav');
@@ -584,48 +870,14 @@ function _renderWideNav(activeId){
     const stage=document.getElementById('stage');if(stage)app.insertBefore(nav,stage);else app.appendChild(nav);
   }
   if(!ACTOR){nav.innerHTML='';return;}
-  let adminItems=[];
-  if(ACTOR.role==='admin'){
-    if(CAMP_MODE==='pre-camp'){
-      adminItems=[
-        {id:'home',label:'Home'},
-        {id:'people',label:'My Youth'},
-        {id:'data',label:'Data'},
-        {id:'notifs',label:'Notices'},
-        {id:'budget',label:'Budget & Costings'},
-        {id:'accom',label:'Accommodation Allocations'},
-        {id:'admin',label:'Admin Settings'},
-      ];
-    }else{
-      adminItems=[
-        {id:'home',label:'Home'},
-        {id:'checkin',label:'Check-in'},
-        {id:'search',label:'Search'},
-        {id:'notes',label:'Notes'},
-        {id:'notifs',label:'Notices'},
-        {id:'admin',label:'Admin Settings'},
-      ];
-    }
-  }else if(ACTOR.role==='director'){
-    if(CAMP_MODE==='pre-camp'){
-      adminItems=[
-        {id:'home',label:'Home'},
-        {id:'people',label:'My Youth'},
-        {id:'data',label:'Data'},
-        {id:'notifs',label:'Notices'},
-      ];
-    }else{
-      adminItems=[
-        {id:'home',label:'Home'},
-        {id:'checkin',label:'Check-in'},
-        {id:'search',label:'Search'},
-        {id:'notifs',label:'Notices'},
-      ];
-    }
-  }
-  if(!adminItems.length)return;
-  nav.innerHTML=adminItems.map(item=>
-    `<div class="wide-nav-item${activeId===item.id?' on':''}" onclick="go('${item.id}')">${esc(item.label)}</div>`
+  const items=navSidebar(ACTOR.role,CAMP_MODE);
+  const ids=new Set(items.map(i=>i.id));
+  // D4: highlight the sidebar item that OWNS the active screen. If the screen is itself a
+  // sidebar item (e.g. budget/accom/notes — which TAB_OF folds under 'home' for the bottom
+  // bar), prefer it; otherwise fall back to TAB_OF's owner, then the id itself.
+  const ownerOf=ids.has(activeId)?activeId:((typeof TAB_OF!=='undefined'&&TAB_OF[activeId])||activeId);
+  nav.innerHTML=items.map(item=>
+    `<div class="wide-nav-item${ownerOf===item.id?' on':''}" onclick="go('${item.id}')">${ic(item.icon)}<span>${esc(item.label)}</span></div>`
   ).join('');
   // Ctrl+S on wide saves settings when on the settings screen
   if(!window._ctrlSListener){
@@ -635,23 +887,12 @@ function _renderWideNav(activeId){
 }
 
 function buildTabs(){
-  let tabs;
-  if(ACTOR&&ACTOR.role==='firstAid'){
-    tabs=[['home','home','Home'],['search','search','Search'],['schedule','clock','Schedule']];
-  }else if(CAMP_MODE==='pre-camp'){
-    tabs=[['home','home','Home'],['people','users','My Youth']];
-    if(ACTOR&&['director','admin'].includes(ACTOR.role))tabs.push(['data','users','Data']);
-    if(ACTOR&&ACTOR.role==='admin'){tabs.push(['notifs','bell','Notices']);tabs.push(['admin','gear','Admin']);}
-    else{tabs.push(['help','help','Help']);tabs.push(['notifs','bell','Notices']);}
-  }else{
-    if(ACTOR&&ACTOR.role==='admin'){
-      tabs=[['home','home','Home'],['checkin','check','Check-in'],['search','search','Search'],['admin','gear','Admin']];
-    }else{
-      tabs=[['home','home','Home'],['checkin','check','Check-in'],['search','search','Search'],['notifs','bell','Notices']];
-    }
-  }
-  document.getElementById('tabs').innerHTML=tabs.map(([id,name,l])=>
-    `<button class="tab" data-tab="${id}" onclick="gotoTab('${id}')"><span class="ic">${ic(name)}</span>${l}</button>`
+  // D3: bottom tabs derive from the single nav source (navModel). When no ACTOR yet
+  // (pre-login), render nothing — the shell is hidden until login anyway.
+  if(!ACTOR){document.getElementById('tabs').innerHTML='';return;}
+  const items=navModel(ACTOR.role,CAMP_MODE).tabs;
+  document.getElementById('tabs').innerHTML=items.map(t=>
+    `<button class="tab" data-tab="${t.id}" onclick="gotoTab('${t.id}')"><span class="ic">${ic(t.icon)}</span>${t.label}</button>`
   ).join('');
 }
 
@@ -659,7 +900,9 @@ const RENDER={};
 
 /* ===== PRE-CAMP HOME ===== */
 RENDER.home=async function renderHome(){
-  if(ACTOR&&ACTOR.role==='firstAid'){await renderHomeFirstAid();return;}
+  // Phase 4: firstAid has no Home — its landing is Search. (gotoTab already redirects home→search;
+  // this guards any direct RENDER.home() call.)
+  if(ACTOR&&ACTOR.role==='firstAid'){await gotoTab('search');return;}
   // Re-check mode on every home visit so mode switches by admin propagate to
   // already-logged-in sessions without requiring a logout/login cycle.
   // NEVER while previewing: preview locally forces CAMP_MODE='at-camp' even though
@@ -668,10 +911,15 @@ RENDER.home=async function renderHome(){
   if(!PREVIEW_MODE){
     try{
       const fresh=await api('/settings');
-      if(fresh&&fresh.campMode&&fresh.campMode!==CAMP_MODE){
-        CAMP_MODE=fresh.campMode;
-        if(SETTINGS)SETTINGS.campMode=fresh.campMode;
-        updateModeUI();buildTabs();
+      if(fresh&&fresh.campMode){
+        // B-3: publish the authoritative mode so OTHER tabs of this origin pick it up via the
+        // 'storage' event (see BOOT). Written every home visit; cheap and idempotent.
+        try{localStorage.setItem('ycp_campmode',fresh.campMode);}catch(_){}
+        if(fresh.campMode!==CAMP_MODE){
+          CAMP_MODE=fresh.campMode;
+          if(SETTINGS)SETTINGS.campMode=fresh.campMode;
+          updateModeUI();buildTabs();
+        }
       }
     }catch(e){}
   }
@@ -693,7 +941,7 @@ RENDER.home=async function renderHome(){
   if(isWide)body+=`<div class="card tap" onclick="go('budget')"><div class="rowsb"><div><div style="font-weight:600">Budget &amp; costings</div><div class="sub">Camper fees by accommodation</div></div><span class="pill info">View ›</span></div></div>`;
   if(isWide)body+=`<div class="card tap" onclick="go('accom')"><div class="rowsb"><div><div style="font-weight:600">Accommodation allocations</div><div class="sub">Spaces &amp; per-church spot allocation</div></div><span class="pill info">View ›</span></div></div>`;
   body+=`<div class="card"><div class="rowsb"><div class="lbl" style="margin:0">${isWide?'Camp registrations':'Your registrations'}</div><b>${h.totalRegistrants||0}</b></div>
-    <div class="rowsb" style="margin-top:6px"><span class="sub" style="font-size:.74rem">${h.totalCampers||0} campers · ${h.totalLeaders||0} leaders</span>${h.unpaidCount?`<span class="pill amb">${h.unpaidCount} unpaid</span>`:'<span class="pill ok">All paid</span>'}</div></div>`;
+    <div class="rowsb" style="margin-top:6px"><span class="sub" style="font-size:.74rem">${h.totalCampers||0} campers · ${h.totalLeaders||0} leaders</span></div></div>`;
   // `regs` (/registrants) loaded in parallel above — used by both the wide by-ministry table and the church accommodation summary.
   if(isWide){
     // By-ministry M/F split — aggregate from /registrants (the /home + /breakdown DTOs carry no gender split)
@@ -706,8 +954,8 @@ RENDER.home=async function renderHome(){
       const hdr=`<div style="display:grid;${gcols};align-items:end;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--line)"><span></span><span style="text-align:center">Student</span><span></span><span style="text-align:center">Leader</span><span></span><span style="text-align:center">Total</span></div>`;
       const rows=churches.map(c=>`<div style="display:grid;${gcols};align-items:center;padding:7px 0;border-top:1px solid var(--line)">
         <span style="font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span>
-        <span style="text-align:center;white-space:nowrap"><b style="color:#4f46e5">${c.maleStudents}</b><b style="color:#db2777;margin-left:9px">${c.femaleStudents}</b></span><span></span>
-        <span style="text-align:center;white-space:nowrap"><b style="color:#4f46e5">${c.maleLeaders}</b><b style="color:#db2777;margin-left:9px">${c.femaleLeaders}</b></span><span></span>
+        <span style="text-align:center;white-space:nowrap"><b style="color:var(--male)">${c.maleStudents}</b><b style="color:var(--female);margin-left:9px">${c.femaleStudents}</b></span><span></span>
+        <span style="text-align:center;white-space:nowrap"><b style="color:var(--male)">${c.maleLeaders}</b><b style="color:var(--female);margin-left:9px">${c.femaleLeaders}</b></span><span></span>
         <span style="text-align:center;font-weight:800;color:var(--ink)">${c.total}</span>
       </div>`).join('');
       body+=`<div class="card" style="padding:8px 12px">${hdr}${rows}</div>`;
@@ -716,15 +964,15 @@ RENDER.home=async function renderHome(){
     const mine=(regs||[]).filter(r=>r.kind==='camper');
     const tent=mine.filter(r=>r.accommodationKind==='tent').length,cls=mine.filter(r=>r.accommodationKind==='classroom').length;
     body+=`<h3 class="sec">Accommodation registrations</h3>`;
-    body+=`<div class="card"><div class="rowsb"><b>△ Tent</b><span class="pill info">${tent} registered</span></div>
-      <div class="rowsb" style="margin-top:8px"><b>⌂ Classroom</b><span class="pill info">${cls} registered</span></div>
+    body+=`<div class="card"><div class="rowsb"><b>${icSm('tent')} Tent</b><span class="pill info">${tent} registered</span></div>
+      <div class="rowsb" style="margin-top:8px"><b>${icSm('classroom')} Classroom</b><span class="pill info">${cls} registered</span></div>
       <div class="sub" style="font-size:.74rem;margin-top:8px">Your group's tent vs classroom split. Specific locations are assigned by the camp office.</div></div>`;
   }
   // At-camp preview entry card — shown in pre-camp to all roles
   body+=`<div class="card tap" style="margin-top:18px;background:linear-gradient(135deg,#fef3c7,#fffbeb);border:1.5px solid #fcd34d" onclick="enterPreview()">
     <div class="rowsb">
       <div>
-        <div style="font-weight:700;font-size:.94rem;color:#92400e">👁 Preview at-camp view</div>
+        <div style="font-weight:700;font-size:.94rem;color:#92400e">${ic('preview')} Preview at-camp view</div>
         <div class="sub" style="color:#b45309;margin-top:2px">See what the app looks like during camp — read only</div>
       </div>
       <span style="font-size:1.2rem;color:#d97706">›</span>
@@ -739,7 +987,7 @@ RENDER.home=async function renderHome(){
 };
 
 function accLabelOf(tent,cls){const p=tent&&cls?'mixed':tent?'tent':cls?'classroom':'none';
-  return{primary:p,text:p==='tent'?`△ All tents · ${tent}`:p==='classroom'?`⌂ All classrooms · ${cls}`:p==='mixed'?`△ Tent ${tent} · ⌂ Classroom ${cls}`:''};}
+  return{primary:p,text:p==='tent'?`${icSm('tent')} All tents · ${tent}`:p==='classroom'?`${icSm('classroom')} All classrooms · ${cls}`:p==='mixed'?`${icSm('tent')} Tent ${tent} · ${icSm('classroom')} Classroom ${cls}`:''};}
 
 /* ===== AT-CAMP HOME ===== */
 async function renderHomeAtCamp(){
@@ -759,11 +1007,12 @@ async function renderHomeAtCamp(){
   if(canReadNotes())tiles.push(`<div class="tile" onclick="go('notes')"><div class="ic">${ic('note')}</div><div class="l">Testimonies &amp; Notes</div></div>`);
   tiles.push(`<div class="tile" onclick="go('schedule')"><div class="ic">${ic('calendar')}</div><div class="l">Schedule</div></div>`);
   tiles.push(`<div class="tile" onclick="go('devotional')"><div class="ic">${ic('book')}</div><div class="l">Devotional</div></div>`);
-  if(ACTOR.role==='church'&&!PREVIEW_MODE)tiles.push(`<div class="tile" style="cursor:default"><div class="ic">⌂</div><div class="l">Your Accommodation</div><div class="sub" style="font-size:.62rem;margin-top:2px">${esc(myAccom)}</div></div>`);
+  if(ACTOR.role==='church'&&!PREVIEW_MODE)tiles.push(`<div class="tile" style="cursor:default"><div class="ic">${ic('classroom')}</div><div class="l">Your Accommodation</div><div class="sub" style="font-size:.62rem;margin-top:2px">${esc(myAccom)}</div></div>`);
   // Director has import:run but the Admin tab (where the importer lives) is admin-only;
   // surface a direct import entry point so the capability is reachable.
   if(ACTOR.role==='director')tiles.push(`<div class="tile" onclick="go('import')"><div class="ic">${ic('users')}</div><div class="l">Import Students</div></div>`);
-  tiles.push(`<div class="tile" onclick="go('faq')"><div class="ic">${ic('help')}</div><div class="l">FAQ</div></div>`);
+  // PC-7: FAQ/Help is a PRE-CAMP aid only — no FAQ tile in at-camp home for any role.
+  // (Admin can still edit FAQ anytime via the Admin console.)
   const notices=(feed||[]).slice(0,3);
   const noticesHtml=notices.length?notices.map(noticeCard).join(''):'<p class="note-hint">All caught up — no notices right now.</p>';
   const myDayHtml=ACTOR.role==='church'?renderMyDay(d):'';
@@ -818,7 +1067,7 @@ function _checkUrgentNoticesFromFeed(feed){
   if(!urgent.length)return;
   const n=urgent[0];
   modal(`<div style="text-align:center;padding:8px 0 4px">
-    <div style="font-size:2rem">🚨</div>
+    <div style="font-size:2rem;color:var(--rose)">${icLg('urgent')}</div>
     <h3 style="color:#dc2626;margin:6px 0">${esc(n.title)}</h3>
     <p style="color:#7f1d1d;font-size:.9rem;margin:0 0 14px">${esc(n.body)}</p>
     <button class="btn" style="background:#dc2626" onclick="_ackUrgent('${n.id}')">Acknowledged</button>
@@ -839,7 +1088,7 @@ function renderMyDay(d){
   return sess&&DUE>0?`<div class="card" style="border:1px solid #fbbf24;background:#fffbeb">
     <div class="lbl" style="margin-top:0;color:#92400e">Your day · ${esc(sess.label)}</div>
     <div style="font-weight:800;font-size:1.4rem;color:#b45309">${DUE} still to check in</div>
-    <button class="btn sm" style="margin-top:8px" onclick="gotoTab('checkin')">Go to Check-in →</button></div>`:'';
+    <button class="btn sm" style="margin-top:8px" onclick="gotoTab('checkin')">Go to Check-in ${icSm('arrowr')}</button></div>`:'';
 }
 async function renderOversightPulse(){
   if(!['director','admin','zoneLeader'].includes(ACTOR.role))return '';
@@ -883,7 +1132,7 @@ RENDER.people=async function renderPeople(){
   paint('people',`<div id="psnap">${snapHtml}</div>
     ${isDir?`<div class="selrow">${churchSel}</div>`:''}<div class="selrow">${genderSel}${gradeSel}</div>
     <div class="search"><span>${ic('search')}</span><input id="pq" placeholder="Search students &amp; leaders…" oninput="drawPeople()"></div>
-    <div id="plist"></div>`,'My Youth',(ACTOR.role==='zoneLeader'?(ACTOR.zone+' Zone'):isDir?'All churches':'Your church')+' · '+ALLREG.length+' people');
+    <div id="plist" class="wide-cards"></div>`,'My Youth',(ACTOR.role==='zoneLeader'?(ACTOR.zone+' Zone'):isDir?'All churches':'Your church')+' · '+ALLREG.length+' people');
   drawPeople();
 };
 function buildPeopleSnap(regs){
@@ -901,12 +1150,12 @@ function buildPeopleSnap(regs){
     </div>
     <div class="lbl" style="margin-top:12px">Student split</div>
     <div class="gbar"><i class="m" style="width:${g.male/gtot*100}%"></i><i class="f" style="width:${g.female/gtot*100}%"></i></div>
-    <div class="glabels"><span>♂ Guys <b style="color:#4f46e5">${g.male}</b></span><span>Girls <b style="color:#db2777">${g.female}</b> ♀</span></div>
+    <div class="glabels"><span>Guys <b style="color:var(--male)">${g.male}</b></span><span>Girls <b style="color:var(--female)">${g.female}</b></span></div>
     <div class="lbl" style="margin-top:12px">Leader split</div>
     <div class="gbar"><i class="m" style="width:${lg.male/lgtot*100}%"></i><i class="f" style="width:${lg.female/lgtot*100}%"></i></div>
-    <div class="glabels"><span>♂ Guys <b style="color:#4f46e5">${lg.male}</b></span><span>Girls <b style="color:#db2777">${lg.female}</b> ♀</span></div>
+    <div class="glabels"><span>Guys <b style="color:var(--male)">${lg.male}</b></span><span>Girls <b style="color:var(--female)">${lg.female}</b></span></div>
     <div class="lbl" style="margin-top:14px">By grade</div><div class="gradebars">${cols}</div>
-    <div class="rowsb" style="margin-top:12px;font-size:.8rem"><span style="font-weight:700">${leaders.length} leaders</span>${wwc?`<span class="pill warn">${wwc} need blue card</span>`:'<span class="pill ok">blue cards ✓</span>'}</div></div>`;
+    <div class="rowsb" style="margin-top:12px;font-size:.8rem"><span style="font-weight:700">${leaders.length} leaders</span>${wwc?`<span class="pill warn">${wwc} need blue card</span>`:`<span class="pill ok">${icSm('check')} Blue cards</span>`}</div></div>`;
 }
 function scopeRegs(){const c=sel('myChurch')||'all';let base=ALLREG;if(ACTOR&&ACTOR.role==='zoneLeader')base=ALLREG.filter(r=>r.zone===ACTOR.zone);return c==='all'?base:base.filter(r=>r.churchId===c);}
 function drawPeople(){
@@ -927,8 +1176,8 @@ function personRow(s){
   const flag=(isL&&!s.blueCardCollected);
   const dot=flag?`<span style="width:8px;height:8px;border-radius:50%;background:#e11d48;display:inline-block;margin-left:6px"></span>`:'';
   const tags=[];
-  if(isL)tags.push(s.blueCardCollected?'<span class="pill ok">✓ Blue card</span>':'<span class="pill warn">No blue card</span>');
-  if(s.medicalConditions&&s.medicalConditions.length)tags.push(`<span class="pill info">⚕ ${esc(s.medicalConditions.join(', '))}</span>`);
+  if(isL)tags.push(s.blueCardCollected?'<span class="pill ok">'+icSm('check')+' Blue card</span>':'<span class="pill warn">No blue card</span>');
+  if(s.medicalConditions&&s.medicalConditions.length)tags.push(`<span class="pill info">${icSm('medical')} ${esc(s.medicalConditions.join(', '))}</span>`);
   if(!tags.length)tags.push('<span class="pill ok">All good</span>');
   const tag=isL?'<span class="lead-tag">LEADER</span>':`<span class="gradepill">Gr ${s.grade}</span>`;
   return `<div class="row" onclick="openPerson('${s.id}')"><div class="av ${esc(s.gender)}">${initials(s.firstName+' '+s.lastName)}</div>
@@ -949,15 +1198,15 @@ async function openPerson(id){
       <div class="kv2"><span class="k">Parent</span><span class="v">${esc(s.parentGuardianName||'—')}</span></div>
       ${s.registrationType?`<div class="kv2"><span class="k">Reg type</span><span class="v">${esc(s.registrationType)}</span></div>`:''}
       ${s.registrationCost!=null?`<div class="kv2"><span class="k">Paid</span><span class="v">$${s.registrationCost.toLocaleString()}</span></div>`:''}`}
-      ${isL?`<div class="kv2"><span class="k">Blue card (WWC)</span><span class="v">${s.blueCardCollected?'<span class="pill ok">✓ Collected</span>':'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
+      ${isL?`<div class="kv2"><span class="k">Blue card (WWC)</span><span class="v">${s.blueCardCollected?`<span class="pill ok">${icSm('check')} Collected</span>`:'<span class="pill warn">Outstanding</span>'}</span></div>`:''}
     </div>
     ${isL?`<div class="card"><div class="lbl" style="margin-top:0">Blue card (WWC)</div>
-      ${s.blueCardCollected?'<p class="note-hint">Blue card collected ✓</p>':(['director','admin'].includes(ACTOR.role)?`<button class="btn alt" onclick="markReg('${s.id}',{blueCardCollected:true})">Mark blue card collected</button>`:'<p class="note-hint">Not yet collected — a director or admin can mark this.</p>')}
+      ${s.blueCardCollected?'<p class="note-hint">Blue card collected</p>':(['director','admin'].includes(ACTOR.role)?`<button class="btn alt" onclick="markReg('${s.id}',{blueCardCollected:true})">Mark blue card collected</button>`:'<p class="note-hint">Not yet collected — a director or admin can mark this.</p>')}
     </div>`:''}`;
   paint('student',body,isL?'Leader':'Camper',esc(s.churchName));
   if(STACK[STACK.length-1]!=='student')STACK.push('student');
 }
-async function markReg(id,patch){try{await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated ✓');await openPerson(id);}catch(e){toast(e.message);}}
+async function markReg(id,patch){try{await api('/registrants/'+id,{method:'PATCH',body:patch});toast('Updated');await openPerson(id);}catch(e){toast(e.message);}}
 
 /* CODES */
 /* HELP / FAQ pre-camp */
@@ -981,6 +1230,11 @@ function _ciLabel(session){
 const CHECKIN_QUEUE=[];let _draining=false,_onlineHandlerAdded=false;
 let _undoTimer=null,_undoCamperId=null,_undoType=null;
 let _lastRoster=null;
+// B-1 (Phase 5): count entries that were hard-dropped on an ONLINE error (4xx etc.) so the
+// check-in screen can surface a "N didn't save" banner. We deliberately keep the existing
+// drop-on-error + no-persistence behaviour (owner chose "banner only") — this makes the loss
+// VISIBLE and prompts a re-tap, it does not silently reconstruct lost taps.
+let _checkinFailed=0;
 
 function _queueEntry(camperId,type){
   CHECKIN_QUEUE.push({camperId,type,sessionId:SEL_SESSION});
@@ -997,7 +1251,7 @@ async function drainQueue(){
       CHECKIN_QUEUE.shift();_markSynced(entry.camperId);
     }catch(e){
       if(!navigator.onLine)break; // wait for online event
-      CHECKIN_QUEUE.shift();_markSynced(entry.camperId,'error');
+      CHECKIN_QUEUE.shift();_markSynced(entry.camperId,'error');_checkinFailed++; // B-1: surface in the banner
     }
   }
   _draining=false;
@@ -1011,6 +1265,13 @@ function _optimisticState(camperId,roster,queue){
   const pending=queue.filter(e=>e.camperId===camperId);
   if(!pending.length)return roster.find(r=>r.id===camperId)?.present??false;
   return pending[pending.length-1].type==='in';
+}
+// B-1: clear the failed badge and re-attempt any entries still queued. We do NOT reconstruct
+// dropped taps (no persistence by design) — the toast tells the user to re-tap red rows.
+function _retryFailedCheckins(){
+  _checkinFailed=0;
+  if(CHECKIN_QUEUE.length)drainQueue();else RENDER.checkin();
+  toast('Re-tap any row still marked red to check them in');
 }
 
 RENDER.checkin=async function renderCheckin(){
@@ -1054,13 +1315,20 @@ RENDER.checkin=async function renderCheckin(){
         <div class="sub">${esc(c.church||c.zone)}${c.grade?' · Yr '+c.grade:''}</div>
       </div>
       <span class="sync-dot ${syncClass}" data-id="${c.id}"></span>
-      <button class="btn ghost sm" style="z-index:1" onclick="event.stopPropagation();notePrompt('${c.id}','${esc(c.name)}')">＋</button>
-      <span style="color:#94a3b8;margin-left:4px">${c.present?'✓':''}</span>
+      <button class="btn ghost sm" style="z-index:1" aria-label="Add note" onclick="event.stopPropagation();notePrompt('${c.id}','${esc(c.name)}')">${icSm('plus')}</button>
+      <span style="color:#94a3b8;margin-left:4px">${c.present?icSm('check'):''}</span>
     </div>`;
   }
   const completionBanner=dueShown===0?`<div class="card" style="background:#dcfce7;border:1px solid #16a34a;text-align:center;padding:18px 12px">
-    <div style="font-size:1.3rem;font-weight:800;color:#15803d">All checked in ✓</div>
+    <div style="font-size:1.3rem;font-weight:800;color:#15803d">${icSm('check')} All checked in</div>
     <div class="sub" style="color:#166534">${presentShown} of ${list.length}${list.length!==roster.length?' (filtered)':''}</div></div>`:'';
+  // B-1: surface unsynced (still draining) + failed (dropped on an online error) state so a
+  // leader never silently believes a tap saved. Failed banner offers a retry.
+  const syncingN=CHECKIN_QUEUE.length;
+  const syncBanner=(syncingN>0||_checkinFailed>0)?
+    (_checkinFailed>0
+      ?`<div class="ci-sync ci-sync-fail" onclick="_retryFailedCheckins()">${icSm('alert')} ${_checkinFailed} check-in${_checkinFailed===1?'':'s'} didn’t save — tap to retry</div>`
+      :`<div class="ci-sync ci-sync-pending">${icSm('clock')} ${syncingN} syncing…</div>`):'';
   const doneSection=doneList.length>0?`<details style="margin-top:8px"><summary class="row" style="cursor:pointer;color:var(--muted);font-size:.85rem;padding:8px 12px">Done · ${doneList.length}</summary>
     ${doneList.map(c=>rowHtml(c,false)).join('')}</details>`:'';
   const html=`<div class="seg" id="dayseg">${dayBtns}</div>
@@ -1069,6 +1337,7 @@ RENDER.checkin=async function renderCheckin(){
       <select onchange="setFilter('gender',this.value)"><option value="all" ${FILTER.gender==='all'?'selected':''}>All genders</option><option value="female" ${FILTER.gender==='female'?'selected':''}>Girls</option><option value="male" ${FILTER.gender==='male'?'selected':''}>Guys</option></select>
       <select onchange="setFilter('grade',this.value)">${gradeOpts}</select>
     </div>
+    ${syncBanner}
     <div class="card" style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="nm">${esc(label)} check-in</div><div class="sub">Still need ${dueShown}${list.length!==roster.length?' · filtered':''}</div></div>
       ${dueShown>0?`<div style="text-align:right"><div style="font-weight:800;font-size:1.4rem;line-height:1;color:#b45309">${dueShown}</div><div class="sub" style="font-size:.68rem">not yet in</div></div>`:''}
@@ -1103,7 +1372,7 @@ function confirmCheckOut(camperId,name){
 function _showUndoToast(){
   let el=document.getElementById('undoToast');
   if(!el){el=document.createElement('div');el.id='undoToast';el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:.9rem';document.body.appendChild(el);}
-  el.innerHTML=`Checked in ✓ <button onclick="undoCheck()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:5px 11px;cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:700">Undo</button>`;
+  el.innerHTML=`${icSm('check')} Checked in <button onclick="undoCheck()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:5px 11px;cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:700">Undo</button>`;
   el.style.display='flex';
 }
 function _hideUndoToast(){const el=document.getElementById('undoToast');if(el)el.style.display='none';}
@@ -1124,7 +1393,7 @@ function notePrompt(camperId,name){
   modal(`<h3>Note · ${esc(name)}</h3><p class="sub" style="margin:4px 0 8px">Visible to zone leaders &amp; directors only.</p>
     <label>Your name (leader)</label><input class="fld" id="noteLeader" value="${esc(d.leader)}" placeholder="e.g. Sarah Doyle">
     <label>Note</label><textarea id="noteBody" placeholder="e.g. left dinner early, looked unwell">${esc(d.body)}</textarea>
-    <button class="btn" onclick="reviewNote('${camperId}','${esc(name)}')">Review →</button>
+    <button class="btn" onclick="reviewNote('${camperId}','${esc(name)}')">Review ${icSm('arrowr')}</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
 }
 function reviewNote(camperId,name){
@@ -1141,87 +1410,178 @@ function reviewNote(camperId,name){
 async function confirmNote(camperId){const d=window._draft;if(!d)return;
   // Backend attributes the note to the logged-in actor; the typed leader name is folded into the body.
   const body=d.leader&&d.leader!==ACTOR.displayName?`${d.body}\n— logged by ${d.leader}`:d.body;
-  try{await api('/notes',{method:'POST',body:{camperId,body,sessionId:SEL_SESSION,category:'note'}});window._draft=null;closeModal();toast('Note submitted ✓');}catch(e){toast(e.message);}}
+  try{await api('/notes',{method:'POST',body:{camperId,body,sessionId:SEL_SESSION,category:'note'}});window._draft=null;closeModal();toast('Note submitted');}catch(e){toast(e.message);}}
 
 /* ===== FIRST AID ===== */
-async function renderHomeFirstAid(){
-  let watch=[];
-  try{watch=await api('/campers/medical');}catch(e){}
-  const rows=watch.slice(0,10).map(c=>`<div class="row" onclick="openCasualtyCard('${c.id}')">
-    <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}</div>
-    <div class="sub">${esc(c.churchName)} · ${esc(c.zone)} Zone${c.atCamp?'':' · <span style="color:#b45309">Not at camp</span>'}</div>
-    ${(c.medicalConditions||[]).map(m=>`<span class="med">${esc(m)}</span>`).join(' ')}</div>
-    <span style="color:#94a3b8">${ic('chevron')}</span></div>`).join('');
-  paint('home',`<div class="hero" style="background:linear-gradient(135deg,#1e3a5f,#0f2035)">
-    <div class="k">First Aid</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
-    <div style="color:#cfe0ff;font-size:.82rem">Camp-wide medical access</div></div>
-    <div class="card"><div class="lbl" style="margin-top:0">Medical Watch (${watch.length} flagged)</div>
-    ${rows||'<p class="note-hint">No campers with medical conditions currently at camp.</p>'}
-    ${watch.length>10?`<button class="btn ghost" onclick="loadMedicalWatch()">View all ${watch.length}</button>`:''}
-    </div>
-    <div class="card"><button class="btn" style="width:100%" onclick="renderSearchFirstAid()">Search all campers</button></div>`,'First Aid','');
-}
-async function loadMedicalWatch(){
-  let watch=[];try{watch=await api('/campers/medical');}catch(e){toast(e.message);return;}
-  const rows=watch.map(c=>`<div class="row" onclick="openCasualtyCard('${c.id}')">
-    <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}</div>
-    <div class="sub">${esc(c.churchName)} · ${esc(c.zone)} Zone</div>
-    ${(c.medicalConditions||[]).map(m=>`<span class="med">${esc(m)}</span>`).join(' ')}</div>
-    <span style="color:#94a3b8">${ic('chevron')}</span></div>`).join('');
-  paint('home',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="RENDER.home()">← Back</button></div>
-    <div class="card"><div class="lbl" style="margin-top:0">Medical Watch — ${watch.length} flagged</div>
-    ${rows||'<p class="note-hint">No campers with medical conditions currently at camp.</p>'}</div>`,'Medical Watch','');
-}
+/* ===== FIRST AID (Phase 4) =====
+   Scope: find a student → see what could hurt them + whether I can treat → reach the student's
+   LEADER (the focus) → log the action → (parent at the bottom as a fallback). Search is the home;
+   Records is the first-aider's logged actions. Medical Watch was removed (owner). Tone is calm —
+   softened alert/consent, token-only colours (no hardcoded hex), darker secondary text (--ink-2). */
+function _faBubble(c){const g=c.gender==='female'?'female':'male';return `<div class="fa-bubble ${g}">${esc((c.firstName||'?')[0]||'')}${esc((c.lastName||'')[0]||'')}</div>`;}
+// Allergy-type dietary items are surfaced in the medical alert too (so an allergen can't hide in a
+// "dietary" card). Anything matching /allerg|anaphyl|intoleran|coeliac|celiac/ is treated as clinical.
+const _ALLERGY_RE=/allerg|anaphyl|intoleran|coeliac|celiac/i;
 function renderSearchFirstAid(){
-  paint('search',`<div class="search"><span>${ic('search')}</span><input id="q" placeholder="Search any camper by name…" oninput="runFaSearch(this.value)"></div><div id="results"><p class="note-hint">Type a name to find any camper across the camp.</p></div>`,'Camper Search','First Aid');
+  paint('search',`<div class="search"><span>${ic('search')}</span><input id="q" placeholder="Search any student by name…" oninput="runFaSearch(this.value)" aria-label="Search students"></div>
+    <div id="results"><p class="note-hint">Type a name to find any student across the camp.</p></div>`,'Find a student','First Aid');
+  const q=document.getElementById('q');if(q)q.focus();
 }
 let faT;function runFaSearch(v){clearTimeout(faT);faT=setTimeout(async()=>{
   const box=document.getElementById('results');if(!box)return;
-  if(!v.trim()){box.innerHTML='<p class="note-hint">Type a name to find any camper.</p>';return;}
+  if(!v.trim()){box.innerHTML='<p class="note-hint">Type a name to find any student.</p>';return;}
   try{const res=await api('/search?q='+encodeURIComponent(v));
     box.innerHTML=res.length?res.map(r=>{const c=r.camper||{};
-      const hasMed=(c.medicalConditions||[]).length>0||c.otherMedications;
-      return `<div class="row" onclick="openCasualtyCard('${c.id}')">
-        <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}${hasMed?' <span class="med">medical</span>':''}</div>
-        <div class="sub">${esc(c.churchName)} · ${esc(c.zone)} Zone · ${c.atCamp?'At camp':'Not at camp'}</div></div>
-        <span style="color:#94a3b8">${ic('chevron')}</span></div>`;}).join(''):'<p class="note-hint">No camper matches.</p>';
+      const hasMed=(c.medicalConditions||[]).length>0||c.otherMedications||(c.dietaryRequirements||[]).some(d=>_ALLERGY_RE.test(d));
+      return `<div class="row" onclick="openStudentInfo('${c.id}')">
+        ${_faBubble(c)}
+        <div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}${hasMed?' <span class="pill" style="background:var(--alert-bg);color:var(--alert-ink);border:1px solid var(--alert-bd)">medical</span>':''}</div>
+        <div class="sub" style="color:var(--ink-2)">${esc(c.churchName)} · ${esc(c.zone)} Zone · ${c.atCamp?'On site':'Not on site'}</div></div>
+        <span style="color:var(--lav-2)">${ic('chevron')}</span></div>`;}).join(''):'<p class="note-hint">No student matches.</p>';
   }catch(e){toast(e.message);}
 },200);}
-let _currentCasualtyCard=null;
-async function openCasualtyCard(id){
+let _currentStudent=null;
+async function openStudentInfo(id){
   let c;try{c=await api('/campers/'+id);}catch(e){toast(e.message);return;}
-  _currentCasualtyCard=c;
-  const hasMed=(c.medicalConditions||[]).length>0||c.otherMedications;
-  const medSection=hasMed?`<div class="card" style="border:2px solid #dc2626">
-    <div class="lbl" style="color:#dc2626;margin-top:0">⚕ Medical</div>
-    ${(c.medicalConditions||[]).map(m=>`<div class="kv"><span class="k">Condition</span><span class="v">${esc(m)}</span></div>`).join('')}
-    ${c.otherMedications?`<div class="kv"><span class="k">Medications</span><span class="v">${esc(c.otherMedications)}</span></div>`:''}
-    ${c.medicareNumber?`<div class="kv"><span class="k">Medicare</span><span class="v" id="mcn" style="cursor:pointer;color:#4f46e5" onclick="revealMedicare('${c.id}')">[tap to show]</span></div>`:''}
-    ${c.consentMedical?'<div class="kv"><span class="k">Medical consent</span><span class="v" style="color:#16a34a">Granted ✓</span></div>':'<div class="kv"><span class="k">Medical consent</span><span class="v" style="color:#dc2626">Not granted</span></div>'}
-    </div>`:'';
-  const presSection=`<div class="card"><div class="lbl" style="margin-top:0">Presence</div>
-    <div class="kv"><span class="k">Status</span><span class="v" style="color:${c.atCamp?'#16a34a':'#b45309'}">${c.atCamp?'At camp':'Not at camp'}</span></div>
-    <div class="kv"><span class="k">Lifecycle</span><span class="v">${esc(c.lifecycle)}</span></div></div>`;
-  const parentSection=c.parentGuardianName||c.parentPhone?`<div class="card"><div class="lbl" style="margin-top:0">Parent / Guardian</div>
-    ${c.parentGuardianName?`<div class="kv"><span class="k">Name</span><span class="v">${esc(c.parentGuardianName)}${c.parentRelation?' ('+esc(c.parentRelation)+')':''}</span></div>`:''}
-    ${c.parentPhone?`<div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(c.parentPhone)}" style="color:#4f46e5">${esc(c.parentPhone)}</a></span></div>`:''}
-    </div>`:'';
-  const dietSection=(c.dietaryRequirements||[]).length>0?`<div class="card"><div class="lbl" style="margin-top:0">Dietary</div>
-    ${c.dietaryRequirements.map(d=>`<span class="med" style="background:#fef3c7;color:#92400e">${esc(d)}</span>`).join(' ')}</div>`:'';
-  paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="renderSearchFirstAid()">← Back</button></div>
-    <div class="card"><div class="lbl" style="margin-top:0">${esc(c.firstName+' '+c.lastName)}</div>
-    <div class="kv"><span class="k">Church</span><span class="v">${esc(c.churchName)} · ${esc(c.zone)} Zone</span></div>
-    <div class="kv"><span class="k">Kind</span><span class="v">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')}</span></div>
-    ${c.gender?`<div class="kv"><span class="k">Gender</span><span class="v">${esc(c.gender)}</span></div>`:''}
-    </div>${medSection}${presSection}${parentSection}${dietSection}`,'Casualty Card','');
+  _currentStudent=c;
+  // Leader contacts (the focus) — masked; fetched in parallel, rendered into #faLead when ready.
+  let contacts=[];try{contacts=await api('/search/contacts/'+id);}catch(e){contacts=[];}
+  const prim=contacts.find(x=>x.type==='primary');const back=contacts.find(x=>x.type==='backup');
+  // Merge allergy-type dietary items into the clinical alert; keep the rest for the Dietary card.
+  const diet=(c.dietaryRequirements||[]);const allergyDiet=diet.filter(d=>_ALLERGY_RE.test(d));const otherDiet=diet.filter(d=>!_ALLERGY_RE.test(d));
+  const alertRows=[
+    ...allergyDiet.map(d=>({tag:'Allergy',b:d})),
+    ...(c.medicalConditions||[]).map(m=>({tag:'Condition',b:m})),
+    ...(c.otherMedications?[{tag:'Meds',b:c.otherMedications}]:[]),
+  ];
+  const alert=alertRows.length
+    ? `<div class="fa-alert"><div class="ah">${icSm('medical')} Medical alert</div>
+        ${alertRows.map(r=>`<div class="row"><span class="tag">${esc(r.tag)}</span><span class="b">${esc(r.b)}</span></div>`).join('')}</div>`
+    : `<div class="fa-alert"><div class="ah">${icSm('check')} No medical conditions recorded</div><div class="fa-calm">Nothing flagged for this student.</div></div>`;
+  const consent=c.consentMedical
+    ? `<div class="fa-consent yes">${ic('check')}<div>Medical consent — Granted<div class="sub">OK to administer first aid</div></div></div>`
+    : `<div class="fa-consent no">${ic('alert')}<div>Medical consent — Not granted<div class="sub">Reach the leader / parent before treating</div></div></div>`;
+  const leadBtn=(ct,cls)=>ct?`<div class="who"><span class="nm">${esc(ct.name)}</span><span class="ptag${cls==='sec'?' sec':''}">${cls==='sec'?'Secondary':'Primary'}</span></div>
+      <div class="sub">${esc(c.churchName)} · ${ct.gender==='female'?'Female':'Male'} ${ct.type==='backup'?'backup':'leader'}</div>
+      <button class="btn fa-call" onclick="faRevealLeader('${c.id}','${esc(ct.role)}',this)">${icSm('phone')} ${esc(ct.phone)}</button>`:'';
+  const leadCard=(prim||back)
+    ? `<div class="fa-lead"><div class="lh">${icSm('phone')} Ministry leader — contact first</div>
+        ${leadBtn(prim,'pri')}${back?`<div style="margin-top:14px">${leadBtn(back,'sec')}</div>`:''}</div>`
+    : `<div class="fa-lead"><div class="lh">${icSm('phone')} Ministry leader</div><div class="sub" style="color:var(--warn)">No leader contact set — ask admin to add one.</div></div>`;
+  const medicare=c.medicareNumber?`<div class="card"><div class="lbl" style="margin-top:0">Medicare</div>
+    <div class="kv"><span class="k">Number</span><span class="v" id="mcn" style="cursor:pointer;color:var(--blue)" onclick="revealMedicare('${c.id}')">[tap to show]</span></div>
+    <div class="sub" style="font-size:var(--t-2xs);color:var(--ink-2)">Revealing is logged for the audit trail.</div></div>`:'';
+  const dietCard=otherDiet.length?`<div class="card"><div class="lbl" style="margin-top:0">Dietary (non-allergy)</div>
+    ${otherDiet.map(d=>`<span class="fa-diet">${esc(d)}</span>`).join('')}</div>`:'';
+  const parent=(c.parentGuardianName||c.parentPhone)?`<div class="fa-last">
+    <div class="lbl">Parent / guardian</div>
+    ${c.parentGuardianName?`<div class="kv"><span class="k">${esc(c.parentGuardianName)}${c.parentRelation?' ('+esc(c.parentRelation)+')':''}</span><span class="v"></span></div>`:''}
+    ${c.parentPhone?`<a class="btn fa-parent" href="tel:${esc(c.parentPhone)}">${icSm('phone')} ${esc(c.parentPhone)}</a>`:''}</div>`:'';
+  paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="renderSearchFirstAid()">${icSm('arrowl')} Back</button></div>
+    <div class="fa-id">${_faBubble(c)}<div><h2>${esc(c.firstName+' '+c.lastName)}</h2>
+      <div class="meta">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')} · ${esc(c.churchName)} · ${esc(c.zone)} Zone</div>
+      <span class="fa-status ${c.atCamp?'on':'off'}">${c.atCamp?'On site':'Not on site'}</span></div></div>
+    ${alert}${consent}${leadCard}${medicare}${dietCard}
+    <button class="btn" onclick="openFirstAidLog('${c.id}')">${icSm('plus')} Log first-aid action</button>
+    <div id="faRecent"></div>
+    ${parent}`,'Student Info','');
+  _loadStudentRecent(id);
+}
+async function faRevealLeader(id,role,btn){
+  try{const ct=await api('/search/contact/'+id+'/'+encodeURIComponent(role));
+    if(btn)btn.innerHTML=`${icSm('phone')} ${esc(ct.phone)}`;
+    toast(ct.name+': '+ct.phone);
+  }catch(e){toast(e.message);}
+}
+async function _loadStudentRecent(id){
+  const box=document.getElementById('faRecent');if(!box)return;
+  let recs=[];try{recs=await api('/notes/firstaid?limit=50');}catch(e){return;}
+  const mine=(recs||[]).filter(n=>n.camperId===id).slice(0,4);
+  if(!mine.length){box.innerHTML='';return;}
+  box.innerHTML=`<div class="lbl" style="margin-top:18px">Recent logs · this student</div>
+    <div class="fa-recent">${mine.map(n=>{const p=_faParse(n.body);return `<div class="r"><span class="tm">${dtFmt(n.createdAt)}</span><span>${esc(p.problem||n.body)}</span></div>`;}).join('')}</div>`;
 }
 async function revealMedicare(id){
   const el=document.getElementById('mcn');
-  const c=_currentCasualtyCard&&_currentCasualtyCard.id===id?_currentCasualtyCard:null;
+  const c=_currentStudent&&_currentStudent.id===id?_currentStudent:null;
   try{
     await api('/campers/'+id+'/reveal-medicare',{method:'POST',body:{}});
     if(el)el.textContent=(c&&c.medicareNumber)||'—';
   }catch(e){toast(e.message);}
+}
+/* Parse a first-aid record body (4 labelled lines) back into its parts for display. */
+function _faParse(body){const o={problem:'',treatment:'',firstAider:'',broughtBy:''};(body||'').split('\n').forEach(line=>{
+  const m=line.match(/^(Problem|Treatment|First-aider|Brought by):\s*(.*)$/i);if(!m)return;
+  const k=m[1].toLowerCase();const v=m[2];
+  if(k==='problem')o.problem=v;else if(k==='treatment')o.treatment=v;else if(k==='first-aider')o.firstAider=v;else if(k==='brought by')o.broughtBy=v;});
+  return o;}
+/* ── Log a first-aid action ─────────────────────────────────────────────────── */
+function openFirstAidLog(id){
+  const c=_currentStudent&&_currentStudent.id===id?_currentStudent:null;
+  const who=c?esc(c.firstName+' '+c.lastName):'student';
+  // The log form is a transient view painted onto the 'search' screen (same pattern as Student Info);
+  // the in-content Back button returns to Student Info. No separate screen/route needed.
+  paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="openStudentInfo('${id}')">${icSm('arrowl')} Back</button></div>
+    <div class="card">
+      ${c?`<div class="fa-id" style="margin-bottom:8px">${_faBubble(c)}<div><h2 style="font-size:var(--t-h3)">${who}</h2><div class="meta">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')} · ${esc(c.churchName)}</div></div></div>`:''}
+      <label class="lbl" style="margin-top:4px">What happened?</label>
+      <textarea id="faProblem" class="fld" style="min-height:84px" placeholder="e.g. Slipped on the court, knock to the left knee, no loss of consciousness…"></textarea>
+      <label class="lbl" style="margin-top:12px">What treatment was given?</label>
+      <textarea id="faTreatment" class="fld" style="min-height:84px" placeholder="e.g. Ice pack 15 min, cleaned graze, dressed, monitored…"></textarea>
+      <div class="fa-form2" style="margin-top:6px">
+        <div><label class="lbl">First-aider <span style="color:var(--danger)">*</span></label>
+          <input id="faWho" class="fld" value="${esc(LAST_LEADER||'')}" placeholder="Who is treating"></div>
+        <div><label class="lbl">Leader who brought them</label>
+          <input id="faBrought" class="fld" placeholder="Optional"></div>
+      </div>
+      <p class="sub" style="font-size:var(--t-2xs);color:var(--ink-2);margin-top:6px">Time and login account are recorded automatically.</p>
+    </div>
+    <button class="btn" id="faSave" onclick="saveFirstAidLog('${id}')">${icSm('check')} Save log</button>`,'Log action','');
+}
+async function saveFirstAidLog(id){
+  const problem=val('faProblem'),treatment=val('faTreatment'),who=val('faWho'),brought=val('faBrought');
+  if(!problem&&!treatment){toast('Describe what happened or the treatment given');return;}
+  if(!who){toast('Enter the first-aider name');return;}
+  LAST_LEADER=who;
+  const body=`Problem: ${problem}\nTreatment: ${treatment}\nFirst-aider: ${who}`+(brought?`\nBrought by: ${brought}`:'');
+  const btn=document.getElementById('faSave');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    await api('/notes',{method:'POST',body:{camperId:id,category:'firstaid',body}});
+    toast('Log saved');
+    await openStudentInfo(id);
+  }catch(e){toast(e.message);if(btn){btn.disabled=false;btn.innerHTML=`${icSm('check')} Save log`;}}
+}
+/* ── First-aid Records tab (the first-aider's logged actions) ─────────────────── */
+let _faRecFilter='today';
+RENDER.records=async function(){
+  let recs=[],page=[];
+  try{[recs,page]=await Promise.all([api('/notes/firstaid?limit=100'),api('/campers?pageSize=300').catch(()=>[])]);}
+  catch(e){paint('records','<p class="note-hint">'+esc(e.message)+'</p>','First-aid records','');return;}
+  window._faRecsAll=recs||[];
+  const camps=Array.isArray(page)?page:page.items||[];const cmap={};camps.forEach(c=>{cmap[c.id]=c.firstName+' '+c.lastName+(c.grade?' · Gr '+c.grade:'');});window._faCamperMap=cmap;
+  paint('records',`<div class="search" style="padding:9px 14px"><span>${ic('search')}</span><input id="faRecQ" placeholder="Filter by student…" oninput="drawFaRecords()" aria-label="Filter records"></div>
+    <div class="seg" style="margin-bottom:12px"><button id="faSegToday" class="${_faRecFilter==='today'?'on':''}" onclick="faRecSeg('today')">Today</button><button id="faSegAll" class="${_faRecFilter==='all'?'on':''}" onclick="faRecSeg('all')">All</button></div>
+    <div id="faRecList"></div>`,'First-aid records','Logged actions');
+  drawFaRecords();
+};
+function faRecSeg(f){_faRecFilter=f;const a=document.getElementById('faSegToday'),b=document.getElementById('faSegAll');if(a)a.classList.toggle('on',f==='today');if(b)b.classList.toggle('on',f==='all');drawFaRecords();}
+function drawFaRecords(){
+  const box=document.getElementById('faRecList');if(!box)return;
+  let list=window._faRecsAll||[];
+  const today=new Date().toISOString().slice(0,10);
+  if(_faRecFilter==='today')list=list.filter(n=>String(n.createdAt||'').slice(0,10)===today);
+  const q=(val('faRecQ')||'').trim().toLowerCase();
+  // join camper name from the cached people list if present; fall back to id
+  const cmap=window._faCamperMap||{};
+  const named=list.map(n=>({n,name:(cmap[n.camperId]?cmap[n.camperId]:'')}));
+  let filtered=named;
+  if(q)filtered=named.filter(x=>x.name.toLowerCase().includes(q));
+  box.innerHTML=filtered.length?`<div class="card">${filtered.map(x=>{const p=_faParse(x.n.body);return `<div class="fa-rec">
+    <div class="top"><span class="nm">${esc(x.name||'Student')}</span><span class="pill info">First-aid</span><span class="tm">${dtFmt(x.n.createdAt)}</span></div>
+    ${p.problem?`<div class="ln"><b>Problem:</b> ${esc(p.problem)}</div>`:''}
+    ${p.treatment?`<div class="ln tx"><b>Treatment:</b> ${esc(p.treatment)}</div>`:''}
+    <div class="sub" style="color:var(--ink-2);margin-top:3px">${esc(p.firstAider||x.n.authorName||'')}${p.broughtBy?' · brought by '+esc(p.broughtBy):''}</div></div>`;}).join('')}</div>`
+    :emptyState('note',_faRecFilter==='today'?'No actions logged today.':'No actions logged yet.');
 }
 
 /* ===== SEARCH ===== */
@@ -1243,20 +1603,20 @@ async function runSearch(v){const box=document.getElementById('results');if(!box
       ${back?`<div class="kv"><span class="k">Secondary leader</span><span class="v">${esc(back.name)} · ${telLink(back.phone)}</span></div>`:''}
       ${!prim&&!back?'<div class="sub" style="color:#b45309">No leader contact set — ask admin to add one.</div>':''}
       <div style="display:flex;gap:8px;margin-top:9px">
-        ${prim?`<button class="btn sm" style="flex:1" onclick="reveal('${c.id}','${esc(prim.role)}')">☎︎ Call primary</button>`:''}
+        ${prim?`<button class="btn sm" style="flex:1" onclick="reveal('${c.id}','${esc(prim.role)}')">${icSm('phone')} Call primary</button>`:''}
         ${back?`<button class="btn alt sm" style="flex:1" onclick="reveal('${c.id}','${esc(back.role)}')">Secondary</button>`:''}
       </div></div>`;}).join(''):'<p class="note-hint">No camper matches.</p>';
   }catch(e){toast(e.message);}}
-async function reveal(id,role){try{const c=await api('/search/contact/'+id+'/'+encodeURIComponent(role));toast('☎︎ '+c.name+': '+c.phone);}catch(e){toast(e.message);}}
+async function reveal(id,role){try{const c=await api('/search/contact/'+id+'/'+encodeURIComponent(role));toast(c.name+': '+c.phone);}catch(e){toast(e.message);}}
 
 /* ===== NOTICES ===== */
 RENDER.notifs=async function(){
   const feed=await api('/notifications');
   const canSend=['zoneLeader','director','admin'].includes(ACTOR.role);
   const canDelete=['zoneLeader','director','admin'].includes(ACTOR.role);
-  paint('notifs',`${canSend?`<button class="btn" onclick="go('compose')">✎ Send a notice</button>`:`<p class="note-hint">Church accounts receive notices; zone leaders &amp; directors send.</p>`}
+  paint('notifs',`${canSend?`<button class="btn" onclick="go('compose')">${ic('edit')} Send a notice</button>`:`<p class="note-hint">Church accounts receive notices; zone leaders &amp; directors send.</p>`}
     ${feed.length?'':`<p class="note-hint">No ${CAMP_MODE==='pre-camp'?'pre-camp':'camp'} notices yet. Leaders &amp; directors can post camp, zone or church updates here.</p>`}${feed.map(n=>`<div class="ncard ${n.priority==='urgent'?'urgent':n.scope==='zone'?'zone':''}">
-      <div class="ntop"><span class="ntag">${n.scope==='camp'?'◆ Camp-wide':n.scope==='church'?'Church':esc(n.zone||'')+' Zone'}</span>
+      <div class="ntop"><span class="ntag">${n.scope==='camp'?icSm('diamond')+' Camp-wide':n.scope==='church'?'Church':esc(n.zone||'')+' Zone'}</span>
       ${n.priority==='urgent'?'<span class="ntag" style="background:#fdecec;color:#b91c1c">Urgent</span>':''}
       <span class="ntime">${timeFmt(n.createdAt)}</span></div>
       <div class="ntitle">${esc(n.title)}</div><div class="nbody">${esc(n.body)}</div>
@@ -1267,32 +1627,98 @@ async function deleteNotice(id){if(!confirm('Delete this notice for everyone?'))
 /* ===== BUDGET (director/admin) =====
    Tent/classroom prices come from Camp settings; the backend has no fee-tier, so every
    camper is charged the full price for their accommodation kind. */
+/* ===== BUDGET & COSTINGS (rebuilt — brief §5) =====
+   Costs come from per-registrant `registrationCost` (the CSV `Cost`), NOT from settings.
+   A category = a distinct cost value within a (church, audience) scope; null cost =
+   "Cost not recorded" (counted, flagged, $0 to totals — never dropped). Grand total
+   reconciles exactly to the sum of every line total. This mirrors the pure helper
+   src/services/budget.ts (the canonical, unit-tested algorithm). */
+function _money(n){return '$'+Number(n||0).toLocaleString('en-AU',{maximumFractionDigits:2});}
+function _budLabel(amount,full){
+  if(amount==null)return 'Cost not recorded';
+  if(amount===0)return 'Sponsored — '+_money(0);
+  if(full!=null&&amount===full)return 'Full — '+_money(amount);
+  if(full!=null&&full>0&&Math.abs(amount-full/2)<1)return 'Half — '+_money(amount);
+  return 'Part — '+_money(amount);
+}
+function _budScopeRows(people,full){
+  const by=new Map();
+  people.forEach(p=>{const k=p.registrationCost==null?'null':String(p.registrationCost);
+    let r=by.get(k);if(!r){r={amount:p.registrationCost==null?null:p.registrationCost,count:0,codes:new Map()};by.set(k,r);}
+    r.count++;const c=(p.discountCode||'').trim();if(c)r.codes.set(c,(r.codes.get(c)||0)+1);});
+  const rows=[...by.values()].map(r=>{let hint=null;if(r.codes.size===1){const [code,n]=[...r.codes.entries()][0];if(n===r.count)hint=code;}
+    return {amount:r.amount,count:r.count,lineTotal:(r.amount||0)*r.count,unrecorded:r.amount==null,codeHint:hint};});
+  rows.sort((a,b)=>a.amount==null?1:b.amount==null?-1:b.amount-a.amount);
+  return rows;
+}
+function computeBudgetClient(regs,filterId){
+  const people=(regs||[]).filter(r=>r.status!=='cancelled').filter(r=>!filterId||filterId==='all'||r.churchId===filterId)
+    .map(r=>({churchId:r.churchId,churchName:r.churchName,kind:r.kind==='leader'?'leader':'camper',registrationCost:r.registrationCost==null?null:Number(r.registrationCost),discountCode:r.discountCode}));
+  let full=null;people.forEach(p=>{if(p.registrationCost!=null&&p.registrationCost>0)full=full==null?p.registrationCost:Math.max(full,p.registrationCost);});
+  const byChurch=new Map();
+  people.forEach(p=>{let c=byChurch.get(p.churchId);if(!c){c={churchId:p.churchId,churchName:p.churchName,campers:[],leaders:[]};byChurch.set(p.churchId,c);}
+    (p.kind==='leader'?c.leaders:c.campers).push(p);});
+  const churches=[...byChurch.values()].map(c=>{const campers=_budScopeRows(c.campers,full),leaders=_budScopeRows(c.leaders,full);
+    const camperCount=campers.reduce((s,r)=>s+r.count,0),leaderCount=leaders.reduce((s,r)=>s+r.count,0);
+    const total=campers.reduce((s,r)=>s+r.lineTotal,0)+leaders.reduce((s,r)=>s+r.lineTotal,0);
+    return {churchId:c.churchId,churchName:c.churchName,camperCount,leaderCount,total,campers,leaders};});
+  churches.sort((a,b)=>a.churchName.localeCompare(b.churchName));
+  return {grandTotal:churches.reduce((s,c)=>s+c.total,0),camperCount:churches.reduce((s,c)=>s+c.camperCount,0),
+    leaderCount:churches.reduce((s,c)=>s+c.leaderCount,0),churchCount:churches.length,churches,fullAmount:full};
+}
 RENDER.budget=async function(){
-  if(!['director','admin'].includes(ACTOR.role)){paint('budget','<p class="note-hint" style="margin-top:24px;text-align:center">Budget is available to directors only.</p>','Budget & costings','');return;}
+  if(!['director','admin'].includes(ACTOR.role)){paint('budget','<p class="note-hint" style="margin-top:24px;text-align:center">Budget is available to directors only.</p>','Budget & Costings','');return;}
   const regs=await api('/registrants');
-  window._budgetPrice={tent:Number(SETTINGS&&SETTINGS.tentPrice)||0,classroom:Number(SETTINGS&&SETTINGS.classroomPrice)||0};
   window._budgetRegs=regs||[];
-  const churches=[...new Map((regs||[]).map(r=>[r.churchId,r.churchName])).entries()].map(([id,name])=>({id,name}));
-  const selHtml=`<div class="filters"><select id="budChurch" onchange="drawBudget()"><option value="all">All ministries</option>${churches.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>`;
-  paint('budget',`${selHtml}<div id="budgetBody"></div>`,'Budget & costings','Camper fees by accommodation');
+  const churches=[...new Map((regs||[]).map(r=>[r.churchId,r.churchName])).entries()].map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+  const selHtml=`<div class="rowsb" style="gap:8px;margin-bottom:12px">
+    <select id="budChurch" onchange="drawBudget()" style="flex:1"><option value="all">All ministries</option>${churches.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
+    <button class="btn alt sm" style="flex:none" onclick="exportBudget()">${icSm('download')} Export CSV</button></div>`;
+  paint('budget',`${selHtml}<div id="budgetBody"></div>`,'Budget & Costings','Registration fees by church');
   drawBudget();
 };
 function drawBudget(){
-  const regs=window._budgetRegs||[];
   const scope=sel('budChurch')||'all';
-  const campers=(scope==='all'?regs:regs.filter(r=>r.churchId===scope)).filter(r=>r.kind==='camper');
-  const withCost=campers.filter(r=>r.registrationCost!=null);
-  const noCost=campers.length-withCost.length;
-  const total=withCost.reduce((s,r)=>s+(r.registrationCost||0),0);
-  // Group by registration type
-  const byType={};
-  withCost.forEach(r=>{const t=r.registrationType||'Standard';byType[t]=(byType[t]||{count:0,sum:0});byType[t].count++;byType[t].sum+=(r.registrationCost||0);});
-  const typeRows=Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0])).map(([t,v])=>`<div class="card"><div class="rowsb"><div><div style="font-weight:600">${esc(t)}</div><div class="sub">${v.count} ${v.count===1?'camper':'campers'}</div></div><b style="font-size:1.05rem">$${v.sum.toLocaleString()}</b></div></div>`).join('');
-  const head=`<div class="card" style="background:linear-gradient(135deg,#9333ea,#1e1b4b);color:#fff;border:none">
-    <div class="lbl" style="color:#d8b4fe;margin:0">Fees${scope==='all'?' · all ministries':''}</div>
-    <div style="font-size:2rem;font-weight:800">$${total.toLocaleString()}</div>
-    <div style="font-size:.8rem;color:#cfe0ff">${withCost.length} campers${noCost?' · '+noCost+' without cost recorded':''}</div></div>`;
-  const box=document.getElementById('budgetBody');if(box)box.innerHTML=head+(typeRows?`<h3 class="sec">By registration type</h3>`+typeRows:'');
+  const rep=computeBudgetClient(window._budgetRegs,scope);
+  const head=`<div class="hero" style="margin-bottom:14px"><div class="k">Total registration fees</div>
+    <div class="big" style="font-size:var(--t-xl);margin-top:6px">${_money(rep.grandTotal)}</div>
+    <div class="cd" style="margin-top:8px"><div class="meta">${rep.camperCount} campers · ${rep.leaderCount} leaders · ${rep.churchCount} ${rep.churchCount===1?'church':'churches'}</div></div></div>`;
+  const catRow=(r)=>`<div class="rowsb budcat${r.unrecorded?' budcat-warn':''}" style="padding:5px 0">
+    <div style="flex:1;min-width:0"><span class="budcat-l">${esc(r.label)}</span>${r.codeHint?`<span class="gradepill">${esc(r.codeHint)}</span>`:''}${r.unrecorded?` ${icSm('alert')}`:''}</div>
+    <div class="sub" style="white-space:nowrap">${r.count} × ${_money(r.amount||0)}</div>
+    <b style="min-width:70px;text-align:right">${_money(r.lineTotal)}</b></div>`;
+  const grp=(title,rows)=>rows.length?`<div class="lbl" style="margin:10px 0 4px">${title}</div>${rows.map(catRow).join('')}`:'';
+  const single=scope!=='all';
+  const churchCard=(c)=>{
+    const open=single?'open':'';
+    return `<div class="card budchurch ${open}" data-cid="${esc(c.churchId)}">
+      <div class="rowsb budchurch-hd" ${single?'':`onclick="_budToggle('${esc(c.churchId)}')"`} style="cursor:${single?'default':'pointer'}">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">${single?'':`<span class="budchev">${icSm('chevron')}</span>`}
+          <div style="min-width:0"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis">${esc(c.churchName)}</div>
+          <div class="sub">${c.camperCount} ${c.camperCount===1?'camper':'campers'}${c.leaderCount?` · ${c.leaderCount} ${c.leaderCount===1?'leader':'leaders'}`:''}</div></div></div>
+        <b style="font-size:var(--t-h3)">${_money(c.total)}</b></div>
+      <div class="budchurch-body">
+        ${grp('Campers',c.campers)}
+        ${grp('Leaders',c.leaders)}
+        <div class="rowsb" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><b>Church total</b><b>${_money(c.total)}</b></div>
+      </div></div>`;
+  };
+  const body=rep.churches.length?`<div class="wide-cards">${rep.churches.map(churchCard).join('')}</div>`:emptyState('star','No registrations yet — import students to see the budget.');
+  const box=document.getElementById('budgetBody');if(box)box.innerHTML=head+body;
+}
+function _budToggle(cid){const card=document.querySelector(`.budchurch[data-cid="${cid}"]`);if(card)card.classList.toggle('open');}
+function exportBudget(){
+  const scope=sel('budChurch')||'all';
+  const rep=computeBudgetClient(window._budgetRegs,scope);
+  const esc2=s=>{const str=String(s);return /[",\n]/.test(str)?'"'+str.replace(/"/g,'""')+'"':str;};
+  const lines=[['Church','Audience','Category','Count','UnitPrice','LineTotal'].join(',')];
+  const emit=(church,aud,rows)=>rows.forEach(r=>lines.push([esc2(church),aud,esc2(r.label),r.count,r.amount||0,r.lineTotal].join(',')));
+  rep.churches.forEach(c=>{emit(c.churchName,'Camper',c.campers);emit(c.churchName,'Leader',c.leaders);
+    lines.push([esc2(c.churchName),'Total','',c.camperCount+c.leaderCount,'',c.total].join(','));});
+  lines.push(['ALL CHURCHES','Grand Total','',rep.camperCount+rep.leaderCount,'',rep.grandTotal].join(','));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='budget-by-church.csv';a.click();URL.revokeObjectURL(url);
+  toast('Budget CSV downloaded');
 }
 
 /* ===== ACCOMMODATION ALLOCATIONS (director/admin) =====
@@ -1308,17 +1734,35 @@ RENDER.accom=async function(){
   paint('accom','<div id="accomBody"></div>','Accommodation allocations','Classrooms by ministry & gender');
   drawAccom();
 };
+// Mirrors src/services/accommodation-allocation.ts computeGroups (incl. PC-10 split).
+// Pool = classroom-kind people per church×gender, INCLUDING leaders (matches backend).
+const ACCOM_SPLIT_THRESHOLD=50;
+function _bracketOfGrade(g){if(g==null)return null;if(g>=7&&g<=9)return '7-9';if(g>=10&&g<=12)return '10-12';return null;}
 function accomChurches(regs){
   const by={};
-  (regs||[]).filter(r=>r.kind==='camper').forEach(r=>{const c=by[r.churchId]||(by[r.churchId]={id:r.churchId,name:r.churchName,total:0,classroom:0,maleCls:0,femaleCls:0});c.total++;
-    if(r.accommodationKind==='classroom'){c.classroom++;if(r.gender==='male')c.maleCls++;else c.femaleCls++;}});
+  (regs||[]).filter(r=>r.status!=='cancelled').forEach(r=>{
+    const c=by[r.churchId]||(by[r.churchId]={id:r.churchId,name:r.churchName,total:0,classroom:0,
+      male:{cls:0,y79:0,y1012:0,yOther:0,ld:0},female:{cls:0,y79:0,y1012:0,yOther:0,ld:0}});
+    c.total++;
+    if(r.accommodationKind==='classroom'){c.classroom++;const g=r.gender==='male'?c.male:c.female;g.cls++;
+      if(r.kind==='leader')g.ld++;else{const b=_bracketOfGrade(r.grade);if(b==='7-9')g.y79++;else if(b==='10-12')g.y1012++;else g.yOther++;}}});
   return by;
+}
+function _accomGenderGroups(c,gender,g){
+  if(g.cls===0)return [];
+  const lbl=gender==='male'?'Guys':'Girls';
+  if(g.cls<=ACCOM_SPLIT_THRESHOLD)return [{key:c.id+'|'+gender,church:c.name,gender,label:lbl,n:g.cls}];
+  const ld79=Math.ceil(g.ld/2),ld1012=g.ld-ld79;
+  const n79=g.y79+g.yOther+ld79,n1012=g.y1012+ld1012;const out=[];
+  if(n79>0)out.push({key:c.id+'|'+gender+'|7-9',church:c.name,gender,label:lbl+' Yr 7–9',n:n79,bracket:'7-9'});
+  if(n1012>0)out.push({key:c.id+'|'+gender+'|10-12',church:c.name,gender,label:lbl+' Yr 10–12',n:n1012,bracket:'10-12'});
+  return out;
 }
 function accomGroups(regs){
   const by=accomChurches(regs),groups=[];
   Object.values(by).forEach(c=>{const elig=c.total>0&&c.classroom/c.total>=0.75;if(elig){
-    if(c.maleCls>0)groups.push({key:c.id+'|male',church:c.name,gender:'male',label:'Guys',n:c.maleCls});
-    if(c.femaleCls>0)groups.push({key:c.id+'|female',church:c.name,gender:'female',label:'Girls',n:c.femaleCls});}});
+    groups.push(..._accomGenderGroups(c,'male',c.male));
+    groups.push(..._accomGenderGroups(c,'female',c.female));}});
   return groups;
 }
 async function addAlloc(roomId,key){if(!key)return;const rooms=window._accomRooms||[],a=JSON.parse(JSON.stringify(window._accomAlloc||{}));
@@ -1351,9 +1795,9 @@ function drawAccom(){
     const roomGender=entries.length?gByKey[entries[0].key].gender:null;
     const addable=roomGender?availGroups.filter(g=>g.gender===roomGender):availGroups;
     const chips=entries.map(e=>{const g=gByKey[e.key];return `<div class="rowsb" style="align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-top:6px"><span style="font-size:.85rem">${esc(g.church)} — ${g.label} (${e.n})</span><button class="btn ghost sm" onclick="removeAlloc('${rm.id}','${e.key}')">Remove</button></div>`;}).join('');
-    const addSel=(rem>0&&addable.length)?`<select onchange="addAlloc('${rm.id}',this.value);this.value=''" style="width:100%;margin-top:8px"><option value="">＋ Add ministry…</option>${addable.map(g=>`<option value="${g.key}">${esc(g.church)} — ${g.label} (${g.avail} left)</option>`).join('')}</select>`:(rem<=0?`<div class="sub" style="margin-top:8px">Room full.</div>`:`<div class="sub" style="margin-top:8px">${roomGender?'No more '+(roomGender==='male'?'Guys':'Girls')+' groups to add.':'All eligible groups are allocated.'}</div>`);
+    const addSel=(rem>0&&addable.length)?`<select onchange="addAlloc('${rm.id}',this.value);this.value=''" style="width:100%;margin-top:8px"><option value="">+ Add ministry…</option>${addable.map(g=>`<option value="${g.key}">${esc(g.church)} — ${g.label} (${g.avail} left)</option>`).join('')}</select>`:(rem<=0?`<div class="sub" style="margin-top:8px">Room full.</div>`:`<div class="sub" style="margin-top:8px">${roomGender?'No more '+(roomGender==='male'?'Guys':'Girls')+' groups to add.':'All eligible groups are allocated.'}</div>`);
     const tone=used?'ok':'info';const lbl=used+'/'+rm.capacity;
-    return `<div class="card"><div class="rowsb"><div style="font-weight:600">⌂ ${esc(rm.name)} <span class="sub">· cap ${rm.capacity}</span></div><span class="pill ${tone}">${lbl}</span></div>${chips}${addSel}</div>`;
+    return `<div class="card"><div class="rowsb"><div style="font-weight:600">${icSm('classroom')} ${esc(rm.name)} <span class="sub">· cap ${rm.capacity}</span></div><span class="pill ${tone}">${lbl}</span></div>${chips}${addSel}</div>`;
   }).join(''):'<p class="note-hint">No classroom rooms yet — add them in Admin → Accommodation.</p>';
   const out=[];
   const by=accomChurches(regs);
@@ -1363,25 +1807,33 @@ function drawAccom(){
   const table=out.length?`<table style="width:100%;border-collapse:collapse;font-size:.82rem">
     <tr style="text-align:left;color:var(--muted)"><th style="padding:6px 4px">Ministry</th><th>Group</th><th>#</th><th>Status</th></tr>
     ${out.map(r=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${r[2]}</td><td><span class="sub">${esc(r[3])}</span></td></tr>`).join('')}
-  </table>`:'<p class="note-hint">Everyone is allocated ✓</p>';
+  </table>`:'<p class="note-hint">Everyone is allocated</p>';
   const td=tentDist(regs);
-  const tentTable=(gk,label)=>{const rows=Object.values(td).filter(c=>c[gk].stu+c[gk].ld>0).map(c=>{const g=c[gk];const st=Math.ceil(g.stu/7),lt=Math.ceil(g.ld/7);return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:center">${g.stu}</td><td style="text-align:center">${g.ld}</td><td style="text-align:center">${st}</td><td style="text-align:center">${lt}</td></tr>`;}).join('');
+  const tentTable=(gk,label)=>{
+    const churchesG=Object.values(td).filter(c=>c[gk].stu+c[gk].ld>0);
+    // PC-11: total student tents / leader tents for this gender (tents are per-church 7-buckets,
+    // students & leaders separate — sum the per-church tent counts).
+    let totStuTents=0,totLdTents=0;
+    const rows=churchesG.map(c=>{const g=c[gk];const st=Math.ceil(g.stu/7),lt=Math.ceil(g.ld/7);totStuTents+=st;totLdTents+=lt;return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:center">${g.stu}</td><td style="text-align:center">${g.ld}</td><td style="text-align:center">${st}</td><td style="text-align:center">${lt}</td></tr>`;}).join('');
     if(!rows)return '';
-    return `<h3 class="sec">Tent City — ${label}</h3><table style="width:100%;border-collapse:collapse;font-size:.8rem"><tr style="text-align:left;color:var(--muted)"><th style="padding:6px 4px">Ministry</th><th style="text-align:center">Students</th><th style="text-align:center">Leaders</th><th style="text-align:center">Student tents</th><th style="text-align:center">Leader tents</th></tr>${rows}</table>`;};
+    return `<h3 class="sec" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span>Tent City — ${label}</span><span class="sub" style="text-transform:none;letter-spacing:0;font-weight:700">${totStuTents} student ${totStuTents===1?'tent':'tents'} · ${totLdTents} leader ${totLdTents===1?'tent':'tents'}</span></h3><table style="width:100%;border-collapse:collapse;font-size:.8rem"><tr style="text-align:left;color:var(--muted)"><th style="padding:6px 4px">Ministry</th><th style="text-align:center">Students</th><th style="text-align:center">Leaders</th><th style="text-align:center">Student tents</th><th style="text-align:center">Leader tents</th></tr>${rows}</table>`;};
   const tentHtml=tentTable('m','Male')+tentTable('f','Female');
   const box=document.getElementById('accomBody');if(!box)return;
-  box.innerHTML=`<h3 class="sec" style="margin-top:2px">Classroom rooms</h3>${roomCards}
+  // A7/PC-12: room cards reflow as wrapping narrow tiles (matches the accommodation-setup
+  // tile pattern), 1→N columns by width, instead of a single fixed column.
+  const roomGrid=rooms.length?`<div class="accom-rooms">${roomCards}</div>`:roomCards;
+  box.innerHTML=`<h3 class="sec" style="margin-top:2px">Classroom rooms</h3>${roomGrid}
     <h3 class="sec">Not in a classroom allocation</h3>${table}
     ${tentHtml||'<p class="note-hint" style="margin-top:14px">Tent City auto-distribution appears once registrants have a tent accommodation kind set.</p>'}`;
 }
 RENDER.compose=function(){
   const isDir=['director','admin'].includes(ACTOR.role);
   paint('compose',`<label>Send to</label><div class="seg" id="audSeg">
-    ${isDir?`<button class="on" data-aud="camp" onclick="setAud(this)">◆ Camp-wide</button><button data-aud="zone" onclick="setAud(this)">A zone</button>`
+    ${isDir?`<button class="on" data-aud="camp" onclick="setAud(this)">${icSm('diamond')} Camp-wide</button><button data-aud="zone" onclick="setAud(this)">A zone</button>`
       :`<button class="on" data-aud="myzone" onclick="setAud(this)">${esc(ACTOR.zone)} Zone</button>`}
     </div>
     ${isDir?`<div id="zoneWrap" style="display:none"><label>Zone</label><select id="zoneSel">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>`:''}
-    <label>Priority</label><div class="seg" id="priSeg"><button class="on" data-pri="normal" onclick="setPri(this)">◈ Normal</button><button data-pri="urgent" onclick="setPri(this)">⚠︎ Urgent</button></div>
+    <label>Priority</label><div class="seg" id="priSeg"><button class="on" data-pri="normal" onclick="setPri(this)">${icSm('check')} Normal</button><button data-pri="urgent" onclick="setPri(this)">${icSm('urgent')} Urgent</button></div>
     <label>Title</label><input class="fld" id="ntitle">
     <label>Message</label><textarea id="nbody"></textarea>
     <button class="btn" id="sendBtn" onclick="sendNotif()">Send notice</button>`,'Send a notice','Goes to leaders');
@@ -1395,7 +1847,7 @@ async function sendNotif(){const title=document.getElementById('ntitle').value.t
   if(window._aud==='camp')p.scope='camp';else if(window._aud==='myzone'){p.scope='zone';p.zone=ACTOR.zone;}
   else{p.scope='zone';p.zone=document.getElementById('zoneSel').value;}
   if(p.scope==='camp'||window._pri==='urgent'){if(!confirm('Send '+(window._pri==='urgent'?'URGENT ':'')+(p.scope==='camp'?'camp-wide':p.zone+' zone')+' notice?'))return;}
-  try{await api('/notifications',{method:'POST',body:p});toast('Delivered ✓');back();}catch(e){toast(e.message);}}
+  try{await api('/notifications',{method:'POST',body:p});toast('Delivered');back();}catch(e){toast(e.message);}}
 
 /* ===== MY YOUTH at-camp ===== */
 
@@ -1417,20 +1869,26 @@ function fdDraw(){
   const alreadyIn=students.filter(c=>c.atCamp);
   const gen=window._fdGender||'all';
   const gr=window._fdGrade||'all';
-  const visible=notIn.filter(c=>(gen==='all'||c.gender===gen)&&(gr==='all'||String(c.grade)===gr));
+  const matchFilter=c=>(gen==='all'||c.gender===gen)&&(gr==='all'||String(c.grade)===gr);
+  const visible=notIn.filter(matchFilter);
+  // AC-3: the gender/grade filter applies to the already-signed-in section too.
+  const visibleIn=alreadyIn.filter(matchFilter);
   const pending=window._fdPending||(window._fdPending=new Set());
   const gradeOpts=['all',...GRADES].map(g=>`<option value="${g}" ${String(g)===gr?'selected':''}>${g==='all'?'All grades':'Yr '+g}</option>`).join('');
   function fdRow(c,done){
+    // AC-4: initials bubble is gender-coloured via .av.male/.av.female (blue/pink).
     const av=`<div class="av ${esc(c.gender)}">${initials(c.firstName+' '+c.lastName)}</div>`;
     const info=`<div style="flex:1;min-width:0"><div class="nm">${esc(c.firstName+' '+c.lastName)}<span class="gradepill">Yr ${c.grade||'—'}</span></div><div class="sub">${esc(c.churchName)}</div></div>`;
     if(done){
-      return `<div class="row" style="opacity:.45;cursor:default">${av}${info}<span class="pill ok">✓ In</span></div>`;
+      // AC-2: an already-signed-in student can be signed OUT here to correct a mistake.
+      const nm=(c.firstName+' '+c.lastName).replace(/'/g,"\\'");
+      return `<div class="row" style="cursor:pointer" onclick="signOutPrompt('${c.id}','${esc(nm)}')">${av}${info}<span class="pill ok">${icSm('check')} In</span><button class="btn ghost sm" style="flex:none" onclick="event.stopPropagation();signOutPrompt('${c.id}','${esc(nm)}')">Sign out</button></div>`;
     }
     const sel=pending.has(c.id);
     return `<div class="row ${sel?'checked':''}" style="cursor:pointer" onclick="fdToggle('${c.id}',this)" data-id="${c.id}">
       ${av}${info}
       <div style="width:26px;height:26px;border-radius:50%;border:2px solid ${sel?'#16a34a':'#c2cdda'};background:${sel?'#16a34a':'transparent'};display:grid;place-items:center;flex:none;transition:.15s">
-        ${sel?'<span style="color:#fff;font-size:.9rem;line-height:1">✓</span>':''}
+        ${sel?icSm('check','cwhite'):''}
       </div></div>`;
   }
   const pendingCount=pending.size;
@@ -1444,8 +1902,8 @@ function fdDraw(){
       <select onchange="window._fdGrade=this.value;fdDraw()">${gradeOpts}</select>
     </div>
     ${visible.length?visible.map(c=>fdRow(c,false)).join(''):'<p class="note-hint">No students match these filters.</p>'}
-    ${notIn.length===0?'<div class="callbox">All students in your group are signed in ✓</div>':''}
-    ${alreadyIn.length?`<h3 class="sec" style="margin-top:16px">Already signed in (${alreadyIn.length})</h3>`+alreadyIn.map(c=>fdRow(c,true)).join(''):''}
+    ${notIn.length===0?`<div class="callbox">${icSm('check')} All students in your group are signed in</div>`:''}
+    ${visibleIn.length?`<h3 class="sec" style="margin-top:16px">Already signed in (${visibleIn.length})</h3>`+visibleIn.map(c=>fdRow(c,true)).join(''):''}
     <div id="fdConfirmBar" style="display:${pendingCount>0?'block':'none'};position:sticky;bottom:10px;margin-top:16px">
       <button class="btn" style="background:#16a34a" onclick="fdConfirmAll()">Confirm ${pendingCount} sign-in${pendingCount===1?'':'s'}</button>
     </div>`;
@@ -1476,7 +1934,7 @@ async function fdConfirmAll(){
       .catch(()=>fail++)
   ));
   if(fail)toast(fail+' failed — please retry');
-  else toast(ok+' student'+(ok===1?'':'s')+' signed in ✓');
+  else toast(ok+' student'+(ok===1?'':'s')+' signed in');
   fdDraw();
 }
 
@@ -1544,8 +2002,8 @@ async function openCamper(id,push=true){
       <div class="kv"><span class="k">${lead?'Mobile':'Student mobile'}</span><span class="v"><a href="tel:${esc(p.mobile||'')}" style="color:#4f46e5;text-decoration:none">${esc(p.mobile||'—')}</a></span></div>
       ${lead?'':`<div class="kv"><span class="k">Medical</span><span class="v">${(p.medicalConditions||[]).join(', ')||'—'}</span></div>
       <div class="kv"><span class="k">Dietary</span><span class="v">${(p.dietaryRequirements||[]).join(', ')||'—'}</span></div>
-      ${p.otherMedications?`<div class="kv"><span class="k">Medication</span><span class="v">${esc(p.otherMedications)}</span></div>`:''}
-      <div class="kv"><span class="k">Consents</span><span class="v">${p.consents?Object.values(p.consents).filter(v=>v&&v.granted).length:0}/3 ✓</span></div>`}
+      ${p.otherMedications?`<div class="kv"><span class="k">Medication</span><span class="v">${esc(p.otherMedications)}</span></div>`:''}`}
+      <!-- AC-6: consents line removed from the profile UI (consent data is kept in the model/DTO). -->
     </div>
     ${camp}
     ${lead?'':`<div class="card"><div class="h3" style="margin-top:0">Parent / guardian</div>
@@ -1565,7 +2023,7 @@ function signOutPrompt(id,name){
     <label>Your name</label><input class="fld" id="soLeader" value="${esc(LAST_LEADER||'')}" placeholder="e.g. Sarah Doyle">
     <label>Reason</label><textarea id="soReason" placeholder="e.g. picked up by parents"></textarea>
     <label>Were parents met at pickup?</label><div class="seg" id="soPm"><button class="on" data-pm="yes" onclick="soPm(this)">Yes</button><button data-pm="no" onclick="soPm(this)">No</button></div>
-    <button class="btn" onclick="signOutReview('${id}','${esc(name)}')">Review →</button>
+    <button class="btn" onclick="signOutReview('${id}','${esc(name)}')">Review ${icSm('arrowr')}</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
   window._soPm='yes';
 }
@@ -1583,7 +2041,7 @@ function signOutReview(id,name){
     <button class="btn ghost" style="margin-top:6px" onclick="signOutPrompt('${id}','${esc(name)}')">‹ Edit</button>`);
 }
 async function signOutConfirm(){const d=window._soDraft;if(!d)return;
-  try{await api('/attendance/sign-out',{method:'POST',body:{camperId:d.id,leaderName:d.leader,reason:d.reason,parentsMet:d.pm}});window._soDraft=null;closeModal();toast('Signed out ✓');openCamper(d.id,false);}catch(e){toast(e.message);}}
+  try{await api('/attendance/sign-out',{method:'POST',body:{camperId:d.id,leaderName:d.leader,reason:d.reason,parentsMet:d.pm}});window._soDraft=null;closeModal();toast('Signed out');openCamper(d.id,false);}catch(e){toast(e.message);}}
 function signInPrompt(id,name){
   modal(`<h3>Sign in · ${esc(name)}</h3><p class="sub" style="margin:4px 0 8px">Signing this youth back IN to camp.</p>
     <label>Your initials</label><input class="fld" id="siInit" placeholder="e.g. SD" maxlength="6">
@@ -1591,7 +2049,7 @@ function signInPrompt(id,name){
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
 }
 async function signInConfirm(id){const init=document.getElementById('siInit').value.trim();if(!init){toast('Enter your initials');return;}
-  try{await api('/attendance/sign-in',{method:'POST',body:{camperId:id,leaderName:init}});closeModal();toast('Signed in ✓');openCamper(id,false);}catch(e){toast(e.message);}}
+  try{await api('/attendance/sign-in',{method:'POST',body:{camperId:id,leaderName:init}});closeModal();toast('Signed in');openCamper(id,false);}catch(e){toast(e.message);}}
 
 /* ===== SCHEDULE ===== */
 let SCHED_DAY=null;
@@ -1624,18 +2082,34 @@ RENDER.devotional=async function(){
 };
 function selDevoDay(d){DEVO_DAY=d;RENDER.devotional();}
 
-/* ===== FAQ at-camp ===== */
+/* ===== FAQ (pre-camp Help aid) ===== */
 RENDER.faq=async function(){
+  // PC-7: FAQ/Help is a pre-camp aid only — never surfaced in at-camp mode (any role). The
+  // tab/tile are already gated; this guard catches a stale back-stack / deep link.
+  if(CAMP_MODE==='at-camp'){gotoTab('home');return;}
   const items=await api('/faq');
-  paint('faq',items.map(f=>`<div class="card"><div class="h3" style="margin-top:0">${esc(f.question)}</div><p style="font-size:.88rem;color:#475569">${esc(f.answer)}</p></div>`).join(''),'FAQ','Quick answers');
+  paint('faq',items.length?items.map(f=>`<div class="card"><div class="h3" style="margin-top:0">${esc(f.question)}</div><p style="font-size:.88rem;color:#475569">${esc(f.answer)}</p></div>`).join(''):emptyState('help','No FAQs yet.'),'FAQ','Quick answers');
 };
 
 /* ===== NOTES ===== */
 RENDER.testimonies=async function(){
   // A testimony is stored as a note with category 'testimony'. The student is optional —
   // the default is a general testimony with no specific student identified.
-  const page=await api('/campers?pageSize=300').catch(()=>[]);
-  const items=(Array.isArray(page)?page:page.items||[]).filter(c=>c.kind==='student').sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName));
+  // CH-2: the dropdown previously fetched only /campers (= isCamper, lifecycle ≥ arrived),
+  // so a church login's youth who have NOT yet signed in (lifecycle 'registered') never
+  // appeared and the list looked empty. Mirror RENDER.firstday: pull BOTH /registrants
+  // (pre-arrival youth, kind 'camper') and /campers (arrived students, kind 'student') and
+  // dedupe by id, so every one of the church's young people is selectable.
+  const [campPage,regs]=await Promise.all([
+    api('/campers?pageSize=300').catch(()=>[]),
+    api('/registrants').catch(()=>[]),
+  ]);
+  const campers=(Array.isArray(campPage)?campPage:campPage.items||[]).filter(c=>c.kind==='student');
+  const regYouth=(regs||[]).filter(r=>r.kind==='camper'&&r.status!=='cancelled');
+  const byId={};
+  campers.forEach(c=>{byId[c.id]={id:c.id,firstName:c.firstName,lastName:c.lastName,churchName:c.churchName};});
+  regYouth.forEach(r=>{if(!byId[r.id])byId[r.id]={id:r.id,firstName:r.firstName,lastName:r.lastName,churchName:r.churchName};});
+  const items=Object.values(byId).sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName));
   const opts=`<option value="" selected>No specific student identified</option>`
     +items.map(c=>`<option value="${c.id}">${esc(c.firstName+' '+c.lastName)} · ${esc(c.churchName)}</option>`).join('');
   paint('testimonies',`<div class="infobox" style="font-size:.82rem">Record a testimony or God-moment from camp. Pick a student if it's about one, or leave it as a general testimony. It is saved with the records that leaders &amp; directors review.</div>
@@ -1648,19 +2122,30 @@ async function submitTestimony(){const camperId=sel('tmCamper'),leader=val('tmLe
   if(!body){toast('Write the testimony');return;}LAST_LEADER=leader;
   const full=leader&&leader!==ACTOR.displayName?`${body}\n— logged by ${leader}`:body;
   const payload={body:full,category:'testimony'};if(camperId)payload.camperId=camperId;
-  try{await api('/notes',{method:'POST',body:payload});toast('Testimony submitted ✓');const t=document.getElementById('tmBody');if(t)t.value='';}catch(e){toast(e.message);}}
+  try{await api('/notes',{method:'POST',body:payload});toast('Testimony submitted');const t=document.getElementById('tmBody');if(t)t.value='';}catch(e){toast(e.message);}}
 RENDER.notes=async function(){
   // /notes/recent returns bare notes (no camper details) — join /campers for name/church/zone/gender/grade.
   const [notes,page]=await Promise.all([api('/notes/recent'),api('/campers?pageSize=300').catch(()=>[])]);
   const camps=Array.isArray(page)?page:page.items||[];const cmap={};camps.forEach(c=>{cmap[c.id]=c;});
-  window._notesAll=(notes||[]).map(n=>{const c=cmap[n.camperId]||{};return Object.assign({},n,{camperName:c.firstName?(c.firstName+' '+c.lastName):(n.camperId||'No specific student'),church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,cat:n.category||'note'});});
+  const noteRecs=(notes||[]).map(n=>{const c=cmap[n.camperId]||{};return Object.assign({},n,{camperName:c.firstName?(c.firstName+' '+c.lastName):(n.camperId||'No specific student'),church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,cat:n.category||'note'});});
+  // AC-8: synthesise "Signed out" records from the attendance data — students no longer at camp
+  // (atCamp:false / lifecycle checked_out|departed) with a sign-out event. Each surfaces as a
+  // record alongside testimonies/notes, sourced from signOutHistory.
+  const signedOut=camps.filter(c=>c.atCamp===false&&(c.signOutHistory||[]).some(e=>e.type==='out')).map(c=>{
+    const last=(c.signOutHistory||[]).filter(e=>e.type==='out').slice(-1)[0]||{};
+    return {camperName:c.firstName+' '+c.lastName,church:c.churchName,zone:c.zone,gender:c.gender,grade:c.grade,
+      cat:'signedout',body:last.reason?('Reason: '+last.reason):'Signed out of camp',authorName:last.leaderName||'—',createdAt:last.timestamp||c.updatedAt};
+  });
+  window._notesAll=[...noteRecs,...signedOut].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const churches=[...new Set(window._notesAll.map(n=>n.church).filter(Boolean))].sort();
   const zonesPresent=[...new Set(window._notesAll.map(n=>n.zone).filter(Boolean))].sort();
-  const recSel=`<div><label>Record</label><select id="ntCat" onchange="drawNotes()"><option value="all">All records</option><option value="testimony">Testimony</option><option value="note">Student note</option></select></div>`;
+  // AC-8: record filter gains "Signed out".
+  const recSel=`<div><label>Record</label><select id="ntCat" onchange="drawNotes()"><option value="all">All records</option><option value="testimony">Testimony</option><option value="note">Student note</option><option value="firstaid">First-aid</option><option value="signedout">Signed out</option></select></div>`;
   const minSel=`<div><label>Ministry</label><select id="ntChurch" onchange="drawNotes()"><option value="all">All ministries</option>${churches.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>`;
   const zoneSel=`<div><label>Zone</label><select id="ntZone" onchange="drawNotes()"><option value="all">All zones</option>${zonesPresent.map(z=>`<option value="${z}">${z} Zone</option>`).join('')}</select></div>`;
-  paint('notes',`<button class="btn alt" onclick="exportNotes()">↓ Export (CSV)</button>
-    <div class="selrow">${recSel}${minSel}</div><div class="selrow">${zoneSel}</div>
+  // AC-7: swap Zone and Ministry positions — Zone first, then Ministry.
+  paint('notes',`<button class="btn alt" onclick="exportNotes()">${icSm('download')} Export (CSV)</button>
+    <div class="selrow">${recSel}${zoneSel}</div><div class="selrow">${minSel}</div>
     <div id="notesList"></div>`,'Testimonies & Student Notes','All zones · whole camp');
   drawNotes();
 };
@@ -1671,18 +2156,27 @@ function drawNotes(){
   if(ch!=='all')list=list.filter(n=>n.church===ch);
   if(z!=='all')list=list.filter(n=>n.zone===z);
   const box=document.getElementById('notesList');if(!box)return;
-  const badge=c=>c==='testimony'?'<span class="pill info">Testimony</span>':'<span class="pill ok">Student note</span>';
-  box.innerHTML=list.length?list.map(n=>{const c=n.cat||'note';const isT=c==='testimony';
-    const right=(n.gender)?`<span class="sub" style="white-space:nowrap">${n.gender==='male'?'♂':'♀'}${n.grade?' · Yr '+n.grade:''}</span>`:'';
+  const badge=c=>c==='testimony'?'<span class="pill info">Testimony</span>':c==='signedout'?'<span class="pill warn">Signed out</span>':c==='firstaid'?'<span class="pill amb">First-aid</span>':'<span class="pill ok">Student note</span>';
+  box.innerHTML=list.length?list.map(n=>{const c=n.cat||'note';
+    const right=(n.gender)?`<span class="sub" style="white-space:nowrap">${n.grade?'Yr '+n.grade:(n.gender==='male'?'Guys':'Girls')}</span>`:'';
+    // First-aid records carry a 4-line body (Problem/Treatment/First-aider/Brought by) — render
+    // the Problem + Treatment lines distinctly rather than as one blob.
+    let bodyHtml;
+    if(c==='firstaid'){const p=_faParse(n.body);
+      bodyHtml=`<div style="font-size:.86rem;margin:4px 0">
+        ${p.problem?`<div><b style="color:var(--alert-ink)">Problem:</b> ${esc(p.problem)}</div>`:''}
+        ${p.treatment?`<div><b style="color:var(--consent-ok-ink)">Treatment:</b> ${esc(p.treatment)}</div>`:''}
+        ${p.firstAider?`<div class="sub" style="color:var(--ink-2)">First-aider: ${esc(p.firstAider)}${p.broughtBy?' · brought by '+esc(p.broughtBy):''}</div>`:''}</div>`;
+    }else{bodyHtml=`<div style="font-size:.86rem;color:#475569;margin:4px 0">${esc(n.body)}</div>`;}
     return `<div class="card"><div class="rowsb" style="align-items:center"><div class="nm">${esc(n.camperName||'—')}</div>${right}</div>
-    <div style="font-size:.86rem;color:#475569;margin:4px 0">${esc(n.body)}</div>
-    <div class="sub">${esc(n.authorName)} · ${dtFmt(n.createdAt)}${n.church?' · '+esc(n.church):''} · ${badge(c)}</div></div>`;}).join(''):'<p class="note-hint">No records match these filters.</p>';
+    ${bodyHtml}
+    <div class="sub">${esc(n.authorName)} · ${dtFmt(n.createdAt)}${n.church?' · '+esc(n.church):''} · ${badge(c)}</div></div>`;}).join(''):emptyState('note','No records match these filters.');
 }
 async function exportNotes(){
   try{const csv=await api('/notes/export');if(!csv||typeof csv!=='string'){toast('Nothing to export');return;}
     const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download='testimonies-and-notes-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-    toast('Exported ✓');
+    toast('Exported');
   }catch(e){toast(e.message);}}
 
 /* ===== ADMIN CONSOLE ===== */
@@ -1716,12 +2210,12 @@ async function switchMode(){
     await api('/admin/mode',{method:'POST',body:{campMode:newMode}});
     CAMP_MODE=newMode;SETTINGS.campMode=newMode;
     updateModeUI();buildTabs();
-    toast(`Switched to ${label} ✓`);STACK=['home'];await RENDER.home();
+    toast(`Switched to ${label}`);STACK=['home'];await RENDER.home();
   }catch(e){toast(e.message);}
 }
 
 /* ===== ADMIN ACCOUNTS ===== */
-const ZONE_OPTS=['Yellow','Blue','Black','Red'];
+const ZONE_OPTS=ZONES; // single source — see ZONES above (kept in sync with backend ZONE_NAMES)
 const zoneSel=(id,s)=>`<select id="${id}">${ZONE_OPTS.map(z=>`<option${z===s?' selected':''}>${z}</option>`).join('')}</select>`;
 RENDER.adminAccounts=async function(){
   const [users,churches]=await Promise.all([api('/accounts/users'),api('/accounts/churches')]);
@@ -1733,10 +2227,10 @@ RENDER.adminAccounts=async function(){
       <div style="font-weight:700;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">${o.title}</div>
       <div style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px">${o.sub}</div>
       <div style="display:flex;gap:5px;margin-top:auto;flex-wrap:wrap">
-        <button class="iconbtn" title="Rename" onclick="${o.onName}">${ic('edit')}</button>
-        <button class="iconbtn" title="Change username" onclick="${o.onUser}">${ic('at')}</button>
-        <button class="iconbtn" title="Change password" onclick="${o.onPass}">${ic('key')}</button>
-        <button class="iconbtn danger" title="Delete" onclick="${o.onDel}">${ic('trash')}</button>
+        <button class="iconbtn" title="Rename" aria-label="Rename" onclick="${o.onName}">${ic('edit')}</button>
+        <button class="iconbtn" title="Change username" aria-label="Change username" onclick="${o.onUser}">${ic('at')}</button>
+        <button class="iconbtn" title="Change password" aria-label="Change password" onclick="${o.onPass}">${ic('key')}</button>
+        <button class="iconbtn danger" title="Delete" aria-label="Delete" onclick="${o.onDel}">${ic('trash')}</button>
       </div></div>`;
   const tileGrid=items=>items.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:4px">${items.join('')}</div>`:'<p class="note-hint">None yet.</p>';
   const lr=tileGrid(leaders.map(u=>acctTile({
@@ -1765,12 +2259,12 @@ RENDER.adminAccounts=async function(){
       <div id="aZoneWrap" style="display:none"><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('aZ')}</div></div></div>
       <button class="btn" onclick="addAcct()" style="margin-top:10px;width:100%">Create account</button></div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
-      <div class="warnbox">⚠ Church name must match the registration export exactly — registrations are matched by name.</div>
+      <div class="warnbox">${icSm('alert')} Church name must match the registration export exactly — registrations are matched by name.</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside" style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('ncZone')}</div></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Username</label><input class="fld" id="ncUser" placeholder="e.g. northside (letters, numbers, . _ -)" style="flex:1" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Password</label><input class="fld" id="ncPass" placeholder="min 6 chars" style="flex:1"></div>
-      <button class="btn" onclick="addChurch()" style="margin-top:10px;width:100%">Create church + account</button></div>`,'Accounts &amp; churches','Admin');
+      <button class="btn" onclick="addChurch()" style="margin-top:10px;width:100%">Create church + account</button></div>`,'Accounts & churches','Admin');
 };
 function aRoleChange(){
   const r=document.getElementById('aR').value;
@@ -1781,7 +2275,7 @@ async function addAcct(){const role=sel('aR');const nm=val('aName').trim();const
   const body={firstName,lastName,username:val('aE'),password:val('aP'),role};
   if(role==='zoneLeader')body.zone=sel('aZ');
   if(!firstName||!val('aE')){toast('Enter name + username');return;}if((body.password||'').length<6){toast('Password 6+ chars');return;}
-  try{await api('/accounts/users',{method:'POST',body});toast('Account created ✓');await _rAccts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users',{method:'POST',body});toast('Account created');await _rAccts();}catch(e){toast(e.message);}}
 const _findUser=id=>(window._allUsers||[]).find(u=>u.id===id)||{};
 const _findChurch=id=>(window._allChurches||[]).find(c=>c.id===id)||{};
 function editLeaderName(id){const u=_findUser(id);
@@ -1796,23 +2290,23 @@ async function saveLeaderName(id,role){const nm=val('enName').trim();const sp=nm
   const body={firstName,lastName,status:sel('enS')};
   if(role==='zoneLeader')body.zone=sel('enZ');
   if(!firstName){toast('Enter a name');return;}
-  try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved ✓');await _rAccts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved');await _rAccts();}catch(e){toast(e.message);}}
 function editChurchName(id){const c=_findChurch(id);
   modal(`<h3>Rename church</h3>
     <label>Church name</label><input class="fld" id="ecnName" value="${esc(c.name||'')}">
-    <div class="warnbox" style="margin-top:8px">⚠ Must match the registration export exactly — registrations are matched by name.</div>
+    <div class="warnbox" style="margin-top:8px">${icSm('alert')} Must match the registration export exactly — registrations are matched by name.</div>
     <label>Zone</label>${zoneSel('ecnZone',c.zone)}
     <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveChurchName(id){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated ✓');await _rAccts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated');await _rAccts();}catch(e){toast(e.message);}}
 function editUsername(id){const u=_findUser(id);
   modal(`<h3>Change username</h3>
     <label>Username</label><input class="fld" id="euU" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
     <button class="btn" style="margin-top:10px" onclick="saveUsername('${id}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveUsername(id){const username=val('euU');if(username.length<2){toast('Username too short');return;}
-  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated ✓');await _rAccts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated');await _rAccts();}catch(e){toast(e.message);}}
 function changePassword(id){const u=_findUser(id);
   modal(`<h3>Change password</h3>
     <div class="sub" style="margin-bottom:8px">${esc(u.firstName?u.firstName+' '+u.lastName:u.username||'Account')}</div>
@@ -1820,7 +2314,7 @@ function changePassword(id){const u=_findUser(id);
     <button class="btn" style="margin-top:10px" onclick="savePassword('${id}')">Set password</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function savePassword(id){const password=document.getElementById('cpP').value;if((password||'').length<6){toast('Password 6+ chars');return;}
-  try{await api('/accounts/users/password',{method:'POST',body:{userId:id,password}});closeModal();toast('Password updated ✓');}catch(e){toast(e.message);}}
+  try{await api('/accounts/users/password',{method:'POST',body:{userId:id,password}});closeModal();toast('Password updated');}catch(e){toast(e.message);}}
 async function delAcct(id){if(!confirm("Delete this account?"))return;
   try{await api("/accounts/users/"+id,{method:"DELETE"});toast("Account deleted");await _rAccts();}catch(e){toast(e.message);}}
 async function delChurch(id){if(!confirm("Delete this church and its login account?"))return;
@@ -1830,14 +2324,19 @@ async function addChurch(){if(!val('ncName')||!val('ncUser')){toast('Enter churc
   if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username: letters, numbers, . _ - only (min 2 chars)');return;}
   const name=val('ncName');
   const body={churchName:name,zone:sel('ncZone'),accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:val('ncPass')};
-  try{await api('/accounts/churches',{method:'POST',body});toast('Church created ✓');await _rAccts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches',{method:'POST',body});toast('Church created');await _rAccts();}catch(e){toast(e.message);}}
 
 // Scroll-preserving re-loaders — capture scrollTop before re-render, restore after.
-async function _rAccts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rAccts();if(el)el.scrollTop=y;}
-async function _rFaq(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rFaq();if(el)el.scrollTop=y;}
-async function _rFaqEdit(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rFaqEdit();if(el)el.scrollTop=y;}
-async function _rSched(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rSched();if(el)el.scrollTop=y;}
-async function _rContacts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await await _rContacts();if(el)el.scrollTop=y;}
+// PC-5: these MUST re-render via the matching RENDER.* function. They previously called
+// themselves (`await await _rFaq()`), an infinite recursion that overflowed the stack
+// ("maximum call stack size exceeded") and meant a saved FAQ/schedule/account never
+// re-painted until a manual refresh. The write that triggers them already invalidated the
+// relevant cache key (via api()→_invalidate), so the re-render fetches fresh data.
+async function _rAccts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminAccounts();if(el)el.scrollTop=y;}
+async function _rFaq(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminFaq();if(el)el.scrollTop=y;}
+async function _rFaqEdit(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminFaqEdit();if(el)el.scrollTop=y;}
+async function _rSched(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminSchedEdit();if(el)el.scrollTop=y;}
+async function _rContacts(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminContacts();if(el)el.scrollTop=y;}
 
 /* ===== ADMIN ACCOMMODATION (classroom rooms) ===== */
 RENDER.adminAccom=async function(){
@@ -1850,12 +2349,12 @@ RENDER.adminAccom=async function(){
         <input class="fld" id="rc_${rm.id}" type="number" inputmode="numeric" min="0" value="${rm.capacity}" placeholder="Cap" style="width:60px;flex:none;padding:6px 4px">
       </div>
       <div style="display:flex;gap:6px">
-        <button class="btn sm" onclick="saveRoom('${rm.id}')" style="flex:1">Save ✓</button>
-        <button class="btn red sm" onclick="delRoom('${rm.id}')" style="flex:none">✕</button>
+        <button class="btn sm" onclick="saveRoom('${rm.id}')" style="flex:1">Save</button>
+        <button class="btn red sm" onclick="delRoom('${rm.id}')" style="flex:none" aria-label="Delete room">${icSm('close')}</button>
       </div>
     </div>`).join('')||'<p class="note-hint">No classroom rooms yet.</p>';
   const tileGrid=rooms&&rooms.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:4px">${tiles}</div>`:tiles;
-  paint('adminAccom',`<div class="infobox">Classroom rooms have a name &amp; capacity. Tent City is auto-distributed (7 per tent) — no setup needed. Prices are set in Camp settings.</div>
+  paint('adminAccom',`<div class="infobox">Classroom rooms have a name &amp; capacity. Tent City is auto-distributed (7 per tent) — no setup needed.</div>
     <div class="card"><h3 class="sec" style="margin-top:0">Classroom rooms</h3>${tileGrid}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add a room</div>
       <div style="display:flex;gap:6px;align-items:flex-end">
@@ -1865,13 +2364,13 @@ RENDER.adminAccom=async function(){
       </div></div>`,'Accommodation setup','Classroom rooms');
 };
 async function saveRoom(id){const el=document.getElementById('stage');const y=el?el.scrollTop:0;
-  try{await api('/accommodation/classrooms/'+id,{method:'PATCH',body:{name:val('rn_'+id),capacity:Number(val('rc_'+id))||0}});toast('Saved ✓');await RENDER.adminAccom();if(el)el.scrollTop=y;}catch(e){toast(e.message);}}
+  try{await api('/accommodation/classrooms/'+id,{method:'PATCH',body:{name:val('rn_'+id),capacity:Number(val('rc_'+id))||0}});toast('Saved');await RENDER.adminAccom();if(el)el.scrollTop=y;}catch(e){toast(e.message);}}
 async function delRoom(id){if(!confirm('Delete this room? Its allocations will be cleared.'))return;
   try{await api('/accommodation/classrooms/'+id,{method:'DELETE'});toast('Deleted');RENDER.adminAccom();}catch(e){toast(e.message);}}
 async function addRoom(){if(!val('nrName')){toast('Enter a room name');return;}
   const name=val('nrName').trim();
   if((window._adminRooms||[]).some(r=>r.name.toLowerCase()===name.toLowerCase())){toast('A room named "'+name+'" already exists');return;}
-  try{await api('/accommodation/classrooms',{method:'POST',body:{name,capacity:Number(val('nrCap'))||0}});toast('Room added ✓');RENDER.adminAccom();}catch(e){toast(e.message);}}
+  try{await api('/accommodation/classrooms',{method:'POST',body:{name,capacity:Number(val('nrCap'))||0}});toast('Room added');RENDER.adminAccom();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN FAQ (pre-camp) ===== */
 RENDER.adminFaq=async function(){
@@ -1882,9 +2381,9 @@ RENDER.adminFaq=async function(){
     <button class="btn red sm" style="flex:1" onclick="delFaqPre('${f.id}')">Delete</button></div></div>`).join('')+
     `<div class="card"><div class="lbl" style="margin-top:0">Add FAQ</div><input class="fld" id="nfq" placeholder="Question"><textarea id="nfa" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqPre()">Add FAQ</button></div>`,'FAQ','Edit answers');
 };
-async function saveFaqPre(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_'+id),answer:val('fa_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+async function saveFaqPre(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_'+id),answer:val('fa_'+id)}});toast('Saved');await _rFaq();}catch(e){toast(e.message);}}
 async function delFaqPre(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});await _rFaq();}catch(e){toast(e.message);}}
-async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('nfq'),answer:val('nfa'),order:99}});toast('Added ✓');await _rFaq();}catch(e){toast(e.message);}}
+async function addFaqPre(){if(!val('nfq')||!val('nfa')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('nfq'),answer:val('nfa'),order:99}});toast('Added');await _rFaq();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN FAQ (at-camp) ===== */
 RENDER.adminFaqEdit=async function(){
@@ -1895,9 +2394,9 @@ RENDER.adminFaqEdit=async function(){
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" style="flex:1" onclick="saveFaqAt('${f.id}')">Save</button><button class="btn red sm" onclick="delFaqAt('${f.id}')">Delete</button></div></div>`).join('')+
     `<div class="card"><div class="h3" style="margin-top:0">Add FAQ</div><input class="fld" id="fqNewQ" placeholder="Question"><textarea id="fqNewA" placeholder="Answer" style="margin-top:8px"></textarea><button class="btn" onclick="addFaqAt()">Add FAQ</button></div>`,'FAQ','Edit all answers');
 };
-async function saveFaqAt(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_q_'+id),answer:val('fq_a_'+id)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+async function saveFaqAt(id){try{await api('/faq/'+id,{method:'PATCH',body:{question:val('fq_q_'+id),answer:val('fq_a_'+id)}});toast('Saved');await _rFaqEdit();}catch(e){toast(e.message);}}
 async function delFaqAt(id){if(!confirm('Delete?'))return;try{await api('/faq/'+id,{method:'DELETE'});await _rFaqEdit();}catch(e){toast(e.message);}}
-async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added ✓');await _rFaqEdit();}catch(e){toast(e.message);}}
+async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter question + answer');return;}try{await api('/faq',{method:'POST',body:{question:val('fqNewQ'),answer:val('fqNewA'),order:99}});toast('Added');await _rFaqEdit();}catch(e){toast(e.message);}}
 
 /* ===== ADMIN SETTINGS ===== */
 /* ===== RECORDS & EXPORT (redirects to adminData) ===== */
@@ -1909,7 +2408,7 @@ async function downloadAuditExport(){
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download='camp-audit-export.xlsx';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-    toast('Audit workbook downloaded ✓');
+    toast('Audit workbook downloaded');
   }catch(e){toast(e.message||'Export failed');}
 }
 async function downloadCsvExport(path,filename){
@@ -1919,15 +2418,16 @@ async function downloadCsvExport(path,filename){
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-    toast('Downloaded ✓');
+    toast('Downloaded');
   }catch(e){toast(e.message||'Export failed');}
 }
 
 RENDER.adminCloseOut=function(){
   paint('adminCloseOut',`
-    <div style="padding:12px 0 4px"><button class="btn ghost sm" onclick="go('adminData')">← Back</button></div>
+    <div style="padding:12px 0 4px"><button class="btn ghost sm" onclick="go('adminData')">${icSm('arrowl')} Back</button></div>
     <div class="card">
       <div class="lbl" style="margin-top:0">Close-out checklist</div>
+      <div class="note-hint" style="text-align:left;margin:-2px 0 12px">Before you roll over: make sure you've run <b>Save Defaults</b> (on the Data screen) at least once this setup — the rollover restores your churches, accounts &amp; content from that baseline. If you haven't, it'll stop and send you there (nothing is purged).</div>
       <div style="margin-bottom:14px">
         <label class="checkbox-label" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <input type="checkbox" id="co1" onchange="onCloseOutConfirmChange()"> Step 1: Download the audit workbook
@@ -1957,15 +2457,31 @@ async function doNewYear(){
     const temps=s.tempPasswords||[];
     let pwHtml='';
     if(temps.length){
+      // R9: these temp passwords are generated DURING rollover, so they are NOT in the
+      // audit workbook downloaded at Step 1 (that ran before rollover, to pass the wipe
+      // guard). They are shown here AND retained for the NEXT compliance export ("Temp
+      // Passwords" tab, included once then cleared) — so they're recoverable if this modal
+      // is dismissed. Copy them now and share securely.
       pwHtml='<div class="card" style="background:#f0fdf4;border:1px solid #86efac"><div class="lbl" style="margin-top:0;color:#166534">Temp passwords for restored accounts</div>'+
         temps.map(t=>`<div class="kv"><span class="k">${esc(t.username)}</span><span class="v" style="font-family:monospace">${esc(t.tempPassword)}</span></div>`).join('')+
-        '<p class="note-hint" style="color:#166534">These were included in the downloaded workbook. Share securely.</p></div>';
+        '<p class="note-hint" style="color:#166534">Copy these now and share securely. They are also retained for your next compliance export (a "Temp Passwords" tab, included once then cleared). Leaders use them to sign in, then set their own password.</p></div>';
     }
-    modal(`<h3>Year ${esc(String(s.year||year))} — rolled over ✓</h3>
+    modal(`<h3>Year ${esc(String(s.year||year))} — rolled over</h3>
       <p>Camp data purged. Baseline restored. Mode set to pre-camp.</p>
       ${pwHtml}
       <button class="btn" style="margin-top:12px" onclick="closeModal();RENDER.admin()">Done</button>`);
-  }catch(e){toast(e.message);}
+  }catch(e){
+    // S1 (Phase 6): newYear throws "No defaults snapshot saved…" if Save Defaults was never run.
+    // Surface it as an actionable modal that routes to Save Defaults (mirrors adminReset's
+    // export-required modal) instead of a bare toast buried in the close-out flow. No data was
+    // purged on this error path (the snapshot check runs before any delete).
+    if(e.message&&e.message.toLowerCase().includes('snapshot')){
+      modal(`<h3>Save your setup first</h3>
+        <p class="sub" style="margin:8px 0 14px">This rollover restores your churches, accounts, accommodation, FAQ, schedule &amp; devotionals from a saved baseline — but you haven't saved one yet. Nothing was changed. Go to <b>Data, Reset &amp; Exports → Save Defaults</b>, then come back and roll over.</p>
+        <button class="btn" onclick="closeModal();go('adminData')">Go to Data &amp; Save Defaults ${icSm('arrowr')}</button>
+        <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+    }else{toast(e.message);}
+  }
 }
 
 // Pure date helpers (UTC-anchored to match dayLong/timeFmt). YYYY-MM-DD in/out.
@@ -1974,18 +2490,18 @@ function _datesBetween(start,end){const out=[];if(!start)return out;const s=new 
 RENDER.adminSettings=async function(){
   const s=SETTINGS||await api('/settings');
   paint('adminSettings',`<div class="card">
-    <label>Camp name</label><input class="fld" id="stName" value="${esc(s.campName||'')}">
-    <label>Year</label><input class="fld" id="stYear" type="number" inputmode="numeric" value="${esc(s.year||'')}">
-    <label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" type="date" value="${esc(s.startDate||'')}" onchange="onStartDateChange()">
-    <label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" type="date" value="${esc(s.endDate||'')}" onchange="renderCheckinDaysPreview()">
+    <div class="two-col">
+      <div><label>Camp name</label><input class="fld" id="stName" value="${esc(s.campName||'')}"></div>
+      <div><label>Year</label><input class="fld" id="stYear" type="number" inputmode="numeric" value="${esc(s.year||'')}"></div>
+      <div><label>Start date (YYYY-MM-DD)</label><input class="fld" id="stStart" type="date" value="${esc(s.startDate||'')}" onchange="onStartDateChange()"></div>
+      <div><label>End date (YYYY-MM-DD)</label><input class="fld" id="stEnd" type="date" value="${esc(s.endDate||'')}" onchange="renderCheckinDaysPreview()"></div>
+    </div>
     <label>At-camp check-in days (auto-generated)</label>
     <div id="stDaysPreview" class="sub" style="background:#f5f3ff;border-radius:10px;padding:9px 11px;font-size:.8rem;color:#5b21b6"></div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <div style="flex:1"><label>△ Tent price ($/person)</label><input class="fld" id="stTent" type="number" inputmode="numeric" min="0" value="${esc(s.tentPrice??0)}"></div>
-      <div style="flex:1"><label>⌂ Classroom price ($/person)</label><input class="fld" id="stClass" type="number" inputmode="numeric" min="0" value="${esc(s.classroomPrice??0)}"></div>
-    </div>
+    <!-- PC-4: tent/classroom price fields removed. Registration fees come from the uploaded
+         data (per-registrant Cost), surfaced in Budget — not from settings. -->
     <button class="btn" style="margin-top:12px" onclick="saveSettings()">Save camp settings</button>
-    <p class="note-hint">Setting the start date pre-fills the end date to the 4th day; you can adjust it. Check-in days are generated from the date range automatically — one Morning and one Afternoon session per day.</p></div>`,'Camp settings','Dates &amp; details');
+    <p class="note-hint">Setting the start date pre-fills the end date to the 4th day; you can adjust it. Check-in days are generated from the date range automatically — one Morning and one Afternoon session per day.</p></div>`,'Camp settings','Dates & details');
   renderCheckinDaysPreview();
 };
 function renderCheckinDaysPreview(){
@@ -2003,16 +2519,25 @@ function onStartDateChange(){
 async function saveSettings(){
   try{
     const days=_datesBetween(val('stStart'),val('stEnd'));
-    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days,tentPrice:Number(val('stTent'))||0,classroomPrice:Number(val('stClass'))||0}});
+    // PC-4: tentPrice/classroomPrice no longer sent from the UI (fields removed). The
+    // CampSettings columns remain in the DB (deprecated) but are not surfaced or updated here.
+    // Timezone is intentionally fixed at Australia/Brisbane (owner decision, Phase 6): the camp
+    // is always Brisbane-time, so this re-asserts it on every save (self-healing). There is no
+    // timezone field in the UI by design — if the camp ever moves timezones, this is the one line
+    // a developer changes. Drives compliance-export timestamp localisation (audit-export.service).
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days}});
     SETTINGS=await api('/settings',{noCache:true});SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
-    toast('Settings saved ✓');
+    toast('Settings saved');
   }catch(e){toast(e.message);}
 }
 
 /* ===== ADMIN DATA ===== */
 RENDER.adminData=async function(){
   let exported='Never';
-  try{const s=await api('/settings');if(s&&s.lastExportedAt)exported=dtFmt(s.lastExportedAt);}catch(e){}
+  let pendingTemps=0;
+  // pendingTempPasswordCount is a SAFE count from the public /settings (the plaintext temp
+  // passwords are redacted there — they live only in the admin-authenticated audit export).
+  try{const s=await api('/settings');if(s){if(s.lastExportedAt)exported=dtFmt(s.lastExportedAt);pendingTemps=s.pendingTempPasswordCount||0;}}catch(e){}
   const isAdmin=ACTOR.role==='admin';
   const uploadSection=`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
     <input type="file" id="fileIn" accept=".csv" class="fld">
@@ -2020,27 +2545,33 @@ RENDER.adminData=async function(){
     <p class="note-hint">Matches existing students by name — adds new ones and updates changed fields.</p>
     <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`
     +(CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'');
-  const exportCards=`<div class="card">
+  // R9: surface temp passwords still waiting from a new-year rollover so the admin knows to
+  // download the workbook (which includes them once, then clears them) rather than lose them.
+  const tempBanner=pendingTemps?`<div class="warnbox">${icSm('alert')} ${pendingTemps} restored account${pendingTemps===1?'':'s have'} a temporary password from the last rollover. Download the audit workbook below — its "Temp Passwords" tab lists them (included once, then cleared). Share each securely with its leader.</div>`:'';
+  const complianceCard=`<div class="card">
     <div class="lbl" style="margin-top:0">Compliance Export</div>
     <div class="kv"><span class="k">Last exported</span><span class="v">${esc(exported)}</span></div>
+    ${tempBanner}
     <p class="note-hint" style="text-align:left">Download the full audit workbook (xlsx) or the sign-in/out log (CSV) as standalone files. The xlsx includes: Summary, Attendees, Sign-in/Sign-out Log, Daily Check-in Log, Notes &amp; Testimonies, and Temp Passwords (if applicable).</p>
-    <button class="btn" style="width:100%;margin-top:8px" onclick="downloadAuditExport()">↓ Download audit workbook (.xlsx)</button>
-    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out','sign-in-out-log.csv')">↓ Sign-in/out log (.csv)</button>
-  </div>
-  <div class="card" style="border:1px solid #fbbf24">
+    <button class="btn" style="width:100%;margin-top:8px" onclick="downloadAuditExport()">${icSm('download')} Download audit workbook (.xlsx)</button>
+    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out','sign-in-out-log.csv')">${icSm('download')} Sign-in/out log (.csv)</button>
+  </div>`;
+  const closeOutCard=`<div class="card" style="border:1px solid #fbbf24">
     <div class="lbl" style="margin-top:0;color:#92400e">Close-out camp</div>
     <p class="note-hint" style="text-align:left;color:#92400e">Complete all 3 steps before rolling over to a new year.</p>
     <div id="closeoutSteps"></div>
-    <button class="btn" onclick="go('adminCloseOut')">Start close-out →</button>
+    <button class="btn" onclick="go('adminCloseOut')">Start close-out ${icSm('arrowr')}</button>
   </div>`;
-  paint('adminData',`${exportCards}${uploadSection}${isAdmin?`
-    <div class="card"><div class="h3" style="margin-top:0">New year rollover</div>
-      <button class="btn" onclick="adminSaveDefaults()">Save baseline (incl. devotionals)</button>
-      <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline. Run this once camp is fully configured, before rolling over.</p></div>
-    <div class="card"><div class="h3" style="margin-top:0">Factory reset</div>
+  const saveDefaultsCard=isAdmin?`<div class="card"><div class="h3" style="margin-top:0">Save Defaults</div>
+      <button class="btn" onclick="adminSaveDefaults()">Save Defaults</button>
+      <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline. Run this once camp is fully configured. The end-of-camp purge &amp; restore is the separate <b>Close-Out Camp</b> step below.</p></div>`:'';
+  const factoryResetCard=isAdmin?`<div class="card"><div class="h3" style="margin-top:0">Factory reset</div>
       <button class="btn red" onclick="adminReset()">Full reset (wipe to bare)</button>
-      <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`:''}
-  `,'Data, Reset &amp; Exports','Upload / export / reset');
+      <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`:'';
+  // PC-1: order = 1. Upload, 2. Save Defaults, 3. Compliance Export, 4. Close-Out, 5. Factory Reset.
+  paint('adminData',
+    `${uploadSection}${saveDefaultsCard}${complianceCard}${closeOutCard}${factoryResetCard}`,
+    'Data, Reset & Exports','Upload / export / reset');
 };
 /* Standalone import screen — gives director (who has import:run but not the Admin
    tab) a way to import. Reuses adminUpload()'s #fileIn/#impResult elements. */
@@ -2128,16 +2659,16 @@ async function dataExport(filtered){
 }
 async function adminSaveDefaults(){if(!confirm('Save the current scaffold (churches, accounts, accommodation, FAQ, schedule, devotionals) as the new-year baseline?'))return;
   // Backend returns {ok:true} (no counts).
-  try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved ✓');}catch(e){toast(e.message);}}
+  try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved');}catch(e){toast(e.message);}}
 function adminNewYear(){
   // Route through the guided close-out flow which enforces export + confirmWipe.
   modal(`<h3>New year rollover</h3>
     <p class="sub" style="margin:8px 0 14px">For data safety, rollovers must go through the guided close-out flow in Records &amp; Export. It ensures you download the audit workbook before any data is purged.</p>
-    <button class="btn" onclick="closeModal();go('adminRecords')">Go to Records &amp; Export →</button>
+    <button class="btn" onclick="closeModal();go('adminRecords')">Go to Records &amp; Export ${icSm('arrowr')}</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
 }
 async function adminReset(){
-  if(!confirm('FULL RESET: wipe ALL data and every non-admin account, keeping only this admin account & settings?\n\nThis cannot be undone. You will be signed out immediately.'))return;
+  if(!confirm('FULL RESET — wipe to bare.\n\nThis permanently deletes EVERY church, EVERY login account (except this admin), and ALL registrants, campers, notes, notifications, and the saved setup scaffold (accommodation, FAQ, schedule, devotionals). Only this admin account and the camp settings remain.\n\nThis is NOT the year rollover (that keeps your churches & scaffold). It cannot be undone, and you will be signed out immediately.'))return;
   if(prompt('Type exactly: I understand this cannot be undone')!=='I understand this cannot be undone'){toast('Reset cancelled — confirmation text did not match');return;}
   try{
     await api('/admin/reset',{method:'POST',body:{force:true,confirmWipe:'I understand this cannot be undone'}});
@@ -2146,7 +2677,7 @@ async function adminReset(){
     if(e.message&&e.message.toLowerCase().includes('export')){
       modal(`<h3>Export required first</h3>
         <p class="sub" style="margin:8px 0 14px">No audit export has been run. Download the records first in Records &amp; Export, then retry the reset.</p>
-        <button class="btn" onclick="closeModal();go('adminRecords')">Go to Records &amp; Export →</button>
+        <button class="btn" onclick="closeModal();go('adminRecords')">Go to Records &amp; Export ${icSm('arrowr')}</button>
         <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
     }else{toast(e.message);}
   }
@@ -2182,8 +2713,8 @@ function _renderImportPreview(r){
         <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Username</label><input class="fld" id="pzUser_${i}" value="${esc(autoUser(n))}" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
         <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Password (min 6)</label><input class="fld" id="pzPass_${i}" placeholder="min 6 chars"></div>
       </div></div>`).join('');
-    const btnLabel=`Create ${phantoms.length} church${phantoms.length===1?'':'es'} →`;
-    phantomHtml=`<div class="warnbox">⚠ ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the CSV — set zone, username &amp; password to create them first:</div>
+    const btnLabel=`Create ${phantoms.length} church${phantoms.length===1?'':'es'} ${icSm('arrowr')}`;
+    phantomHtml=`<div class="warnbox">${icSm('alert')} ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the CSV — set zone, username &amp; password to create them first:</div>
       ${rows}
       <button class="btn" style="margin-top:6px" onclick="_createPhantomChurches(${esc(JSON.stringify(phantoms))})">${btnLabel}</button>
       <button class="btn ghost" style="margin-top:6px;margin-left:6px" onclick="_clearImport()">Cancel</button>`;
@@ -2209,7 +2740,7 @@ async function _createPhantomChurches(names){
     try{await api('/accounts/churches',{method:'POST',body:{churchName:name,zone,accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:pass}});}
     catch(e){toast('Failed to create "'+name+'": '+(e.message||'error'));if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
   }
-  toast(names.length+' church'+(names.length===1?'':'es')+' created ✓');
+  toast(names.length+' church'+(names.length===1?'':'es')+' created');
   try{const r=await api('/import/csv',{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:true}});_renderImportPreview(r);}catch(e){toast(e.message);}
 }
 async function _confirmImport(){
@@ -2219,7 +2750,7 @@ async function _confirmImport(){
     _pendingImportCsv=null;
     const box=document.getElementById('impResult');if(box){box.style.display='block';
       box.innerHTML=`<div class="callbox"><b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors</div>`;}
-    toast('Import complete ✓');
+    toast('Import complete');
   }catch(e){toast(e.message);}
 }
 function _clearImport(){_pendingImportCsv=null;const b=document.getElementById('impResult');if(b)b.style.display='none';}
@@ -2237,13 +2768,13 @@ RENDER.adminWizard=async function(){
   const checks=await Promise.all(WIZARD_STEPS.map(s=>Promise.resolve(s.check())));
   const steps=WIZARD_STEPS.map((s,i)=>{const done=!!checks[i];
     return `<div class="row" onclick="go('${s.screen}')" style="cursor:pointer">
-      <div class="av" style="background:${done?'#dcfce7':'#f1f5f9'};color:${done?'#16a34a':'#94a3b8'}">${done?'✓':(i+1)}</div>
+      <div class="av" style="background:${done?'#dcfce7':'#f1f5f9'};color:${done?'#16a34a':'#94a3b8'}">${done?icSm('check'):(i+1)}</div>
       <div style="flex:1"><div class="nm">${esc(s.label)}</div></div>
       <span style="color:#94a3b8">${ic('chevron')}</span></div>`;}).join('');
   const allDone=checks.every(Boolean);
   paint('adminWizard',`<div class="card"><div class="lbl" style="margin-top:0">Setup checklist</div>
     ${steps}
-    ${allDone?'<div class="callbox" style="margin-top:12px">All steps complete ✓ Camp is ready to go.</div>':'<p class="note-hint">Complete each step in order.</p>'}
+    ${allDone?'<div class="callbox" style="margin-top:12px">'+icSm('check')+' All steps complete — camp is ready to go.</div>':'<p class="note-hint">Complete each step in order.</p>'}
     </div>`,'Setup Wizard','Pre-camp checklist');
 };
 
@@ -2263,7 +2794,7 @@ RENDER.adminDevos=async function(){
   }));
   paint('adminDevos',blocks.join(''),'Devotionals','Edit each camp day');
 };
-async function saveDevo(d){try{await api('/devotional',{method:'POST',body:{day:d,verse:val('dv_v_'+d),reference:val('dv_r_'+d),reflection:val('dv_f_'+d),prayer:val('dv_p_'+d)}});toast('Saved ✓');}catch(e){toast(e.message);}}
+async function saveDevo(d){try{await api('/devotional',{method:'POST',body:{day:d,verse:val('dv_v_'+d),reference:val('dv_r_'+d),reflection:val('dv_f_'+d),prayer:val('dv_p_'+d)}});toast('Saved');}catch(e){toast(e.message);}}
 
 /* ===== ADMIN SCHEDULE ===== */
 // One editable table row (Time + Activity). Index r keeps input ids unique per day.
@@ -2300,7 +2831,7 @@ async function saveSchedDay(d){
     const existing=await api('/schedule?day='+d,{noCache:true}).catch(()=>[]);
     for(const it of (existing||[])){await api('/schedule/'+it.id,{method:'DELETE'});}
     for(const e of entries){await api('/schedule',{method:'POST',body:{day:d,startTime:e.startTime,title:e.title,type:'activity'}});}
-    toast('Saved '+dayLong(d)+' ✓');await _rSched();
+    toast('Saved '+dayLong(d)+'');await _rSched();
   }catch(e){toast(e.message);await _rSched();}
 }
 
@@ -2335,7 +2866,7 @@ RENDER.adminContacts=async function(){
 };
 function toggleContactCard(id){const b=document.getElementById('contactBody_'+id),ch=document.getElementById('contactChev_'+id);if(!b)return;const open=b.style.display!=='none';b.style.display=open?'none':'block';if(ch)ch.style.transform=open?'':'rotate(90deg)';}
 async function saveContacts(id){const C=(n,p)=>({name:val(n),phone:val(p)});
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved ✓');await _rContacts();}catch(e){toast(e.message);}}
+  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{contacts:{male:{primary:C('mp_n_'+id,'mp_p_'+id),backup:C('mb_n_'+id,'mb_p_'+id)},female:{primary:C('fp_n_'+id,'fp_p_'+id),backup:C('fb_n_'+id,'fb_p_'+id)}}}});toast('Contacts saved');await _rContacts();}catch(e){toast(e.message);}}
 
 async function _tryRestoreSession(){
   const tok=localStorage.getItem('ycp_token');const actorJson=localStorage.getItem('ycp_actor');
@@ -2360,6 +2891,17 @@ document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='E
 document.getElementById('username').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show'))closeModal();});
 _initDemoLogin();_tryRestoreSession();
+
+/* B-3: cross-tab + on-focus mode sync. A second tab (or a tab not on Home) used to keep stale
+   pre-camp/at-camp nav after an admin switched mode until the user navigated Home. */
+window.addEventListener('storage',e=>{
+  if(e.key==='ycp_campmode'&&e.newValue)_applyModeChange(e.newValue);
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!ACTOR||PREVIEW_MODE)return;
+  // A backgrounded tab may have missed the storage event — re-check the authoritative mode.
+  api('/settings').then(s=>{if(s&&s.campMode)_applyModeChange(s.campMode);}).catch(()=>{});
+});
 
 /* PWA: register the service worker (network-first HTML shell, network-only API,
    cache-first assets). On a new SW taking control after a deploy, reload once so

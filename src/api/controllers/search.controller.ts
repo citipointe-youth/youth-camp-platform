@@ -15,6 +15,13 @@ export function makeSearchController(services: SearchControllerServices) {
       return services.search.search(req.ctx.actor, q);
     },
 
+    async resolveContacts(req: HttpRequest) {
+      if (!req.ctx) throw new UnauthorizedError();
+      const camperId = req.params['camperId'];
+      if (!camperId) throw new BadRequestError('Missing camperId');
+      return services.search.resolveContacts(req.ctx.actor, camperId);
+    },
+
     async revealContact(req: HttpRequest) {
       if (!req.ctx) throw new UnauthorizedError();
       const camperId = req.params['camperId'];

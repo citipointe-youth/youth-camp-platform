@@ -6,7 +6,7 @@ import type {
 import type { CampSettings } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
 import { daysUntil, zonedNow } from '../utils/date';
-import { buildSessions } from './checkin-sessions';
+import { buildSessions, currentSession as pickCurrentSession } from './checkin-sessions';
 import { isRegistrant, isCamper } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
 
@@ -19,7 +19,8 @@ export interface PreCampDashboard {
   totalRegistrants: number;
   totalCampers: number;
   totalLeaders: number;
-  unpaidCount: number;
+  // PC-3: "unpaid" is not an app concept. All uploaded registrations are confirmed;
+  // payment is surfaced only in Budget. No unpaid count on the home DTO.
   noBlueCardCount: number;
   accommodationSummary: Array<{
     kind: string;
@@ -31,7 +32,6 @@ export interface PreCampDashboard {
     churchName: string;
     zone: string;
     registrants: number;
-    unpaid: number;
     noBlueCard: number;
   }>;
 }
@@ -71,7 +71,6 @@ export function makeDashboardService(
           return p.churchId === actor.churchId;
         });
 
-        const unpaidCount = scoped.filter((p) => p.paymentStatus === 'unpaid').length;
         const noBlueCardCount = scoped.filter((p) => p.kind === 'leader' && p.blueCardNumber == null).length;
 
         // Head counts by accommodation kind (blocks removed; capacity is no longer
@@ -92,7 +91,6 @@ export function makeDashboardService(
           totalRegistrants: scoped.length,
           totalCampers: scoped.filter((p) => p.kind === 'youth').length,
           totalLeaders: scoped.filter((p) => p.kind === 'leader').length,
-          unpaidCount,
           noBlueCardCount,
           accommodationSummary,
         };
@@ -106,7 +104,6 @@ export function makeDashboardService(
               churchName: ch.name,
               zone: ch.zone,
               registrants: churchRegs.length,
-              unpaid: churchRegs.filter((p) => p.paymentStatus === 'unpaid').length,
               noBlueCard: churchRegs.filter((p) => p.kind === 'leader' && p.blueCardNumber == null).length,
             };
           });
@@ -128,11 +125,20 @@ export function makeDashboardService(
         // Check-in sessions are derived from the camp's check-in days (settings), not
         // the schedule — two per day (AM/PM). B3 FIX: today + now from the camp tz.
         const { date: todayStr, time: nowTime } = zonedNow(settings.timezone || 'Australia/Brisbane');
-        const todaySessions = buildSessions(settings.checkInDays ?? []).filter((s) => s.day === todayStr);
-        // Current session = the LAST session today that has already started (matches
-        // checkin.service). Null before the morning session begins.
-        const currentSession = [...todaySessions].reverse().find((s) => s.startTime <= nowTime) ?? null;
-        const nextSession = todaySessions.find((s) => s.startTime > nowTime) ?? null;
+        const days = settings.checkInDays ?? [];
+        const todaySessions = buildSessions(days).filter((s) => s.day === todayStr);
+        // H-2 FIX: use the SHARED currentSession helper (AM before 12:00 / PM at-or-after),
+        // exactly as checkin.service does — the bespoke `startTime <= now` calc here used the
+        // PM startTime (13:00) and so disagreed with check-in for the whole 12:00–13:00 window
+        // (dashboard counted "due" against AM while a leader tapping Check-in landed on PM).
+        const current = pickCurrentSession(days, todayStr, nowTime);
+        // Only treat it as today's current session if it actually falls today (the helper can
+        // fall back to a past/future session when there are none today — the dashboard shows
+        // no current/next session in that case, matching the prior null behaviour).
+        const currentSession = current && current.day === todayStr ? current : null;
+        // Next = the session after the current one in today's ordering (AM → PM; nothing after PM).
+        const curIdx = currentSession ? todaySessions.findIndex((s) => s.id === currentSession.id) : -1;
+        const nextSession = curIdx >= 0 ? todaySessions[curIdx + 1] ?? null : (todaySessions[0] ?? null);
 
         const notifications = await notifRepo.findActive();
         const relevantNotifs = notifications.filter((n) => {

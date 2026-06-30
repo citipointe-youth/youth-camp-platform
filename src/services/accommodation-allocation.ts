@@ -7,14 +7,29 @@ export interface AllocationOccupant {
   kind: string;                   // 'youth' | 'leader'
   accommodationKind?: string | null; // 'tent' | 'classroom' | null
   lifecycle?: string | null;      // 'cancelled' excluded
+  grade?: number | null;          // PC-10: school grade (7..12), null for leaders
 }
 
+/** PC-10: school-grade bracket for the large-pool split. */
+export type GradeBracket = '7-9' | '10-12';
+
 export interface AllocationGroup {
-  key: string;        // `${churchId}|${gender}`
+  key: string;        // `${churchId}|${gender}` or, when split, `${churchId}|${gender}|${bracket}`
   churchId: string;
   church: string;
   gender: AllocationGender;
   n: number;
+  bracket?: GradeBracket;  // present only on split sub-pools (PC-10)
+}
+
+// PC-10: a church×gender classroom pool larger than this splits into 7-9 / 10-12 sub-pools.
+export const SPLIT_THRESHOLD = 50;
+
+export function bracketOfGrade(grade: number | null | undefined): GradeBracket | null {
+  if (grade == null) return null;
+  if (grade >= 7 && grade <= 9) return '7-9';
+  if (grade >= 10 && grade <= 12) return '10-12';
+  return null;
 }
 
 export interface ClassroomLike { id: string; name: string; capacity: number }
@@ -24,10 +39,21 @@ export type AllocationMap = Record<string, AllocEntry[]>;
 export const ELIGIBLE_RATIO = 0.75;
 export const TENT_SIZE = 7;
 
+// Per church×gender classroom tally, broken down by grade bracket + leader count, so a
+// pool over SPLIT_THRESHOLD can be split into 7-9 / 10-12 sub-pools (PC-10).
+interface GenderTally {
+  cls: number;          // total classroom-kind people of this gender (youth + leaders)
+  youth79: number;      // classroom youth in grades 7-9
+  youth1012: number;    // classroom youth in grades 10-12
+  youthOther: number;   // classroom youth with no/unknown grade (kept with 7-9 when splitting)
+  leaders: number;      // classroom leaders (no grade)
+}
 interface ChurchTally {
   id: string; name: string; total: number; classroom: number;
-  maleCls: number; femaleCls: number;
+  male: GenderTally; female: GenderTally;
 }
+
+function newGender(): GenderTally { return { cls: 0, youth79: 0, youth1012: 0, youthOther: 0, leaders: 0 }; }
 
 function tallyChurches(occupants: readonly AllocationOccupant[]): Map<string, ChurchTally> {
   const by = new Map<string, ChurchTally>();
@@ -35,16 +61,46 @@ function tallyChurches(occupants: readonly AllocationOccupant[]): Map<string, Ch
     if (o.lifecycle === 'cancelled') continue;
     let c = by.get(o.churchId);
     if (!c) {
-      c = { id: o.churchId, name: o.churchName, total: 0, classroom: 0, maleCls: 0, femaleCls: 0 };
+      c = { id: o.churchId, name: o.churchName, total: 0, classroom: 0, male: newGender(), female: newGender() };
       by.set(o.churchId, c);
     }
     c.total++;
     if (o.accommodationKind === 'classroom') {
       c.classroom++;
-      if (o.gender === 'male') c.maleCls++; else c.femaleCls++;
+      const g = o.gender === 'male' ? c.male : c.female;
+      g.cls++;
+      if (o.kind === 'leader') g.leaders++;
+      else {
+        const b = bracketOfGrade(o.grade);
+        if (b === '7-9') g.youth79++;
+        else if (b === '10-12') g.youth1012++;
+        else g.youthOther++;
+      }
     }
   }
   return by;
+}
+
+// Build the group(s) for one church×gender classroom pool. A pool with >SPLIT_THRESHOLD
+// people splits into two grade-bracket sub-pools (7-9 / 10-12); that gender's leaders divide
+// evenly across the two (odd leader → the extra goes to 7-9). Youth with no/unknown grade ride
+// with the 7-9 bracket. A pool at or below the threshold stays one group with the original key.
+function groupsForGender(
+  c: ChurchTally, gender: AllocationGender, g: GenderTally,
+): AllocationGroup[] {
+  if (g.cls === 0) return [];
+  const base = { churchId: c.id, church: c.name, gender };
+  if (g.cls <= SPLIT_THRESHOLD) {
+    return [{ key: `${c.id}|${gender}`, ...base, n: g.cls }];
+  }
+  const ld79 = Math.ceil(g.leaders / 2);   // odd leader → 7-9
+  const ld1012 = g.leaders - ld79;
+  const n79 = g.youth79 + g.youthOther + ld79;
+  const n1012 = g.youth1012 + ld1012;
+  const out: AllocationGroup[] = [];
+  if (n79 > 0) out.push({ key: `${c.id}|${gender}|7-9`, ...base, n: n79, bracket: '7-9' });
+  if (n1012 > 0) out.push({ key: `${c.id}|${gender}|10-12`, ...base, n: n1012, bracket: '10-12' });
+  return out;
 }
 
 export function computeGroups(occupants: readonly AllocationOccupant[]): AllocationGroup[] {
@@ -52,8 +108,8 @@ export function computeGroups(occupants: readonly AllocationOccupant[]): Allocat
   for (const c of tallyChurches(occupants).values()) {
     const eligible = c.total > 0 && c.classroom / c.total >= ELIGIBLE_RATIO;
     if (!eligible) continue;
-    if (c.maleCls > 0) groups.push({ key: `${c.id}|male`, churchId: c.id, church: c.name, gender: 'male', n: c.maleCls });
-    if (c.femaleCls > 0) groups.push({ key: `${c.id}|female`, churchId: c.id, church: c.name, gender: 'female', n: c.femaleCls });
+    groups.push(...groupsForGender(c, 'male', c.male));
+    groups.push(...groupsForGender(c, 'female', c.female));
   }
   return groups;
 }

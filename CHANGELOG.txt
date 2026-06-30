@@ -1,6 +1,380 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-06-30 — IMPROVEMENT INITIATIVE PHASE 6 (year-to-year reusability review; NOT YET DEPLOYED)
+----------------------------------------------------------------------------------------------
+A feature-by-feature assessment of whether a non-coder admin can reuse the app for next year's camp
+through the UI alone (no code / schema / backend changes). Deliverable:
+docs/PHASE-6-REUSABILITY-REVIEW.md (feature table + verdicts + a plain-English "New Camp Year"
+runbook + a resolved-findings list). Posture: fix clear low-risk issues here, surface design-level
+choices to the owner. The owner then made the calls below, and they're now reflected in code+docs.
+*** Verified by reasoning + node --check on the SPA <script> (Node under the Playwright driver):
+PARSE OK, backticks even = 598. No .ts files changed, so tsc --noEmit + vitest are unaffected (still
+gated in DEPLOY-CHECKLIST §0). CommonJS tsconfig + anchored /data/ gitignore untouched. Migrations
+unchanged (next free number still 014). Nothing pushed/deployed. ***
+
+VERDICT: reusable year-to-year through the UI. The config a non-coder touches each year — dates,
+churches, accounts, accommodation rooms, costs (CSV Cost column), discount codes (CSV Code column),
+FAQ, schedule, devotionals, ministry contacts — is all in-app editable; campers are a pure CSV
+re-import. After the owner decisions below, every functional area is "reusable through the UI"; the
+only things that ever need a developer are two deliberate fixed constraints (timezone relocation, a
+new zone name), neither a per-year task.
+
+  * FIX 1 (correctness/reuse) — stale SPA zone list. public/index.html ZONES was still
+    ['Yellow','Blue','Green','Red'] — pre-migration-011, which renamed the 'Green' zone to 'Black'.
+    The director's "send a zone notice" composer is the only consumer of ZONES, so a director could
+    NOT target the live 'Black' zone and selecting 'Green' sent a notice no church/leader could ever
+    receive. Corrected to ['Yellow','Blue','Black','Red'] (matches backend ZONE_NAMES + the accounts
+    screen's ZONE_OPTS). Also collapsed the duplicate ZONE_OPTS to reference the single ZONES const so
+    the two lists can't drift apart again. (sw.js cache bumped camp-v6 -> camp-v7 so the new SPA ships.)
+    NOTE: this is a live PROD defect, not just a reuse nit — Phase 7 should prioritise shipping it.
+  * FIX 2 (S1, reusability guard) — New Year rollover now guards against a missing baseline. newYear
+    throws "No defaults snapshot saved…" if Save Defaults was never run; this was previously only a
+    bare toast buried in the close-out flow. Now doNewYear()'s catch detects that error and shows an
+    actionable "Save your setup first" modal that routes to the Data screen (mirrors adminReset's
+    export-required modal), and the Close-Out checklist opens with a reminder to run Save Defaults
+    first. NOTHING IS PURGED on this path (the snapshot check runs before any delete). SPA-only.
+
+  OWNER DECISIONS (2026-06-30) — design-level gaps resolved, now CLOSED (not carried forward):
+    - Z1 (zones): KEEP the four zones (Yellow/Blue/Black/Red) FIXED — documented as a platform
+      constraint in the review. No code change; admin-managed zones deliberately NOT built. A
+      different/extra zone would need a developer (enum + migration), which is accepted.
+    - T1 (timezone): camp is ALWAYS Australia/Brisbane — fixed by design, no in-app field. The draft
+      "clobber fix" (preserve a stored timezone on save) was REVERTED: under a fixed-Brisbane
+      invariant, re-asserting timezone:'Australia/Brisbane' on every save is correct and self-healing.
+      saveSettings() is therefore UNCHANGED from before this phase (a clarifying comment was added).
+    - seed.ts demo data (post-Factory-Reset fallback) and the import phantom-church Yellow default:
+      reviewed, acceptable, documented, no change.
+
+2026-06-30 — IMPROVEMENT INITIATIVE PHASE 5 (six-hats whole-program review; NOT YET DEPLOYED)
+---------------------------------------------------------------------------------------------
+A de-Bono six-thinking-hats executive review of the WHOLE program (Phases 1–4), re-run per role
+(admin / director / church / zoneLeader / first-aid). Deliverable: docs/PHASE-5-SIXHATS-REVIEW.md.
+Posture: fix clear low-risk issues here, report the rest for the owner. *** Verified by reasoning +
+node --experimental-strip-types --check on every changed .ts (Node v24 under the Playwright driver) —
+all clean. Full tsc --noEmit + vitest still gated in DEPLOY-CHECKLIST §0 (no project node_modules in
+the authoring env). CommonJS tsconfig + anchored /data/ gitignore untouched. Nothing pushed/deployed. ***
+
+REMEDIATION SUB-PHASE (2026-06-30) — owner reviewed the six-hats findings and chose what to build now
+(decisions locked in PHASE-5-SIXHATS-REVIEW.md); design in docs/PHASE-5-REMEDIATION-DESIGN.md, ordered
+steps in docs/PHASE-5-REMEDIATION-PLAN.md. SPA <script> re-parsed clean via node --check (backticks
+even = 594); sw.js cache bumped camp-v5 -> camp-v6 so the new SPA ships.
+
+  * B-2 (Medium, security) — SESSION_SECRET fail-fast. New exported assertSessionSecret() in
+    auth.service.ts throws when NODE_ENV=production and the secret is unset/equals the in-source
+    fallback; called from createAppInstance() (src/app.ts) — the single path both src/index.ts and
+    api/index.ts use — so a misconfigured prod deploy refuses to start instead of serving forgeable
+    tokens. No-op outside prod / when a real secret is set (a correct deploy is unaffected). New
+    auth.service.test.ts cases (prod+unset throws / prod+fallback throws / prod+real ok / non-prod ok).
+  * B-1 (High, data-trust) — check-in unsynced/failed BANNER (owner chose "banner only", keeping the
+    current drop-on-error + no-persistence behaviour). drainQueue() now increments _checkinFailed when
+    an online error drops an entry; RENDER.checkin shows an amber "N syncing…" or a red, tappable
+    "N didn't save — tap to retry" banner (.ci-sync* CSS, token colours). Retry re-runs the drain and
+    prompts a re-tap of red rows — it does NOT silently reconstruct lost taps. *** RESIDUAL RISK
+    ACCEPTED: a tab close mid-drain still loses pending entries, and a hard-dropped 4xx is still lost;
+    the banner makes both VISIBLE but does not prevent them. Full durability (localStorage queue +
+    retry) is a documented later-phase follow-up. ***
+  * B-3 (Medium, UX) — cross-tab + on-focus mode sync. RENDER.home publishes the authoritative campMode
+    to localStorage('ycp_campmode'); a BOOT 'storage' listener + a 'visibilitychange' re-check apply a
+    mode change in other/backgrounded tabs via _applyModeChange() (updates CAMP_MODE, rebuilds tabs,
+    re-homes if the current screen is gone in the new mode). PREVIEW_MODE guarded throughout (a
+    previewing user is never snapped out).
+  * B-4 (Medium, perf) — narrowed _invalidate(): /import no longer Cache.clear()s everything (drops only
+    /home,/registrants,/campers,/accommodation,/checkin); /settings drops /settings,/checkin (NOT
+    /schedule — de-linked); /schedule drops only /schedule (NOT /checkin). /home still always clears, so
+    correctness holds.
+  * M-1 (visual) — .iconbtn consolidated to ONE rule (was a contradictory min-44 vs width-32 pair):
+    32x32 visual chrome with a ≥44px hit area via a transparent ::before.
+  * M-2 (visual) — type floor: --t-micro .58rem -> .7rem (≈9.3 -> 11.2px @16px root, clears the ~11px
+    legibility floor); --t-2xs .66 -> .68rem.
+  * M-3 (visual) — tokenised 12 solid-fill #ede9fe -> var(--chip) (.tab.on, .seg, .bar7, .pill.info,
+    .av, .ntag, .notice:active, .wide-nav-item:hover, accbadge/lead-tag). Token definitions untouched.
+  * L-1 (cleanup) — deleted the 9 genuinely-unused tokens (--s1/--s5/--s6/--s7, --r-lg, --shadow,
+    --amber, --green, --ok). Kept the now-used ones (--s2/3/4, --r-sm, --r, --shadow-sm, --tint-2) —
+    the Phase-3 dead-list had drifted. Verified zero var() references before deleting.
+  * Reset copy (Low) — adminReset() confirmation now spells out scope (every church, every account
+    except admin, all registrants/notes/scaffold) and contrasts it with the year rollover. Typed-gate
+    + force/confirmWipe backend contract unchanged (copy only).
+
+  Deferred (documented): B-1 full durability; L-3 .statband column step.
+
+KNOWN-RISK CLEARANCE (2026-06-30) — R8 + R9 (NOT YET DEPLOYED, ships with the initiative):
+  * R8 (accommodation reservations vs availability) — SUPERSEDED / MOOT. The model it concerned
+    (AccommodationBlock + per-church reservations + accommodation-occupancy.ts) was removed in the
+    2026-06-27 rework (migration 004). Nothing to change; recorded so it isn't re-opened.
+  * R9 (new-year restores accounts password-less) — RESOLVED. The temp-password generator was already
+    built (accounts CAN log in); this session fixed the residual gaps found while verifying it:
+    - *** SECURITY: GET /settings is PUBLIC and was leaking settings.lastTempPasswords (plaintext
+      rollover passwords) to ANY unauthenticated caller between rollover and the next export.
+      settings.controller.get() now STRIPS the array and exposes only pendingTempPasswordCount.
+      NEW src/api/controllers/settings.controller.test.ts pins the redaction. ***
+    - SPA rollover modal copy corrected (it falsely claimed the temps were in the already-downloaded
+      Step-1 workbook — that workbook predates the passwords). Now: shown here + retained for the
+      NEXT export, copy now & share securely.
+    - Admin -> Data shows a "N temp passwords pending" banner (from the safe count) so they aren't
+      silently consumed by the next export.
+    - SECURITY-ACTIONS.md §6 runbook rewritten (was stale: "restored accounts have no password").
+    Files: src/api/controllers/settings.controller.ts (+ .test.ts NEW), public/index.html (rollover
+    modal + adminData banner), SECURITY-ACTIONS.md. Verified: changed .ts parse-clean
+    (node --experimental-strip-types --check); SPA <script> clean (node --check, backticks even=596).
+    No migration; no new dependency. Backend behaviour of newYear/audit-export unchanged (only the
+    PUBLIC /settings projection is narrowed). Nothing pushed/deployed.
+
+FIXED — C-1 (Critical, the pinned pre-deploy gate): PC-10 split-pool allocations could not be persisted.
+A church×gender classroom pool >50 splits into 7-9 / 10-12 sub-pools with a 3-part group key
+(churchId|gender|bracket); setAllocations dropped the bracket on save and RoomAllocation had no bracket
+column, so split allocations silently vanished on reload and never decremented availability.
+  * supabase/migrations/013_allocation_bracket.sql (NEW) — `alter table classroom_allocations add
+    column if not exists bracket text;` (idempotent, backward-compatible; existing rows = null = the
+    old 2-part key). Migration 013 — the number reserved for this since Phase 3.
+  * src/core/entities/accommodation.ts — new AllocationBracket type; RoomAllocation.bracket?:
+    AllocationBracket | null.
+  * src/services/accommodation.service.ts — setAllocations now parses ALL key parts and saves
+    bracket ?? null; rowsToMap rebuilds the 3-part key when a bracket is present (else 2-part).
+  * src/repositories/supabase/supabase.allocation.ts — toAlloc/cols/UPDATE_COLS carry `bracket`.
+  * src/services/accommodation.characterisation.test.ts — NEW round-trip test (H-1): a 60-person
+    single-gender pool splits, allocate the c1|male|7-9 sub-pool, save, reload, assert the 3-part key
+    survives. This is the integration gap that hid C-1.
+
+FIXED — H-2 (High): dashboard vs check-in disagreed on the "current session" for the 12:00–13:00
+window. dashboard.service reimplemented the calc as `startTime <= now` (PM startTime = 13:00) so it
+returned AM at 12:30, while checkin.service used the shared currentSession helper (PM_FROM = 12:00,
+returns PM). For that hour the at-camp dashboard counted "checkInsDue" against the AM roster while a
+leader tapping Check-in landed on PM; it also contradicted CLAUDE.md + the inline comment.
+  * src/services/dashboard.service.ts — now imports + uses the shared currentSession helper (today-only
+    guard preserved; nextSession derived by position in today's session list).
+  * src/services/dashboard.service.test.ts — NEW 12:30 test asserts currentSession === PM (the
+    previously-divergent window) and nextSession === null. Existing 10:00 / 15:00 tests still hold.
+
+FIXED — env hygiene (Low): src/config/env.ts defined a JWT_SECRET key that was NEVER read anywhere —
+session signing uses SESSION_SECRET (read directly in auth.service.ts). Setting JWT_SECRET in a
+deployment gave a false sense of having secured sessions. Removed the dead key; left a comment pointing
+to SESSION_SECRET.
+
+REPORTED (left open for owner — see docs/PHASE-5-SIXHATS-REVIEW.md): SESSION_SECRET falls back to an
+insecure constant in production with only a console warning (recommend fail-fast); optimistic check-in
+queue hard-drops on any online error (4xx) with only a red dot — no retry/alert/persistence, and the
+queue is lost on tab close; multi-tab mode-switch desync; over-broad client-cache invalidation; the
+Medium visual items (M-1 44px / M-2 11px floor / M-3 token discipline) and L-1 dead tokens carried from
+Phase 3. None are deploy-blocking once C-1/H-2 are verified green on the real toolchain.
+
+2026-06-29 — IMPROVEMENT INITIATIVE PHASE 4 (first-aid login UX; NOT YET DEPLOYED)
+---------------------------------------------------------------------------------
+Executive UX review + rebuild of the first-aid login so it is genuinely effective for a first-aider
+on shift: find a student's details fast, and make a quick log of any action taken. Deliverables:
+docs/PHASE-4-FIRSTAID-UX.md (review, two rounds of owner feedback folded in) and the working-root
+mock ui-mocks-firstaid.html. *** Verified by reasoning + a REAL parser: node --check (Node v24 found
+under the Playwright driver) confirms the SPA <script> is syntactically clean; backend TS
+parse-checked via node --experimental-strip-types. Full tsc --noEmit + vitest still gated in
+DEPLOY-CHECKLIST §0 (no project toolchain/node_modules in the authoring env). CommonJS tsconfig +
+anchored /data/ gitignore untouched. NO migration. Nothing pushed/deployed. ***
+
+RBAC (src/services/access-control.ts) — new, additive capabilities:
+  * note:write:firstaid — granted to firstAid + director + admin. note.service.add asserts it ONLY
+    when category==='firstaid' (else the general note:write). Net effect: a first-aider can create
+    ONLY first-aid records, never testimonies/general notes; church/zoneLeader keep general note:write
+    as before but do NOT get firstaid-write (church is read-only on first-aid).
+  * note:read:firstaid — granted to firstAid + zoneLeader + director + admin + CHURCH. Backs the new
+    GET /notes/firstaid, which returns ONLY category==='firstaid' notes, scoped by canAccessPerson
+    (firstAid/director/admin -> all, zoneLeader -> zone, church -> own church). Never leaks
+    testimonies/general notes. firstAid still does NOT get general note:read.
+
+Backend:
+  * src/services/note.service.ts — category-scoped add() authorization; a first-aid record now
+    REQUIRES a camperId (BadRequestError otherwise). New recentFirstAid(actor, limit) read method.
+  * src/api/controllers/note.controller.ts — recentFirstAid handler. New route GET /notes/firstaid.
+  * src/api/controllers/search.controller.ts — resolveContacts handler (exposes the pre-existing
+    search.service.resolveContacts). New route GET /search/contacts/:camperId — masked ministry-leader
+    contacts for the Student Info "reach the leader" card (reuses camper:read:sensitive; no new perm).
+
+SPA (public/index.html):
+  * Nav: navModel('firstAid') is now Search . Records . Schedule (3 tabs). Medical Watch REMOVED
+    (owner) — no Watch tab, no watch shortcut, no /campers/medical call on the first-aid path. gotoTab
+    redirects home->search for firstAid (its landing is Search); RENDER.home self-redirects too.
+  * "Casualty Card" renamed "Student Info" and re-ranked: identity -> medical alert -> consent ->
+    LEADER contacts (primary + secondary, the focus) -> Medicare -> dietary -> Log action -> recent
+    logs -> parent (bottom). Allergy-type dietary items are merged into the medical alert so an
+    allergen can't hide in a separate "dietary" card (the safety fix).
+  * Tone softened (owner): the alert + consent boxes use calm amber/tint surfaces, not intense
+    red/green. Light-grey secondary text darkened for legibility (new --ink-2 token). All first-aid
+    hardcoded hex tokenised (advances C1/C3 for these screens).
+  * Leader call buttons: clear background, black text, bordered (icon is the affordance); buttons show
+    just the number (no "Call NAME" prefix); the secondary number is shown (no "tap to reveal").
+  * New "Log action" form: What happened? / What treatment was given? / First-aider (required, named
+    explicitly since the station likely shares one login) / Leader who brought them (optional). Saved
+    as StudentNote{category:'firstaid'} with a 4-line body; account id + time stamped server-side.
+    On phone the two people-fields stack; side-by-side at >=540px.
+  * New Records tab (RENDER.records) — the first-aider's logged actions, newest first, Today/All +
+    per-student filter, empty state via emptyState().
+  * Admin/zoneLeader Testimonies & Student Notes: the Record filter gains a "First-aid" option (amber
+    pill); drawNotes renders the Problem/Treatment lines distinctly. The existing notes CSV export
+    already carries category + body, so first-aid records appear in it automatically.
+  * Fixed a stray '}' that crept into drawNotes during the filter edit (caught by node --check).
+
+
+------------------------------------------------------------------------------------------------
+Independent senior-engineer review of the Phase 1-2 code (deliverable: docs/PHASE-3-REVIEW.md).
+Posture: fix clear low-risk issues in place, report the rest. *** No npm/tsc/vitest toolchain in
+the authoring env — verified by reasoning + reading the existing vitest suites + a backtick/brace
+scan (index.html <script> backticks still even = 560). typecheck/vitest remain gated in
+DEPLOY-CHECKLIST.md §0. CommonJS tsconfig + anchored /data/ gitignore untouched. Nothing pushed. ***
+
+Fixed this phase (all in public/index.html; CSS/HTML-template only, no .ts changed):
+  * C1 EMOJI-SWEEP MISS (NEW, missed by the earlier sweep + the Phase-1/2 "zero emoji" claim):
+    two user-facing full-width PLUS characters (U+FF0B "＋") remained.
+      - Daily check-in roster "add note" button (~L1194): replaced "＋" with ${icSm('plus')} +
+        aria-label="Add note" (the 'plus' glyph already existed in ICONS; this call site was
+        simply missed). Now matches the icon-only-button convention (icSm + aria-label).
+      - Accommodation room "+ Add ministry…" <select> option (~L1575): an SVG can't render inside
+        an <option>, so the full-width "＋" became a plain ASCII "+".
+    grep now confirms ZERO U+FF0B and zero emoji/pictograph/full-width symbols in index.html
+    (the remaining non-ASCII are intentional typographic – — … · › × ↗ arrows the owner kept).
+  * L-2 FAQ EDIT DID NOT RE-RENDER (parity fix): saveFaqPre/saveFaqAt toasted "Saved" but, unlike
+    add/delete (which call _rFaq/_rFaqEdit), never repainted the list, so an edited question only
+    showed after a manual refresh. Added the matching reloader (await _rFaq() / _rFaqEdit()) after
+    the save. No focus-disruption risk: post-Save focus is on the (repainted-away) Save button,
+    identical to the existing add/delete handlers.
+
+Reported, NOT fixed (queued for the owner / a later phase — see PHASE-3-REVIEW.md):
+  * [HIGH, NEW — missed by the prior review] dashboard.service.ts:131 reimplements "current
+    session" as `startTime <= nowTime` (PM becomes current at its 13:00 startTime) while
+    checkin.service.getCurrentSession() uses the shared currentSession() helper (PM becomes current
+    at PM_FROM = 12:00). In the 12:00-13:00 window the two DISAGREE: the at-camp dashboard shows AM
+    (and computes checkInsDue against AM) while the check-in screen lands the leader on PM. This
+    also contradicts CLAUDE.md, which states both services use the shared helper. The dashboard
+    tests only pin 10:00 / 15:00, so the divergent window is untested. Recommended fix: replace the
+    bespoke line with the shared pickCurrentSession(days, todayStr, nowTime) (+ a 12:30 test).
+    Left for owner: changes a documented behaviour (the no-session-before-AM semantics + nextSession
+    derivation) and is unverifiable here without vitest.
+  * [CRITICAL, confirmed] C-1 PC-10 split allocations are not persisted — accommodation.service.ts
+    setAllocations (L127) destructures only [churchId, gender] from the 3-part split key
+    `churchId|gender|bracket`, and RoomAllocation/the classroom_allocations table have no bracket
+    column, so split-pool allocations vanish on reload. The SPA sends the full 3-part key correctly;
+    the loss is purely backend. Needs migration 013 (next free number; table is classroom_allocations,
+    NOT room_allocations) + RoomAllocation.bracket + repo mappings + a 3-part round-trip test. Owned
+    by Phase 5; hard pre-Phase-7-deploy gate. (H-1 = the test gap that hid it; fix together.)
+  * Medium/Low visual + cleanup items (M-1 44px targets, M-2 11px floor, M-3 hardcoded hex, L-1 dead
+    tokens, L-3 .statband) carried unchanged from the earlier review — visual, eyeball on-device.
+
+2026-06-29 — IMPROVEMENT INITIATIVE PHASE 2 (UI showcase + owner-feedback pass; NOT YET DEPLOYED)
+-------------------------------------------------------------------------------------------------
+Built a rich owner-facing UI showcase (working-root ui-mocks.html) emphasising dynamic/
+responsive resizing — a live width-slider/iframe demo driving the REAL Phase-1 breakpoints,
+plus a same-screen-at-360/768/1280 side-by-side comparator. Faithfulness fixes brought the
+older static mock screens in line with what Phase 1 actually shipped (emoji->SVG in the admin
+wide-layout, removed the "unpaid" pill (PC-3) and at-camp FAQ tile (PC-7)). Then implemented
+the owner's feedback into the real app. *** No npm/tsc/vitest toolchain in the authoring env;
+no .ts files were changed this round (CSS + HTML template strings only), so typecheck/vitest
+are unaffected — verified by structural checks. EYEBALL the white header + wide layout on-device. ***
+
+Real-app changes (public/index.html):
+  * Header is now WHITE at EVERY width (owner: match the web/desktop header on phone too). Base
+    .bar was a violet->navy gradient on phone/tablet and only turned white at >=980px; it's now
+    white + dark text + hairline border everywhere. role-badge/sign-out/back-button restyled to
+    read on white; mode/day badges keep their coloured fills. Purple identity stays in hero cards.
+  * A6 wide two-column/table layout at >=980px (owner-approved). New .wide-cards utility: single
+    column <980px (unchanged), 2 columns >=980, 3 columns >=1280. Applied to the My Youth roster
+    (#plist) and Budget collapsed church rows; an EXPANDED Budget church spans full width. Roster
+    stats snapshot stays full-width on top (owner decision). Phone/tablet byte-for-byte unchanged.
+  * Wired the previously-dead .two-col rule into the Settings form (field pairs two-up on laptop).
+  * No logic/data/fetch changes; B6 "no double fetch" invariant re-verified (RENDER.people still
+    fetches /registrants once). CommonJS tsconfig + anchored /data/ gitignore untouched.
+
+Design draft only — PHASE 4 (First-aid login), NO feature code built this round:
+  * docs/PHASE-4-FIRST-AID-DESIGN.md + four labelled "design draft" phone frames in ui-mocks.html.
+  * Intended: first-aiders log problem+treatment on a student (reuses StudentNote.category =
+    'firstaid', no migration); records roll into the admin/zoneLeader Testimonies & Notes screen
+    as a new "First-aid" Record-filter option + badge; first-aid home becomes camper search and
+    nav item 2 becomes a first-aid records history. Live first-aid behaviour UNCHANGED this round.
+
+2026-06-29 — IMPROVEMENT INITIATIVE PHASE 1 (engineering-maturity pass; NOT YET DEPLOYED)
+------------------------------------------------------------------------------------------
+Maturing the SPA toward Connection Made Simple's engineering patterns (fluid type/
+breakpoints, SVG-only icons, complete perf/SW model) ON the camp's existing indigo/
+purple identity + pre-built-<section> SPA structure (no reskin, no setApp rewrite).
+Plus a full Budget rebuild and 22 owner bug fixes, de-conflicted with the rebuilds.
+Full design + plan: docs/IMPROVEMENT-DESIGN.md, docs/IMPROVEMENT-PLAN.md,
+docs/CODE-QUALITY-LOG.md. Program ledger: docs/PROGRAM-LOG.md. Ship steps:
+docs/DEPLOY-CHECKLIST.md.  *** No npm/tsc/vitest toolchain in the authoring env —
+verified by reasoning + string-aware structural checks + grep; tests written to run
+on a real machine. EYEBALL the CSS on-device before relying on the type-scale changes. ***
+
+Category A — Responsive (headline fix)
+  * A1 Fluid type scale: 11 :root tokens (--t-display..--t-micro); html root font
+    16->17px@768->18px@1280 so all rem text scales phone->tablet->laptop. 72 style-block
+    font-size literals mapped to tokens (<=~0.7px deltas — scale rationalisation, flag for eyeball).
+  * A2/A3 Continuous breakpoints 540/768/900(+1280 root bump) added BEFORE the 980 sidebar
+    block; content column widens 460->600->720->820 below the sidebar threshold (was a fixed
+    460px phone strip — the owner's core complaint); --pad gutter steps 14->18->22.
+  * A4 Fluid grids: .tiles auto-fill minmax(132px) -> continuous 2->3->4 columns.
+  * A7/PC-12 classroom-allocation room cards reflow as wrapping narrow tiles (.accom-rooms).
+Category C — Visual system / iconography
+  * C1 Removed ALL emoji/pictographs/affordance glyphs -> SVG icon registry (13 new glyphs:
+    preview,urgent,medical,phone,classroom,tent,close,arrowr,arrowl,download,diamond,plus).
+    Size helpers icSm/icLg/icXl + emptyState(). 30 textContent toast checkmarks stripped.
+  * C2 Audited every ic*() key -> registry: no missing keys / blank icons.
+  * C3 Tokenised indigo tints + gender accents (--violet-d/-dd,--tint,--lav/-2,--male/-bg,
+    --female/-bg); 25 raw-hex in CSS + swept body gender hex now tokens.
+Category D — Navigation single source
+  * D3 navModel(role,mode) -> {tabs,extras}; buildTabs + _renderWideNav both derive from it.
+  * D1/CH-1 church & zoneLeader now get a populated desktop sidebar mirroring their tabs.
+  * D2/AC-5 admin at-camp sidebar = Home, Check In, Search, Notices, Accommodation Allocations,
+    Admin Settings (exact order); Admin -> RENDER.admin console hub.
+  * D4 sidebar highlight prefers a screen's own sidebar id (budget/accom/notes), else TAB_OF.
+  * D5 paint() preserves scrollTop on same-screen re-paints (no jump on dropdown/filter).
+Category H / §5 — BUDGET FULL REBUILD
+  * NEW pure helper src/services/budget.ts (computeBudget/labelForAmount/budgetToCsv) +
+    budget.test.ts. Category = distinct registrationCost per (church,audience); null cost =
+    "Cost not recorded" (counted, flagged, $0 to totals — never dropped); labels dataset-
+    relative (Full/Half/Part/Sponsored — NO hardcoded 180/90/0). Grand total == sum of every
+    line total (asserted). SPA RENDER.budget rebuilt to mirror it: grand-total hero card,
+    ministry filter + client-side Export CSV, collapsible per-church rows (CAMPERS then LEADERS
+    category rows: count x price = line; church-total line). Animated expander.
+  * PC-4 removed tent/classroom price from admin Settings; saveSettings no longer sends them;
+    Budget reads per-registrant cost. CampSettings.tentPrice/classroomPrice columns kept
+    (deprecated) — NO migration.
+Category J — Data correctness + bug fixes
+  * AC-1 (J2) check-in sessions: first day PM-only, last day AM-only, interior AM+PM,
+    1-day=PM-only (checkin-sessions.buildSessions) + checkin-sessions.test.ts.
+  * PC-10 (J3) accommodation: a church x gender classroom pool >50 splits into 7-9 / 10-12
+    sub-pools; leaders halved (ceil->7-9); ungraded youth ride 7-9; AllocationOccupant.grade
+    added + populated. Split keys stay single-gender (validate/auto-fill/cascade unchanged).
+    +7 vitest cases. SPA mirror rewritten (now also counts leaders in the pool — fixes a
+    pre-existing SPA/backend discrepancy).
+  * PC-11 Tent City Male/Female headings show total student-tents and leader-tents.
+  * PC-3 (J4) removed the "unpaid" concept from the home DTO + render (unpaidCount,
+    perChurchBreakdown.unpaid). paymentStatus field + reminders feature untouched.
+Phase-0 bug fixes
+  * PC-9 fixed 3 title-position "&amp;" (paint titles use textContent) -> "&".
+  * PC-5 fixed _rAccts/_rFaq/_rFaqEdit/_rSched/_rContacts infinite self-recursion (stack
+    overflow + "new FAQ/schedule needs refresh") -> each now calls its RENDER.*.
+  * AC-6 removed the consents line from openCamper (data kept in DTO).
+  * AC-7 swapped Zone & Ministry filter positions on Notes/Testimonies.
+  * AC-8 added a "Signed out" record filter (synthesised from camper signOutHistory).
+  * AC-2 first-day already-signed-in students can be signed OUT (error correction).
+  * AC-3 first-day filter now applies to the signed-in section too.
+  * AC-4 first-day initials bubble gender-coloured (blue/pink, --male/--female).
+  * CH-2 testimony student dropdown merges /registrants + /campers (church youth appear
+    regardless of lifecycle).
+  * PC-2 "New year rollover" -> "Save Defaults" (handler already hit /admin/defaults,
+    distinct from Close-Out -> /admin/new-year); dropped "(incl. devotionals)".
+  * PC-1 reordered Data screen: Upload, Save Defaults, Compliance Export, Close-Out, Factory Reset.
+  * PC-6 FAQ admin already lists existing FAQs with edit/delete (confirmed).
+  * PC-7 FAQ/Help hidden in at-camp (tile removed; RENDER.faq guards at-camp -> home).
+Category E/G/K/L — a11y / feedback / PWA / micro-interactions
+  * E1 focus-visible rings; E2 .iconbtn 44px; E3 aria-labels on icon-only buttons + toast
+    role=status aria-live; E4 prefers-reduced-motion block (was absent); L1 press states.
+  * K1 sw.js API_RE was MISSING /export (SPA downloads /export/audit|registrants|signin-out) —
+    added (the documented gotcha); cache bumped camp-v3 -> camp-v4. K2 controllerchange
+    auto-reload already present.
+  * G2 confirmed all error toasts use Error.message (no object-Object).
+
+Migrations: NONE required (all work is frontend + pure logic over existing fields). Note the
+repo already had migrations through 012 (the brief assumed 010); next free number is 013.
+Deploy gotchas (CommonJS tsconfig; anchored /data/ gitignore) left intact.
+NOT pushed, NOT deployed — handoff pack only. See docs/DEPLOY-CHECKLIST.md.
+
+
 2026-06-27 — ACCOMMODATION ALLOCATION REWORK (branch accom-allocation-rework)
 -----------------------------------------------------------------------------
 Replaced the per-church "spot count" accommodation model with the original
@@ -533,16 +907,34 @@ through these. Ordered by likelihood of biting.
       Verify on the deploy Node version that midnight check-in points resolve to
       '00:00' (a date.test.ts case covers this). Low risk, version-dependent.
 
-[R9] NEW-YEAR RESTORES ACCOUNTS WITHOUT PASSWORDS. The defaults snapshot strips
-     passwordHash (correct — don't persist hashes in a snapshot), so newYear restores
-     church/zone accounts with passwordHash=undefined. They cannot log in until an
-     admin sets a password (Admin -> Accounts). Document this in the operator runbook,
-     OR add a post-rollover "set passwords" step / temporary-password generator. The
-     single admin account keeps its real hash (it is preserved, not restored).
+[R9] NEW-YEAR RESTORES ACCOUNTS WITHOUT PASSWORDS.
+     -> RESOLVED 2026-06-30. newYear already generates a temp password per restored
+        church/zone account (generateTempPassword + hashPassword), so they CAN log in;
+        the list is shown in the rollover modal and retained in settings.lastTempPasswords
+        for the next audit export ("Temp Passwords" tab, included once then cleared). This
+        session fixed the residual gaps found while verifying it:
+        - SPA rollover modal claimed the temps "were included in the downloaded workbook" —
+          FALSE (the Step-1 workbook is downloaded BEFORE rollover, to pass the wipe guard,
+          so it predates the passwords). Copy corrected; now explains they're shown here +
+          retained for the next export.
+        - SECURITY (the important one): GET /settings is PUBLIC (auth:false) and returned the
+          full settings object incl. lastTempPasswords — so between rollover and the next
+          export, ANY unauthenticated caller could read every restored account's plaintext
+          temp password. FIXED: settings.controller.get() now strips lastTempPasswords and
+          exposes only a safe `pendingTempPasswordCount`. Pinned by NEW
+          settings.controller.test.ts. The plaintext temps are reachable ONLY via the
+          admin-authenticated audit export now.
+        - Admin -> Data now shows a banner when temp passwords are pending (count from the
+          safe field), so they aren't silently consumed by the next export.
+        - SECURITY-ACTIONS.md §6 runbook updated (was still "restored accounts have no
+          password"). The single admin account keeps its own real hash (preserved, not
+          restored) — unchanged.
 
-[R8] OPEN PRODUCT DECISION (from the B1 fix): should church-level `reservations`
-     (held spots not yet assigned to individuals) ALSO reduce block availability,
-     to stop a church over-holding? The B1 fix counts assigned occupants only.
-     `accommodation-occupancy.ts` is the single place to change if yes. Tie this to
-     finalising the per-church spot model and the setReservations capacity check
-     (the latter also closes the reservation double-booking race noted in the audit).
+[R8] OPEN PRODUCT DECISION — church-level `reservations` reducing block availability.
+     -> SUPERSEDED / MOOT 2026-06-30. The entire model this risk was about — AccommodationBlock,
+        per-church `reservations`, and `accommodation-occupancy.ts` — was REMOVED in the
+        2026-06-27 accommodation rework (migration 004 dropped the tables). The current model
+        is classroom rooms + an allocation map + display-only tent buckets; there is no
+        "reservation vs availability" decision left to make. No code change required; recorded
+        here so the risk isn't re-opened. (Verified: grep finds no reservations/AccommodationBlock/
+        accommodation-occupancy in src/.)

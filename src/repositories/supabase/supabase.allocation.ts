@@ -9,14 +9,16 @@ function toAlloc(r: Record<string, unknown>): RoomAllocation {
     churchId: r['church_id'] as string,
     gender: r['gender'] as RoomAllocation['gender'],
     n: r['n'] as number,
+    // C-1: PC-10 split sub-pools carry a grade bracket. null/absent for non-split pools.
+    bracket: (r['bracket'] as RoomAllocation['bracket']) ?? null,
   };
 }
 
 function cols(a: RoomAllocation): Record<string, unknown> {
-  return { id: a.id, room_id: a.roomId, church_id: a.churchId, gender: a.gender, n: a.n };
+  return { id: a.id, room_id: a.roomId, church_id: a.churchId, gender: a.gender, n: a.n, bracket: a.bracket ?? null };
 }
 
-const UPDATE_COLS = ['room_id', 'church_id', 'gender', 'n'] as const;
+const UPDATE_COLS = ['room_id', 'church_id', 'gender', 'n', 'bracket'] as const;
 
 export class SupabaseAllocationRepository implements IAllocationRepository {
   constructor(private sql: SqlClient) {}

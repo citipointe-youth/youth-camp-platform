@@ -78,6 +78,61 @@ A deep audit across three areas was completed and all bugs addressed. Key change
 - `person.service.test.ts`: 4 `listMedicalWatch` cases — atCamp filter, departed excluded, church scoping, firstAid access (BUG-12).
 - `admin.characterisation.test.ts`: `BadRequestError` import added; `force:true` alone throws `BadRequestError` for `newYear` (BUG-13).
 
+## Improvement Initiative — Phase 1 applied (2026-06-29, NOT yet deployed)
+
+A 7-phase improvement program is underway (CMS engineering-maturity patterns onto this app's
+identity). **Phase 1 changes are in the tree but NOT pushed/deployed.** See
+`docs/IMPROVEMENT-DESIGN.md`, `docs/IMPROVEMENT-PLAN.md`, `docs/PROGRAM-LOG.md`,
+`docs/CODE-QUALITY-LOG.md`, `docs/DEPLOY-CHECKLIST.md`, and the dated `CHANGELOG.txt` section.
+Contract changes from Phase 1 that supersede notes below:
+- **Responsive system:** `:root` now has a fluid **type scale** (`--t-display`…`--t-micro`) and the
+  `html` root font scales 16→17→18px at 768/1280. Continuous breakpoints (540/768/900/1280) sit
+  before the 980px sidebar block; the content column widens 460→820px below 980. Use the `--t-*`
+  tokens (and `--pad`, gender `--male/--female`, tint `--violet-d/--lav` etc.) — don't hardcode.
+- **Icons:** SVG-only (no emoji). `ICONS` registry + `ic()` and new size helpers
+  `icSm/icLg/icXl(n,cls)` + `emptyState(icon,msg)`. Adding a glyph = add to `ICONS`.
+- **Navigation:** **single source** `navModel(role,mode)` → `{tabs,extras}`. `buildTabs` (bottom)
+  and `_renderWideNav` (sidebar, via `navSidebar`) both derive from it — change nav in ONE place.
+  Church/zoneLeader now have a populated desktop sidebar; admin at-camp sidebar = Home, Check In,
+  Search, Notices, Accommodation Allocations, Admin Settings.
+- **Budget:** REBUILT. Costs come from per-registrant `registrationCost` (NOT
+  `CampSettings.tentPrice/classroomPrice`, which are now deprecated/unused — removed from the
+  Settings UI, columns left in DB). Pure logic: `src/services/budget.ts` (`computeBudget`/
+  `labelForAmount`/`budgetToCsv`). Categories = distinct cost per (church, camper|leader); null
+  cost = "Cost not recorded" ($0, flagged, never dropped); grand total reconciles to the sum of all
+  line totals. SPA `RENDER.budget`/`drawBudget` mirror it (collapsible church rows + client CSV).
+- **Check-in sessions (AC-1):** `buildSessions` now makes the **first** camp day **PM-only**, the
+  **last** day **AM-only**, interior days AM+PM (1-day camp = PM-only).
+- **Accommodation (PC-10):** a church×gender classroom pool **>50** splits into `7-9`/`10-12`
+  sub-pools (keys `${churchId}|${gender}|${bracket}`); leaders halved across brackets;
+  `AllocationOccupant` gained `grade`. Single-gender/auto-fill/cascade unchanged. Tent City headings
+  show total student/leader tents (PC-11).
+- **Removed concepts:** "unpaid" is gone from the home DTO/UI (PC-3); FAQ/Help is pre-camp only
+  (PC-7). `paymentStatus` field + reminders feature remain.
+- **Service worker:** `sw.js` is now `camp-v4`; `API_RE` includes `/export` (was missing).
+
+### Phase 4 applied (2026-06-29, NOT yet deployed) — first-aid login UX
+See `docs/PHASE-4-FIRSTAID-UX.md` (review) + working-root `ui-mocks-firstaid.html` (mock).
+- **firstAid nav** = **Search · Records · Schedule** (`navModel('firstAid')`). Search is the landing
+  (no `home` tab — `gotoTab` redirects home→search for firstAid). **Medical Watch removed** (no Watch
+  tab, no `/campers/medical` on the first-aid path).
+- **First-aid records** = `StudentNote{category:'firstaid'}` (no migration). Body is 4 labelled lines
+  `Problem:`/`Treatment:`/`First-aider:`/`Brought by:`. Written via `POST /notes` (category-scoped),
+  read via **`GET /notes/firstaid`** (only firstaid category, `canAccessPerson`-scoped).
+- **RBAC:** new `note:write:firstaid` (firstAid+director+admin) and `note:read:firstaid`
+  (firstAid+zoneLeader+director+admin+**church**, the last own-church only). `note.service.add`
+  asserts the firstaid capability **only** when `category==='firstaid'`; first-aiders can write/read
+  ONLY first-aid records, never general notes/testimonies. **church can READ own-church first-aid
+  records but not WRITE them** and has no general `note:read`.
+- **Student Info** (renamed from "Casualty Card", `openStudentInfo`) leads with the student's
+  **ministry leader** contacts (primary+secondary, via the existing `GET /search/contacts/:id`
+  masked-contact path + audited reveal — no new permission); parent is the bottom fallback. Medical
+  alert + consent are tone-softened; allergy-type dietary items are merged into the alert.
+- **Admin Notes** (`RENDER.notes`/`drawNotes`): a **"First-aid"** Record-filter option + amber badge +
+  Problem/Treatment body render; the notes CSV export already carries them (category column).
+- **Tokens:** added `--ink-2` (darker secondary text) + softened `--alert-*`/`--consent-*` palette;
+  all first-aid hardcoded hex tokenised (C1/C3 for these screens).
+
 ## Commands (run from this folder)
 
 ```bash
@@ -136,7 +191,7 @@ api (Express) → controllers → services → repositories (interfaces) → cor
 | `zoneLeader` | Own zone | All of above (zone-scoped), read notes, send zone notices, read registrants in zone |
 | `director` | All | All of above (camp-wide), import, camp-wide notices |
 | `admin` | All + back office | Everything + admin:manage (settings, accounts, accommodation, FAQ, schedule, devotionals, mode switch) |
-| `firstAid` | All (read-only) | `camper:read`, `camper:read:sensitive`, `checkin:write` (attendance only). No notes, no admin, no pre-camp data. |
+| `firstAid` | All | `camper:read`, `camper:read:sensitive`, `attendance:write` (attendance only, NOT `checkin:write`), **`note:write:firstaid`** + **`note:read:firstaid`** (Phase 4 — first-aid records only, never general notes/testimonies). No admin, no pre-camp data. |
 
 There is always exactly one `admin` account. It cannot be deleted or deactivated.
 
@@ -167,6 +222,9 @@ Users in pre-camp mode can tap **"👁 Preview at-camp view"** on the pre-camp h
 (it is pure plan communication); `ScheduleItem.isCheckInPoint` and `getCheckInPoints` no longer
 exist.
 
+- **(AC-1, 2026-06-29)** the **first** camp day generates a **PM session only** (arrive at lunch),
+  the **last** day an **AM session only** (depart at lunch); interior days keep AM+PM; a 1-day camp
+  is PM-only.
 - Session id = **`${day}~am` / `${day}~pm`** (e.g. `2026-09-28~pm`) — delimiter is `~`, URL-safe (a `#` would be parsed as a URL fragment when the id is put in a request path; SPA also `encodeURIComponent`s it); this is the key in
   `Camper.checkInHistory[].sessionId`.
 - `getCurrentSession()` picks today's AM before midday / PM after (camp tz); falls back to the
@@ -239,7 +297,7 @@ The SPA was forked from an earlier demo and had drifted onto the demo's **MockAP
 - **Check-in status** = `{session, roster:[{camperId,firstName,lastName,church,zone,gender,grade,medicalFlag,checkedIn,lastEntry}], checkedInCount, totalCount}` — roster now includes gender/grade/medicalFlag directly (no second `/campers` fetch needed).
 - **Attendance** is `POST /attendance/sign-in|sign-out` with a `camperId` body (not `/campers/:id/sign-*`). Notes for a camper = `GET /notes/camper/:id`. Search reveal = `GET /search/contact/:camperId/:role` (role like `male-primary`).
 - **`/home`** DTO differs by mode: pre-camp has `totalCampers/totalLeaders/noBlueCardCount/accommodationSummary[]/perChurchBreakdown[]` (no gender split, no church `code`, no `expected`); the by-ministry M/F table and church code are derived client-side from `/registrants` and `/accounts/churches`.
-- **Accommodation (reworked 2026-06-27 to match the prototype):** classroom **rooms** (`/accommodation/classrooms`, name+capacity) + an **allocation map** (`GET/PATCH /accommodation/allocations` = `{roomId:[{key:"churchId|gender", n}]}`) + eligible-group helper (`/accommodation/groups`) + church-facing `/accommodation/church-rooms/:churchId`. Allocatable **groups** = per church×gender (students **and** leaders pooled together) where **≥75% of that church's campers are classroom-kind**; the SPA **auto-fills** a room to capacity (remainder shown as "unallocated"), rooms are **single-gender** (enforced in the service via `validateAllocations` AND the SPA dropdown), and un-allocate cascades freed people into other rooms. **Tents** are not allocated — `tentDistribution` auto-buckets tent-kind campers into **7-person tents, students and leaders separate** (display only). The old `AccommodationBlock` + per-church `reservations` model is **gone** (DB tables dropped in migration `004`). **Tent/classroom prices live on `CampSettings`** (`tentPrice`/`classroomPrice`, set in admin Settings); Budget reads them from settings. Pure logic + types: `src/services/accommodation-allocation.ts`. The church "Your accommodation" home tile is shown **only in real at-camp** (`campMode==='at-camp' && !PREVIEW_MODE`).
+- **Accommodation (reworked 2026-06-27 to match the prototype):** classroom **rooms** (`/accommodation/classrooms`, name+capacity) + an **allocation map** (`GET/PATCH /accommodation/allocations` = `{roomId:[{key:"churchId|gender", n}]}`) + eligible-group helper (`/accommodation/groups`) + church-facing `/accommodation/church-rooms/:churchId`. Allocatable **groups** = per church×gender (students **and** leaders pooled together) where **≥75% of that church's campers are classroom-kind**; the SPA **auto-fills** a room to capacity (remainder shown as "unallocated"), rooms are **single-gender** (enforced in the service via `validateAllocations` AND the SPA dropdown), and un-allocate cascades freed people into other rooms. **Tents** are not allocated — `tentDistribution` auto-buckets tent-kind campers into **7-person tents, students and leaders separate** (display only). The old `AccommodationBlock` + per-church `reservations` model is **gone** (DB tables dropped in migration `004`). **(SUPERSEDED 2026-06-29 — see "Improvement Initiative" above):** `CampSettings.tentPrice/classroomPrice` are now **deprecated/unused** — removed from the Settings UI; Budget reads per-registrant `registrationCost`, not settings. The eligible-group logic now also **splits a church×gender pool >50 into `7-9`/`10-12` brackets** (PC-10). Pure logic + types: `src/services/accommodation-allocation.ts`. The church "Your accommodation" home tile is shown **only in real at-camp** (`campMode==='at-camp' && !PREVIEW_MODE`).
 - **Notes** require a `camperId`; a **testimony** is a note with `category:'testimony'` (so the testimonies screen picks a student). `/notes/recent` has no camper details (joined from `/campers`); `/notes/export` returns a **CSV string** (downloaded directly) with a Category column.
 - **Admin paths**: `/accounts/users`, `/accounts/churches`, `/admin/defaults`, `DELETE /admin/notifications`, `/import/csv` (body `{csvData}`, CSV only), `/devotional/:day` (path param). Passwords are **min 8**. Church create needs `churchName`+`zone`+`account*` fields only. (Password edits use `POST /accounts/users/password` `{userId,password}`.)
 

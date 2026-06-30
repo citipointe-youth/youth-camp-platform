@@ -28,6 +28,13 @@ describe('access-control: can()', () => {
     expect(can(c, 'notification:send:camp')).toBe(false);
   });
 
+  it('church can READ first-aid records (own church) but cannot WRITE them or read general notes (Phase 4)', () => {
+    const c = actor('church');
+    expect(can(c, 'note:read:firstaid')).toBe(true);
+    expect(can(c, 'note:write:firstaid')).toBe(false);
+    expect(can(c, 'note:read')).toBe(false);
+  });
+
   it('zoneLeader can send zone notices but not camp-wide; director can do both', () => {
     expect(can(actor('zoneLeader'), 'notification:send:zone')).toBe(true);
     expect(can(actor('zoneLeader'), 'notification:send:camp')).toBe(false);
@@ -82,10 +89,19 @@ describe('access-control: firstAid role', () => {
     expect(can(actor('firstAid'), 'checkin:write')).toBe(false);
   });
 
-  it('firstAid cannot read registrants, write notes, or manage admin', () => {
+  it('firstAid cannot read registrants, write GENERAL notes, or manage admin', () => {
     expect(can(actor('firstAid'), 'registrant:read')).toBe(false);
     expect(can(actor('firstAid'), 'note:write')).toBe(false);
+    expect(can(actor('firstAid'), 'note:read')).toBe(false);
     expect(can(actor('firstAid'), 'admin:manage')).toBe(false);
+  });
+
+  it('firstAid CAN write + read first-aid records (Phase 4), without general note access', () => {
+    expect(can(actor('firstAid'), 'note:write:firstaid')).toBe(true);
+    expect(can(actor('firstAid'), 'note:read:firstaid')).toBe(true);
+    // but NOT the general capabilities
+    expect(can(actor('firstAid'), 'note:write')).toBe(false);
+    expect(can(actor('firstAid'), 'note:read')).toBe(false);
   });
 
   it('canAccessPerson: firstAid can access any person regardless of church/zone', () => {

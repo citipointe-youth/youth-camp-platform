@@ -2,7 +2,7 @@ import type {
   IClassroomRepository, IAllocationRepository, IChurchRepository,
   ISettingsRepository, IPersonRepository,
 } from '../repositories/interfaces/entity-repositories';
-import type { Classroom, RoomAllocation, AllocationGender } from '../core/entities/accommodation';
+import type { Classroom, RoomAllocation, AllocationGender, AllocationBracket } from '../core/entities/accommodation';
 import type { Actor } from '../core/entities/user';
 import { assertCan, assertCanAccessChurch } from './access-control';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
@@ -57,13 +57,17 @@ export function makeAccommodationService(
       kind: p.kind,
       accommodationKind: p.accommodationKind ?? null,
       lifecycle: p.lifecycle ?? null,
+      grade: p.grade ?? null,   // PC-10: needed for the >50 grade-bracket split
     }));
   }
 
   function rowsToMap(rows: readonly RoomAllocation[]): AllocationMap {
     const map: AllocationMap = {};
     for (const r of rows) {
-      (map[r.roomId] ??= []).push({ key: `${r.churchId}|${r.gender}`, n: r.n });
+      // C-1: reconstruct the original group key. PC-10 split sub-pools carry a bracket
+      // and use the 3-part key (`churchId|gender|bracket`); non-split pools the 2-part key.
+      const key = r.bracket ? `${r.churchId}|${r.gender}|${r.bracket}` : `${r.churchId}|${r.gender}`;
+      (map[r.roomId] ??= []).push({ key, n: r.n });
     }
     return map;
   }
@@ -123,8 +127,11 @@ export function makeAccommodationService(
       for (const [roomId, entries] of Object.entries(allocations)) {
         for (const e of entries) {
           if (e.n <= 0) continue;
-          const [churchId, gender] = e.key.split('|') as [string, AllocationGender];
-          await allocationRepo.save({ id: newId('alloc'), roomId, churchId, gender, n: e.n });
+          // C-1: parse ALL key parts. A PC-10 split sub-pool sends a 3-part key
+          // (`churchId|gender|bracket`); dropping the bracket here made split
+          // allocations un-persistable (the reloaded 2-part key matched no live group).
+          const [churchId, gender, bracket] = e.key.split('|') as [string, AllocationGender, AllocationBracket?];
+          await allocationRepo.save({ id: newId('alloc'), roomId, churchId, gender, n: e.n, bracket: bracket ?? null });
         }
       }
       return rowsToMap(await allocationRepo.findAll());

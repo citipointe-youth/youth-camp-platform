@@ -19,6 +19,12 @@ export function makeNoteController(services: NoteControllerServices) {
       return services.note.recent(req.ctx.actor, limit);
     },
 
+    async recentFirstAid(req: HttpRequest) {
+      if (!req.ctx) throw new UnauthorizedError();
+      const limit = req.query['limit'] ? parseInt(req.query['limit'], 10) : 50;
+      return services.note.recentFirstAid(req.ctx.actor, limit);
+    },
+
     async exportRows(req: HttpRequest) {
       if (!req.ctx) throw new UnauthorizedError();
       return services.note.exportRows(req.ctx.actor);

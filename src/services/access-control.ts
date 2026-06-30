@@ -13,6 +13,11 @@ export type Action =
   | 'attendance:write'
   | 'note:write'
   | 'note:read'
+  // First-aid records (Phase 4). A first-aid record is a StudentNote with category 'firstaid'.
+  // Kept as their own capabilities so firstAid (and church) get first-aid access WITHOUT gaining
+  // general note read/write. note.service asserts note:write:firstaid only when category==='firstaid'.
+  | 'note:write:firstaid'
+  | 'note:read:firstaid'
   | 'notification:send:zone'
   | 'notification:send:camp'
   | 'import:run'
@@ -29,6 +34,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'checkin:write',
     'attendance:write',
     'note:write',
+    // Phase 4: church can READ first-aid records for its OWN church's campers (scoped by
+    // canAccessPerson). It gets no first-aid WRITE and no general note:read.
+    'note:read:firstaid',
   ]),
   zoneLeader: new Set<Action>([
     'registrant:read',
@@ -38,6 +46,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'attendance:write',
     'note:write',
     'note:read',
+    'note:read:firstaid',
     'notification:send:zone',
   ]),
   director: new Set<Action>([
@@ -50,7 +59,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'checkin:write',
     'attendance:write',
     'note:write',
+    'note:write:firstaid',
     'note:read',
+    'note:read:firstaid',
     'notification:send:zone',
     'notification:send:camp',
     'import:run',
@@ -65,20 +76,27 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<Action>> = {
     'checkin:write',
     'attendance:write',
     'note:write',
+    'note:write:firstaid',
     'note:read',
+    'note:read:firstaid',
     'notification:send:zone',
     'notification:send:camp',
     'import:run',
     'admin:manage',
   ]),
-  // firstAid: read-only at-camp access. No registrant:read (pre-camp hub is not accessible).
-  // attendance:write allows attendance sign-in/out only. checkin:write is intentionally withheld
-  // — firstAid must not record daily session entries, only physical presence events.
+  // firstAid: read-only at-camp access PLUS first-aid record logging (Phase 4).
+  // No registrant:read (pre-camp hub is not accessible). attendance:write allows attendance
+  // sign-in/out only. checkin:write is intentionally withheld — firstAid must not record daily
+  // session entries, only physical presence events. note:write:firstaid lets it log first-aid
+  // records (category 'firstaid' only — enforced in note.service); note:read:firstaid lets it
+  // read them. firstAid does NOT get general note:write/note:read (no testimonies/general notes).
   // Cannot send notifications — canSendNotification() returns false via default paths (intentional).
   firstAid: new Set<Action>([
     'camper:read',
     'camper:read:sensitive',
     'attendance:write',
+    'note:write:firstaid',
+    'note:read:firstaid',
   ]),
 };
 

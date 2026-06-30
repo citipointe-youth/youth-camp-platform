@@ -1,4 +1,4 @@
-const CACHE = 'camp-v3';
+const CACHE = 'camp-v7';
 const APP_SHELL = ['/'];
 
 // API paths that must NEVER be served from cache. GOTCHA (from connection-made-simple):
@@ -6,7 +6,10 @@ const APP_SHELL = ['/'];
 // through to the cache-first asset path below and can get the SPA's HTML cached under
 // that URL — which then breaks JSON parsing ("unexpected token <"). When you add a new
 // top-level API route to the backend, add it here AND bump CACHE above.
-const API_RE = /^\/(auth|home|settings|admin|registrants|accommodation|campers|checkin|attendance|notes|search|notifications|schedule|faq|devotional|import|accounts|health|setup)(\/|$|\?)/;
+// (export ADDED — the SPA downloads /export/audit, /export/registrants, /export/signin-out;
+//  without it these fell through to cache-first and could serve stale HTML — the documented
+//  API_RE gotcha. Verified against src/api/http/router.ts route prefixes.)
+const API_RE = /^\/(auth|home|settings|admin|registrants|accommodation|campers|checkin|attendance|notes|search|notifications|schedule|faq|devotional|import|export|accounts|health|setup)(\/|$|\?)/;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

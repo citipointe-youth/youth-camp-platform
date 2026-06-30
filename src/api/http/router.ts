@@ -118,11 +118,17 @@ export function buildRoutes(services: Services): (Route | BufferRoute)[] {
     // ----- Notes -----
     { method: 'POST', path: '/notes', auth: true, handler: (r) => note.add(r) },
     { method: 'GET', path: '/notes/recent', auth: true, handler: (r) => note.recent(r) },
+    // First-aid records only (Phase 4) — category 'firstaid', scoped by canAccessPerson.
+    // Authorised by note:read:firstaid (firstAid/zoneLeader/director/admin/church). Declared
+    // before /notes/camper/:camperId; both are distinct literal prefixes so order is not critical.
+    { method: 'GET', path: '/notes/firstaid', auth: true, handler: (r) => note.recentFirstAid(r) },
     { method: 'GET', path: '/notes/export', auth: true, handler: (r) => note.exportRows(r) },
     { method: 'GET', path: '/notes/camper/:camperId', auth: true, handler: (r) => note.forCamper(r) },
 
     // ----- Search -----
     { method: 'GET', path: '/search', auth: true, handler: (r) => search.search(r) },
+    // Masked ministry-leader contacts for one camper (Student Info "reach the leader" card).
+    { method: 'GET', path: '/search/contacts/:camperId', auth: true, handler: (r) => search.resolveContacts(r) },
     { method: 'GET', path: '/search/contact/:camperId/:role', auth: true, handler: (r) => search.revealContact(r) },
 
     // ----- Notifications -----

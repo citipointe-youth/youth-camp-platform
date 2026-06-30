@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { makeAuthService, toActor } from './auth.service';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { makeAuthService, toActor, assertSessionSecret } from './auth.service';
 import { InMemoryUserRepository } from '../repositories/in-memory';
 import { hashPassword } from '../utils/crypto';
 import type { User } from '../core/entities/user';
@@ -116,6 +116,40 @@ describe('AuthService token lifecycle (stateless HMAC sessions)', () => {
     const [, sig] = token.split('.');
     const forged = Buffer.from(JSON.stringify({ userId: 'u1', expiresAt: Date.now() + 1e6, actor: { id: 'u1', role: 'admin' } })).toString('base64url') + '.' + sig;
     expect(await svc.resolveToken(forged)).toBeNull();
+  });
+});
+
+describe('assertSessionSecret() — B-2 production fail-fast', () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    // Restore the env between cases so one test can't leak into another.
+    process.env['NODE_ENV'] = saved['NODE_ENV'];
+    if (saved['SESSION_SECRET'] === undefined) delete process.env['SESSION_SECRET'];
+    else process.env['SESSION_SECRET'] = saved['SESSION_SECRET'];
+  });
+
+  it('throws in production when SESSION_SECRET is unset', () => {
+    process.env['NODE_ENV'] = 'production';
+    delete process.env['SESSION_SECRET'];
+    expect(() => assertSessionSecret()).toThrow(/SESSION_SECRET/);
+  });
+
+  it('throws in production when SESSION_SECRET equals the insecure fallback', () => {
+    process.env['NODE_ENV'] = 'production';
+    process.env['SESSION_SECRET'] = 'camp-platform-dev-secret-change-in-production';
+    expect(() => assertSessionSecret()).toThrow(/SESSION_SECRET/);
+  });
+
+  it('does NOT throw in production when a real SESSION_SECRET is set', () => {
+    process.env['NODE_ENV'] = 'production';
+    process.env['SESSION_SECRET'] = 'a-genuinely-random-32-plus-byte-secret-value-xyz';
+    expect(() => assertSessionSecret()).not.toThrow();
+  });
+
+  it('does NOT throw outside production even with no SESSION_SECRET', () => {
+    process.env['NODE_ENV'] = 'development';
+    delete process.env['SESSION_SECRET'];
+    expect(() => assertSessionSecret()).not.toThrow();
   });
 });
 

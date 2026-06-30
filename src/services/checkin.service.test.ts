@@ -35,21 +35,21 @@ function person(over: Partial<Person> = {}): Person {
 function settings(): CampSettings {
   const now = '2026-01-01T00:00:00.000Z';
   return {
-    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-07-01', endDate: '2026-07-05',
-    timezone: 'UTC', checkInDays: ['2026-07-01', '2026-07-02'],
+    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-06-30', endDate: '2026-07-05',
+    timezone: 'UTC', checkInDays: ['2026-06-30', '2026-07-01', '2026-07-02'],
     accommodationLocked: false, tentPrice: 80, classroomPrice: 120, campMode: 'at-camp', createdAt: now, updatedAt: now,
   };
 }
 
 describe('getSessions — derived from check-in days', () => {
-  it('produces a Morning and Afternoon session per camp day', async () => {
+  it('first day is PM-only, interior days AM+PM, last day AM-only (AC-1)', async () => {
     const personRepo = new InMemoryPersonRepository();
     const settingsRepo = new InMemorySettingsRepository();
     await settingsRepo.saveSingleton(settings());
     const svc = makeCheckInService(personRepo, settingsRepo);
     const sessions = await svc.getSessions();
     expect(sessions.map((s) => s.id)).toEqual([
-      '2026-07-01~am', '2026-07-01~pm', '2026-07-02~am', '2026-07-02~pm',
+      '2026-06-30~pm', '2026-07-01~am', '2026-07-01~pm', '2026-07-02~am',
     ]);
   });
 });
