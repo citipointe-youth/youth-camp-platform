@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { verifyPassword } from '../utils/crypto';
-import type { IUserRepository } from '../repositories/interfaces/entity-repositories';
+import type { IUserRepository, ISettingsRepository } from '../repositories/interfaces/entity-repositories';
 import type { Actor, User, SafeUser } from '../core/entities/user';
 import type { ZoneName } from '../core/types/enums';
 import { UnauthorizedError } from '../core/errors/app-error';
@@ -89,7 +89,7 @@ export interface AuthService {
   logout(token: string): Promise<void>;
 }
 
-export function makeAuthService(users: IUserRepository): AuthService {
+export function makeAuthService(users: IUserRepository, settings?: ISettingsRepository): AuthService {
   return {
     async login(input: unknown) {
       const parsed = LoginInputSchema.safeParse(input);
@@ -102,6 +102,23 @@ export function makeAuthService(users: IUserRepository): AuthService {
 
       const valid = await verifyPassword(password, user.passwordHash);
       if (!valid) throw new UnauthorizedError('Invalid credentials');
+
+      // Admin-controlled login locks (manual toggles in Settings). Blocks ONLY at login —
+      // existing sessions keep working until their token TTL. Credentials are verified first
+      // so a locked account can't be probed for valid passwords via the lock message.
+      if (settings && (user.role === 'church' || user.role === 'zoneLeader')) {
+        const s = await settings.getSingleton();
+        const locked =
+          (user.role === 'church' && s?.churchLoginLocked) ||
+          (user.role === 'zoneLeader' && s?.zoneLeaderLoginLocked);
+        if (locked) {
+          throw new UnauthorizedError(
+            user.role === 'church'
+              ? 'Church logins are currently disabled by the camp administrator.'
+              : 'Zone leader logins are currently disabled by the camp administrator.',
+          );
+        }
+      }
 
       const token = signSession(toActor(user), Date.now() + TOKEN_TTL_MS);
       return { token, user: toSafeUser(user) };

@@ -10,7 +10,8 @@ function settings(over: Partial<CampSettings> = {}): CampSettings {
   return {
     id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-07-01', endDate: '2026-07-05',
     timezone: 'Australia/Brisbane', checkInDays: [], accommodationLocked: false,
-    tentPrice: 80, classroomPrice: 120, campMode: 'pre-camp', createdAt: now, updatedAt: now, ...over,
+    tentPrice: 80, classroomPrice: 120, churchLoginLocked: false, zoneLeaderLoginLocked: false,
+    campMode: 'pre-camp', createdAt: now, updatedAt: now, ...over,
   };
 }
 

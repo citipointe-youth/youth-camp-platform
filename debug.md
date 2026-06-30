@@ -58,7 +58,7 @@ check "expected vs actual" before touching code.
 >   540/768/900/980/1280. "Text too small/large" or "doesn't scale" → these.
 > - **sw.js `camp-v7`**, `API_RE` now includes `/export`.
 
-## Frontend — `public/index.html` (single ~2,260-line SPA)
+## Frontend — `public/index.html` (single ~2,920-line SPA)
 
 This one file is the only real navigation cost in the repo. Map below (line numbers are a
 2026-06-26 snapshot); **grep the name to confirm the line** — they drift on every edit.
@@ -112,7 +112,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `scopeRegs / drawPeople / personRow` | 878 / 879 / 892 |
 | `openPerson / markReg` | 906 / 925 |
 | `RENDER.help` | 929 |
-| `RENDER.budget` (prices from `SETTINGS.tentPrice/classroomPrice`) | ~1249 |
+| `RENDER.budget` (prices from per-registrant `registrationCost` — NOT settings prices, which are deprecated) | ~1249 |
 | `RENDER.accom` — classroom **rooms** + allocation map. Helpers: `accomChurches`/`accomGroups` (75% eligibility), `addAlloc` (auto-fill, single-gender guard), `removeAlloc` (cascade), `drawAccom`, `tentDist` (7/tent). | ~1278 |
 | `RENDER.data` (director/admin data view) | 1958 |
 
@@ -155,7 +155,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `RENDER.adminRecords` | ~1808 | **Redirects to `adminData`** — all export/close-out content merged there. |
 | `RENDER.adminCloseOut` (+ `doNewYear`) | ~1830 / ~1855 | Back button → `adminData`. |
 | `RENDER.adminSettings / saveSettings` | 1891 / 1916 |
-| ⮑ **Timezone hardcoded** to Australia/Brisbane (field removed); check-in days **auto-derived** from start/end via `_datesBetween`; `renderCheckinDaysPreview`/`onStartDateChange` (start pre-fills end +3 days). | — |
+| ⮑ **Timezone hardcoded** to Australia/Brisbane (field removed); check-in days **auto-derived** from start/end via `_datesBetween`; `renderCheckinDaysPreview`/`onStartDateChange` (start pre-fills end +3 days). Also hosts the two **login-lock toggles** (`stChurchLock`/`stZoneLock` → `churchLoginLocked`/`zoneLeaderLoginLocked`, `.tgl` switch) saved in `saveSettings`. | — |
 | `RENDER.adminData` (+ `adminReset`, `adminClear`) | ~1926 | **Merged from Records & Export**: shows compliance export card, close-out card, CSV upload, notifications clear (at-camp), rollover, factory reset. Title = "Data, Reset & Exports". |
 | `RENDER.import / adminUpload / _renderImportPreview / _confirmImport / _createPhantomChurches` | ~1947 / ~2030 / ~2074 / ~2090 / ~2095 | Phantom churches now get a per-church form (zone + username + password) with a "Create N churches" pre-step that re-runs dry-run after creation. |
 | `RENDER.adminWizard` | ~2130 |
@@ -217,8 +217,12 @@ service. **Bugs are almost always in a service.**
 
 Verification: `npm run typecheck` (clean) · `npm run test` (vitest, 261 pass). Note the two
 deploy-only gotchas in CLAUDE.md (CommonJS tsconfig; anchored `/data/` gitignore) — neither is
-caught by tsc/vitest. Schema migrations `008`–`013` applied to prod; `src/repositories/supabase/*`
-must not reference dropped columns. Migration `013` adds `bracket text` to `classroom_allocations`.
+caught by tsc/vitest. Schema migrations `008`–`014` applied to prod; `src/repositories/supabase/*`
+must not reference dropped columns. Migration `013` adds `bracket text` to `classroom_allocations`;
+migration `014` adds `church_login_locked` + `zone_leader_login_locked` (boolean, default false) to
+`settings`. **`supabase.settings` writes ALL settings columns on every save** — if a new settings
+column isn't migrated to prod, every settings save (and mode switch / new-year) fails; reads
+tolerate absence via `?? false`.
 
 ---
 
@@ -262,3 +266,4 @@ must not reference dropped columns. Migration `013` adds `bracket text` to `clas
 | New-year / reset / wipe guard | SPA `adminCloseOut`/`doNewYear` (1843/1867), `adminReset` (2038); backend `admin.service` |
 | 403 / permission denied | backend `access-control.ts` (one file) |
 | 401 / kicked to login | SPA `sessionExpired` (429) `api()` (357); check `SESSION_SECRET` env |
+| **Church / zone leader can't log in ("disabled by the camp administrator")** | Working as designed — admin toggled a login lock in **Settings** (`churchLoginLocked` / `zoneLeaderLoginLocked`). Backend check is `auth.service.login` (after the password). Locks block **new logins only**; existing sessions persist to the 12h TTL. admin/director/firstAid never blocked. Toggles: `RENDER.adminSettings`/`saveSettings`. |

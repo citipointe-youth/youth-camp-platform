@@ -16,6 +16,8 @@ function toSettings(r: Record<string, unknown>): CampSettings {
     accommodationLocked: r['accommodation_locked'] as boolean,
     tentPrice: (r['tent_price'] as number) ?? 0,
     classroomPrice: (r['classroom_price'] as number) ?? 0,
+    churchLoginLocked: (r['church_login_locked'] as boolean | null) ?? false,
+    zoneLeaderLoginLocked: (r['zone_leader_login_locked'] as boolean | null) ?? false,
     campMode: r['camp_mode'] as CampSettings['campMode'],
     lastTempPasswords: (r['last_temp_passwords'] as CampSettings['lastTempPasswords']) ?? null,
     lastExportedAt: (r['last_exported_at'] as Date | null)?.toISOString() ?? null,
@@ -37,6 +39,8 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
     accommodation_locked: s.accommodationLocked,
     tent_price: s.tentPrice,
     classroom_price: s.classroomPrice,
+    church_login_locked: s.churchLoginLocked,
+    zone_leader_login_locked: s.zoneLeaderLoginLocked,
     camp_mode: s.campMode,
     last_temp_passwords: s.lastTempPasswords ?? null,
     last_exported_at: s.lastExportedAt ?? null,
@@ -48,7 +52,8 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
 const UPDATE_COLS = [
   'camp_name', 'year', 'start_date', 'end_date', 'timezone',
   'check_in_banner', 'check_in_days', 'accommodation_locked',
-  'tent_price', 'classroom_price', 'camp_mode',
+  'tent_price', 'classroom_price',
+  'church_login_locked', 'zone_leader_login_locked', 'camp_mode',
   'last_temp_passwords', 'last_exported_at', 'updated_at',
 ] as const;
 

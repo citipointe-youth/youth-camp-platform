@@ -166,7 +166,7 @@ export async function buildContainer(): Promise<Container> {
       scheduleRepo.init(), devotionals.init(), faqs.init(), settingsRepo.init(), snapshots.init(),
     ]);
 
-    const auth = makeAuthService(users);
+    const auth = makeAuthService(users, settingsRepo);
     const settings = makeSettingsService(settingsRepo);
     const personSvc = makePersonService(people);
     const accommodationSvc = makeAccommodationService(classrooms, allocations, churches, settingsRepo, people);
@@ -279,7 +279,7 @@ export async function buildContainer(): Promise<Container> {
   ]);
 
   // ----- Services -----
-  const auth = makeAuthService(users);
+  const auth = makeAuthService(users, settingsRepo);
   const settings = makeSettingsService(settingsRepo);
   const personSvc = makePersonService(people);
   const accommodationSvc = makeAccommodationService(classrooms, allocations, churches, settingsRepo, people);

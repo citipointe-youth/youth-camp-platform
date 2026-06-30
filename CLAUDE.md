@@ -13,7 +13,7 @@ A **combined** youth camp management platform that merges two previously separat
 
 An admin can switch the entire app between modes via `POST /admin/mode`. Other logged-in sessions pick up the mode change automatically on next home-tab navigation (no logout required) — `RENDER.home` re-fetches `/settings` and rebuilds tabs if `campMode` changed.
 
-The app is **platform-agnostic**: persistence is in-memory (optionally snapshotted to JSON files), with a Supabase backend in progress. Swapping to a real DB touches only `src/container.ts` + new repository implementations.
+The app is **platform-agnostic**: persistence is in-memory (optionally snapshotted to JSON files), with a Supabase backend deployed to production (`PERSISTENCE=supabase`). Swapping the backend touches only `src/container.ts` + new repository implementations.
 
 ## ✅ DEPLOYED — live on Supabase (2026-06-22)
 
@@ -27,9 +27,8 @@ in-memory to a real Supabase backend is done and serving traffic.
 | **Supabase** | ref `nwfafrgojqkxylbppywo` (Sydney); all 16 tables applied; reached via `DATABASE_URL` (transaction pooler) |
 | **Login** | `admin` (username, not email); password set in the DB post-deploy |
 
-Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolved — see
-"PHASE 6: DEPLOYMENT"), `docs/DEPLOYMENT-DESIGN.md`, `docs/REMAINING-WORK.md`,
-`docs/verification/` (Python harness), `docs/archive/` (historical).
+Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS), `docs/PROGRAM-LOG.md` (initiative log),
+`docs/PROGRAM-SUMMARY.md`, `docs/CODE-QUALITY-LOG.md`, `docs/archive/` (historical).
 
 ### ⚠️ Two deploy-only gotchas — DON'T regress these (neither is caught by `tsc`/`vitest`)
 1. **`tsconfig` must emit CommonJS** (`module: CommonJS`, `moduleResolution: Node`). Switching
@@ -40,7 +39,7 @@ Trackers: **`CHANGELOG.txt`** (phase-by-phase + KNOWN RISKS, several now resolve
    deploys still work but the git auto-deploy fails with *"Cannot find module './data/seed'"*.
 
 ### Status of the bigger roadmap
-- **Gate 0 passes** — `npm run typecheck` clean, **202 tests pass**.
+- **Gate 0 passes** — `npm run typecheck` clean, **261 tests pass**.
 - **Supabase repo layer is complete and wired** (`PERSISTENCE==='supabase'` branch in `container.ts`); migrations applied; all repos verified round-tripping in prod (R11 closed).
 - **Phase 1 (Person unification) is COMPLETE.** The unified `Person` entity/repo/service is the live path. `/registrants` and `/campers` are lifecycle-filtered DTO views over `PersonService` — no separate Registrant/Camper services exist. The Supabase layer targets the `people` table. `docs/STEP4-SWITCHOVER.md` has been archived.
 - **Fixed defects** (now compiler-confirmed): app-won't-start, accommodation availability (B1), reset/new-year (A3/A4), timezone (B3), CSV import perf + BOM (C1), remind scoping (C2), stateless auth + security headers + login rate-limit.
@@ -78,13 +77,12 @@ A deep audit across three areas was completed and all bugs addressed. Key change
 - `person.service.test.ts`: 4 `listMedicalWatch` cases — atCamp filter, departed excluded, church scoping, firstAid access (BUG-12).
 - `admin.characterisation.test.ts`: `BadRequestError` import added; `force:true` alone throws `BadRequestError` for `newYear` (BUG-13).
 
-## Improvement Initiative — Phase 1 applied (2026-06-29, NOT yet deployed)
+## Improvement Initiative — Phases 1–7 deployed (2026-06-28)
 
-A 7-phase improvement program is underway (CMS engineering-maturity patterns onto this app's
-identity). **Phase 1 changes are in the tree but NOT pushed/deployed.** See
-`docs/IMPROVEMENT-DESIGN.md`, `docs/IMPROVEMENT-PLAN.md`, `docs/PROGRAM-LOG.md`,
-`docs/CODE-QUALITY-LOG.md`, `docs/DEPLOY-CHECKLIST.md`, and the dated `CHANGELOG.txt` section.
-Contract changes from Phase 1 that supersede notes below:
+A 7-phase improvement program (CMS engineering-maturity patterns onto this app's identity) was
+completed and deployed to production on 2026-06-28. See `docs/PROGRAM-LOG.md`,
+`docs/PROGRAM-SUMMARY.md`, `docs/CODE-QUALITY-LOG.md`, and the dated `CHANGELOG.txt` section.
+Contract changes that supersede notes below:
 - **Responsive system:** `:root` now has a fluid **type scale** (`--t-display`…`--t-micro`) and the
   `html` root font scales 16→17→18px at 768/1280. Continuous breakpoints (540/768/900/1280) sit
   before the 980px sidebar block; the content column widens 460→820px below 980. Use the `--t-*`
@@ -109,10 +107,9 @@ Contract changes from Phase 1 that supersede notes below:
   show total student/leader tents (PC-11).
 - **Removed concepts:** "unpaid" is gone from the home DTO/UI (PC-3); FAQ/Help is pre-camp only
   (PC-7). `paymentStatus` field + reminders feature remain.
-- **Service worker:** `sw.js` is now `camp-v4`; `API_RE` includes `/export` (was missing).
+- **Service worker:** `sw.js` is now `camp-v7` (stepped v3→v4 P1 →v5 P4 →v6 P5 →v7 P6); `API_RE` includes `/export` (was missing).
 
-### Phase 4 applied (2026-06-29, NOT yet deployed) — first-aid login UX
-See `docs/PHASE-4-FIRSTAID-UX.md` (review) + working-root `ui-mocks-firstaid.html` (mock).
+### Phase 4 (first-aid login UX) — deployed 2026-06-28
 - **firstAid nav** = **Search · Records · Schedule** (`navModel('firstAid')`). Search is the landing
   (no `home` tab — `gotoTab` redirects home→search for firstAid). **Medical Watch removed** (no Watch
   tab, no `/campers/medical` on the first-aid path).
@@ -132,6 +129,30 @@ See `docs/PHASE-4-FIRSTAID-UX.md` (review) + working-root `ui-mocks-firstaid.htm
   Problem/Treatment body render; the notes CSV export already carries them (category column).
 - **Tokens:** added `--ink-2` (darker secondary text) + softened `--alert-*`/`--consent-*` palette;
   all first-aid hardcoded hex tokenised (C1/C3 for these screens).
+
+## UI/bugfix batch — deployed 2026-06-30
+
+A small fix batch (admin-requested) shipped on 2026-06-30:
+- **Account login locks (NEW).** `CampSettings` gained `churchLoginLocked` + `zoneLeaderLoginLocked`
+  (both default `false`; migration `014`). Two **manual** toggles in admin **Settings**
+  (`RENDER.adminSettings`/`saveSettings`, `.tgl` switch). When on, accounts of that role are
+  blocked **at login only** — `auth.service.login` checks the lock *after* the password (so a
+  locked account can't be probed) and throws `UnauthorizedError`. **Existing signed sessions keep
+  working until their 12h TTL** (no per-request enforcement — stateless tokens carry the actor).
+  admin/director/firstAid are never affected. `makeAuthService(users, settingsRepo?)` — the
+  settings repo is optional (login lock is a no-op when absent, e.g. in unit tests). There is **no**
+  automatic date-based trigger (deliberately dropped — the app is serverless with no scheduler).
+- **Devotional editor:** the per-day **Save** button moved to the tile's **top-right**, inline with
+  the day header (`RENDER.adminDevos`, `.rowsb` header row).
+- **Tooltips (`helpTip`):** budget "Total registration fees" tip **removed**; long tips shortened;
+  `_clampTip()` (called from `_toggleTip` on tap + a delegated `mouseover`) nudges the bubble so it
+  never runs off either screen edge. Added brief at-camp tips to **first-day sign-in, daily
+  check-in, My Youth, student search, testimonies**.
+- **Accommodation allocations page** (`drawAccom`): heading **"Classroom rooms" → "Classrooms"**;
+  **"Not in a classroom allocation" → "Classrooms (Pending Allocation)"**; the pending-allocation
+  table now pads **every** column (not just the first) so it doesn't crowd on a phone, count
+  right-aligned. (The separate Accommodation **setup** screen `RENDER.adminAccom` still says
+  "Classroom rooms" — the rename was scoped to the allocations page only.)
 
 ## Commands (run from this folder)
 

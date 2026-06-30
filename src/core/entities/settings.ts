@@ -17,6 +17,11 @@ export interface CampSettings {
   accommodationLocked: boolean;
   tentPrice: number;
   classroomPrice: number;
+  // Account login locks (manual toggles in admin Settings). When true, accounts of that
+  // role are blocked at LOGIN only (existing sessions keep working until their token TTL).
+  // Default false; admin/director/firstAid are never affected.
+  churchLoginLocked: boolean;
+  zoneLeaderLoginLocked: boolean;
   // Mode switch
   campMode: CampMode;
   // Temp passwords from the most recent new-year rollover, cleared after export.

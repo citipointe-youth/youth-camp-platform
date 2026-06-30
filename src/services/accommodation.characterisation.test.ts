@@ -82,6 +82,8 @@ function settings(over: Partial<CampSettings>): CampSettings {
     accommodationLocked: false,
     tentPrice: 80,
     classroomPrice: 120,
+    churchLoginLocked: false,
+    zoneLeaderLoginLocked: false,
     campMode: 'pre-camp',
     createdAt: now,
     updatedAt: now,

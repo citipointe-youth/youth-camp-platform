@@ -3,7 +3,26 @@ import { makeAuthService, toActor, assertSessionSecret } from './auth.service';
 import { InMemoryUserRepository } from '../repositories/in-memory';
 import { hashPassword } from '../utils/crypto';
 import type { User } from '../core/entities/user';
+import type { CampSettings } from '../core/entities/settings';
+import { SETTINGS_ID } from '../core/entities/settings';
+import type { ISettingsRepository } from '../repositories/interfaces/entity-repositories';
 import { UnauthorizedError } from '../core/errors/app-error';
+
+// Minimal settings repo stub for the login-lock checks. Only getSingleton is exercised.
+function fakeSettings(over: Partial<CampSettings> = {}): ISettingsRepository {
+  const now = '2026-01-01T00:00:00.000Z';
+  const settings: CampSettings = {
+    id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-07-01', endDate: '2026-07-05',
+    timezone: 'Australia/Brisbane', checkInDays: [], accommodationLocked: false,
+    tentPrice: 80, classroomPrice: 120, churchLoginLocked: false, zoneLeaderLoginLocked: false,
+    campMode: 'pre-camp', createdAt: now, updatedAt: now, ...over,
+  };
+  return {
+    async init() {},
+    async getSingleton() { return settings; },
+    async saveSingleton(s: CampSettings) { return s; },
+  };
+}
 
 async function seedUser(repo: InMemoryUserRepository, over: Partial<User> = {}): Promise<User> {
   const now = new Date().toISOString();
@@ -70,6 +89,57 @@ describe('AuthService.login', () => {
   it('rejects malformed input without throwing a non-auth error', async () => {
     const svc = makeAuthService(repo);
     await expect(svc.login({ username: '' })).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+});
+
+describe('AuthService.login — admin login locks', () => {
+  let repo: InMemoryUserRepository;
+  beforeEach(async () => {
+    repo = new InMemoryUserRepository();
+    await repo.init();
+  });
+
+  it('blocks a church login when churchLoginLocked is true', async () => {
+    await seedUser(repo, { id: 'c1', username: 'victory', role: 'church', churchId: 'ch1' });
+    const svc = makeAuthService(repo, fakeSettings({ churchLoginLocked: true }));
+    await expect(
+      svc.login({ username: 'victory', password: 'demo1234' }),
+    ).rejects.toThrow(/disabled by the camp administrator/);
+  });
+
+  it('allows a church login when churchLoginLocked is false', async () => {
+    await seedUser(repo, { id: 'c1', username: 'victory', role: 'church', churchId: 'ch1' });
+    const svc = makeAuthService(repo, fakeSettings({ churchLoginLocked: false }));
+    const res = await svc.login({ username: 'victory', password: 'demo1234' });
+    expect(res.token).toBeTruthy();
+  });
+
+  it('blocks a zoneLeader login when zoneLeaderLoginLocked is true', async () => {
+    await seedUser(repo, { id: 'z1', username: 'yellowzone', role: 'zoneLeader', zone: 'Yellow' });
+    const svc = makeAuthService(repo, fakeSettings({ zoneLeaderLoginLocked: true }));
+    await expect(
+      svc.login({ username: 'yellowzone', password: 'demo1234' }),
+    ).rejects.toThrow(/disabled by the camp administrator/);
+  });
+
+  it('does NOT block a church login when only the zoneLeader lock is on (and vice-versa)', async () => {
+    await seedUser(repo, { id: 'c1', username: 'victory', role: 'church', churchId: 'ch1' });
+    const svc = makeAuthService(repo, fakeSettings({ zoneLeaderLoginLocked: true }));
+    expect((await svc.login({ username: 'victory', password: 'demo1234' })).token).toBeTruthy();
+  });
+
+  it('never blocks admin/director/firstAid even when both locks are on', async () => {
+    await seedUser(repo, { id: 'd1', username: 'director', role: 'director' });
+    const svc = makeAuthService(repo, fakeSettings({ churchLoginLocked: true, zoneLeaderLoginLocked: true }));
+    expect((await svc.login({ username: 'director', password: 'demo1234' })).token).toBeTruthy();
+  });
+
+  it('checks the lock AFTER the password — a locked account with a wrong password still gets the generic error', async () => {
+    await seedUser(repo, { id: 'c1', username: 'victory', role: 'church', churchId: 'ch1' });
+    const svc = makeAuthService(repo, fakeSettings({ churchLoginLocked: true }));
+    await expect(
+      svc.login({ username: 'victory', password: 'wrong' }),
+    ).rejects.toThrow(/Invalid credentials/);
   });
 });
 
