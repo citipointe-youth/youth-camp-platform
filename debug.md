@@ -78,7 +78,8 @@ Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (
 ### Infrastructure / plumbing
 | Symbol | ~Line | Owns |
 |---|---|---|
-| `_doFetch` / `api` | 338 / 357 | All HTTP. Bare results, throws on non-2xx. **Preview write-guard** lives in `api()`. Timeout + GET coalescing + **30s result cache**; non-GET writes call `_invalidate`. |
+| `_doFetch` / `api` | 338 / 357 | All HTTP. Bare results, throws on non-2xx. **Preview write-guard** lives in `api()`. Timeout + GET coalescing + **30s result cache**; non-GET writes call `_invalidate`. **`_doFetch` drives the top loading bar** (below). |
+| `_npStart` / `_npDone` / `#nprog` | ~586 / ~594 / CSS ~281 | **Global top loading bar** (2026-07-01). Reference-counted; `_doFetch` calls `_npStart()` on entry and `_npDone()` in `finally`, so only **real** network requests animate the bar (cached GETs bypass `_doFetch` → no flash). `#nprog` = first child of `.app`, absolute `top:0`. "Bar stuck / never shows / flashes on cached nav" → the counter balance in these two fns. |
 | `Cache` / `_allCached` / `_invalidate` / `_prefetch` | 313 / 322 / 325 / 375 | **Perf layer (ported from CMS).** Cache = 30s TTL Map; `_prefetch` warms endpoints after login; `_invalidate` maps a write path → stale keys. **Stale data after a write = `_invalidate` mapping.** |
 | `sessionExpired` | 429 | 401 handling (clears Cache) |
 | `ICONS` / `ic` | 394 / 414 | SVG icon set + renderer (incl. `edit/at/key/trash` for account rows). **Blank icon = missing key here.** |
@@ -158,9 +159,9 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | ⮑ **Timezone hardcoded** to Australia/Brisbane (field removed); check-in days **auto-derived** from start/end via `_datesBetween`; `renderCheckinDaysPreview`/`onStartDateChange` (start pre-fills end +3 days). Also hosts the two **login-lock toggles** (`stChurchLock`/`stZoneLock` → `churchLoginLocked`/`zoneLeaderLoginLocked`, `.tgl` switch) saved in `saveSettings`. | — |
 | `RENDER.adminData` (+ `adminReset`, `adminClear`) | ~1926 | **Merged from Records & Export**: shows compliance export card, close-out card, CSV upload, notifications clear (at-camp), rollover, factory reset. Title = "Data, Reset & Exports". |
 | `RENDER.import / adminUpload / _renderImportPreview / _confirmImport / _createPhantomChurches` | ~1947 / ~2030 / ~2074 / ~2090 / ~2095 | Phantom churches now get a per-church form (zone + username + password) with a "Create N churches" pre-step that re-runs dry-run after creation. |
-| `RENDER.adminWizard` | ~2130 |
+| `RENDER.adminWizard` (+ `WIZARD_STEPS`) | ~3012 / ~3001 | **9 steps (2026-07-01):** settings→churches→accounts→accom **rooms**→**accomAlloc** (`accom`)→schedule→**devos**→**faq**→**contacts**, logical order. Each step has an auto-`check()` (green tick) + a `tip` shown via `helpTip`. "Wizard step wrong/missing tick or tooltip" → `WIZARD_STEPS`. |
 | `RENDER.adminDevos / saveDevo` | 2153 / 2168 |
-| `RENDER.adminSchedEdit` — **per-day table** (`_schedRow` 2172, `addSchedRow` 2193, `saveSchedDay` 2197 = source-of-truth replace). No location, no `isCheckInPoint`. | 2176 |
+| `RENDER.adminSchedEdit` — **per-day table** (`_schedRow` ~3048, `addSchedRow`, `saveSchedDay` = source-of-truth replace). No location, no `isCheckInPoint`. Grid `96px minmax(0,1fr) auto` + `.sched-row input{min-width:0}` (2026-07-01, fixes phone overlap — native `type=time` `min-width:auto` was overflowing the Time track). | ~3050 |
 | `RENDER.adminContacts / saveContacts` (+ `toggleContactCard` 2235; header shows `n/4 Contacts`) | 2210 / 2236 |
 
 ---
@@ -235,7 +236,10 @@ tolerate absence via `?? false`.
 | Wrong tab highlighted | SPA `TAB_OF` (505) |
 | Tab missing/extra for a role or mode | SPA `buildTabs` (605) / `_renderWideNav` (567) — check grid above |
 | **Stale data after a write / screen won't refresh** | SPA `Cache` (313) + `_invalidate` (325) — the write's path must map to the right stale keys. `{noCache:true}` forces fresh. |
-| Slow home / spinner flash on revisit | SPA `_prefetch` (375), `_navTo` stale-while-revalidate (537), parallel loads in `RENDER.home` (629) |
+| Slow home / spinner flash on revisit | SPA `_prefetch` (375, warms admin `/accounts/*` too), `_navTo` stale-while-revalidate (537), parallel loads in `RENDER.home` (629) |
+| **Top loading bar stuck / missing / flashes on cached nav** | SPA `_npStart`/`_npDone` (~586/~594) + `#nprog` CSS (~281). Only `_doFetch` (real network) drives it; cached GETs bypass it by design. Feels unresponsive on button tap = expected serverless latency, now covered by the bar. |
+| **Setup wizard: wrong step order / missing tick / no tooltip** | SPA `WIZARD_STEPS` (~3001) — 9 steps, each with `check()` (tick) + `tip` (`helpTip`). `RENDER.adminWizard` ~3012. |
+| **Schedule-edit Time/Activity inputs overlap on phone** | SPA `_schedRow` (~3048) grid `96px minmax(0,1fr) auto` + `.sched-row input{min-width:0}`. Native `type=time` `min-width:auto` overflows a fixed track without this. |
 | Write silently blocked, "preview" toast | SPA `api()` preview guard (357) + `enterPreview` (483) |
 | **Preview at-camp view won't load** | SPA `RENDER.home` `/settings` re-fetch is guarded by `if(!PREVIEW_MODE)` (~636); `enterPreview` (483) |
 | Mode change didn't reach a logged-in user | SPA `RENDER.home` `/settings` re-fetch (~636, skipped in preview); backend `admin.service` |

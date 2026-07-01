@@ -154,6 +154,32 @@ A small fix batch (admin-requested) shipped on 2026-06-30:
   right-aligned. (The separate Accommodation **setup** screen `RENDER.adminAccom` still says
   "Classroom rooms" — the rename was scoped to the allocations page only.)
 
+## UI/UX fix batch — deployed 2026-07-01
+
+Admin-requested batch (pre-camp). **SPA-only** (`public/index.html`) — no backend/schema change,
+no migration. Verified: SPA `node --check` OK, `npm run typecheck` clean, `npm run test` = 270 pass.
+- **Schedule-edit overlap (phone):** `_schedRow` grid is now `96px minmax(0,1fr) auto` (row **and**
+  its header) + a `.sched-row input{min-width:0}` rule. Native `<input type="time">` keeps
+  `min-width:auto` and was overflowing the fixed 92px Time track into the Activity field on narrow
+  screens — the `minmax(0,1fr)` + `min-width:0` lets both inputs shrink to their tracks.
+- **Setup wizard (`WIZARD_STEPS`) expanded + reordered** into a logical setup flow:
+  Camp settings → Churches → Accounts → **Accommodation rooms** → **Accommodation allocation** →
+  Schedule → **Devotionals** → **FAQ** → **Ministry contacts**. The four new steps (`accomAlloc`
+  →`accom`, `devos`→`adminDevos`, `faq`→`adminFaq`, `contacts`→`adminContacts`) auto-detect "done"
+  like the originals: allocation = any room in `/accommodation/allocations` has an occupant;
+  devotionals = any `checkInDays` day has verse/reflection/prayer; FAQ = ≥1 `/faq` entry; contacts =
+  any church has ≥1 named leader. ("Accommodation" → "Accommodation rooms" to distinguish it from
+  the new allocation step.) Each step also carries a `tip` rendered as a `helpTip('…')` bubble beside
+  its label (Bug 3 — a short tooltip per wizard item).
+- **Global top loading bar (`#nprog`, NEW):** a thin accent bar under the top edge, driven from
+  `_doFetch` via reference-counted `_npStart`/`_npDone` (creeps to 90%, snaps to 100% on completion,
+  fades). Addresses the "screen sits still 1–1.5s after a button push" complaint (genuine serverless
+  + Supabase round-trip latency; stale-while-revalidate revisits showed no loading hint). **Only real
+  network requests drive it** — cached GETs bypass `_doFetch`, so instant navigations don't flash the
+  bar. `#nprog` is the first child of `.app` (absolute `top:0`); tune colour/height in that one CSS rule.
+- **Latency quick-win:** `_prefetch` now also warms `/accounts/churches` + `/accounts/users` for
+  admin/director on login (the Accounts, Ministry-contacts and Wizard screens then open from cache).
+
 ## Commands (run from this folder)
 
 ```bash
