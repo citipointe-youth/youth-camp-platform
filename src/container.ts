@@ -180,7 +180,7 @@ export async function buildContainer(): Promise<Container> {
     const exportSvc = makeExportService(people, churches);
     const churchImportSvc = makeChurchImportService(users, churches);
     const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
-    const account = makeAccountService(users, churches);
+    const account = makeAccountService(users, churches, people);
     const dashboard = makeDashboardService(people, notifications, churches);
     const admin = makeAdminService(
       users, churches, people, classrooms, allocations, faqs, scheduleRepo,
@@ -293,7 +293,7 @@ export async function buildContainer(): Promise<Container> {
   const exportSvc = makeExportService(people, churches);
   const churchImportSvc = makeChurchImportService(users, churches);
   const auditExportSvc = makeAuditExportService(people, notes, settingsRepo);
-  const account = makeAccountService(users, churches);
+  const account = makeAccountService(users, churches, people);
   const dashboard = makeDashboardService(
     people,
     notifications,

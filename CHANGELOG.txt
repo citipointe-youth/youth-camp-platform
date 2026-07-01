@@ -1,6 +1,29 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-01 — FIX: church rename now propagates to attached people (NOT YET DEPLOYED)
+-----------------------------------------------------------------------------------
+A Person carries a denormalized churchName snapshot alongside churchId (person.ts). updateChurch
+(account.service.ts) only saved the Church row, so after an admin renamed a church every attached
+person kept the OLD name on rosters/search/check-in/audit-export (all read p.churchName), while the
+home per-church breakdown and Elvanto export showed the NEW name (they re-resolve by churchId) —
+an inconsistent, half-renamed state. Data was never orphaned (churchId is the real FK; access
+scoping keys off it), so this was a display/consistency defect, not data loss.
+
+  * FIX — updateChurch re-stamps churchName on every person attached to the church when (and only
+    when) the name actually changes: personRepo.findByChurch(id) -> saveMany(...) (one bulk write,
+    not N). No-op / contacts-only / same-name edits touch nobody. makeAccountService now takes the
+    person repo (both container.ts call sites updated). Works on memory + supabase (church_name
+    already round-trips; no migration).
+  * EDGE CASE — this is rare: names are normally settled before any people or accommodation
+    allocations exist, and a CSV re-import under a changed name creates a NEW church+account
+    (church match is by name) rather than renaming. Fix mainly covers the deliberate admin rename.
+  * KNOWN, NOT FIXED — zone is the same denormalization on Person and updateChurch also accepts a
+    zone change; a stale person.zone is worse than a stale name (zoneLeader access scoping keys off
+    it). Deliberately left out of this change; one-line follow-up in the same loop if wanted.
+  * Verified: npm run typecheck clean; npm run test = 270 pass (3 new in account.service.test.ts:
+    propagation, other-church isolation, no-rewrite-on-unchanged-name). Nothing pushed/deployed.
+
 2026-06-30 — IMPROVEMENT INITIATIVE PHASE 6 (year-to-year reusability review; NOT YET DEPLOYED)
 ----------------------------------------------------------------------------------------------
 A feature-by-feature assessment of whether a non-coder admin can reuse the app for next year's camp

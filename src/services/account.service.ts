@@ -1,4 +1,8 @@
-import type { IUserRepository, IChurchRepository } from '../repositories/interfaces/entity-repositories';
+import type {
+  IUserRepository,
+  IChurchRepository,
+  IPersonRepository,
+} from '../repositories/interfaces/entity-repositories';
 import type { User, SafeUser } from '../core/entities/user';
 import type { Church } from '../core/entities/church';
 import type { Actor } from '../core/entities/user';
@@ -33,6 +37,7 @@ export interface AccountService {
 export function makeAccountService(
   userRepo: IUserRepository,
   churchRepo: IChurchRepository,
+  personRepo: IPersonRepository,
 ): AccountService {
   return {
     async listUsers(actor) {
@@ -173,7 +178,21 @@ export function makeAccountService(
       if (!existing) throw new NotFoundError('Church not found');
       const data = UpdateChurchSchema.parse(input);
       const updated: Church = { ...existing, ...data, id: existing.id, updatedAt: nowISO() };
-      return churchRepo.save(updated);
+      const saved = await churchRepo.save(updated);
+      // Person carries a denormalized `churchName` snapshot (person.ts) alongside
+      // `churchId`. A rename must re-stamp it on every attached person, or rosters
+      // and exports keep showing the old name. (Edge case — names are normally
+      // settled before any people/allocations exist — but cheap to keep consistent.)
+      if (data.name !== undefined && data.name !== existing.name) {
+        const attached = await personRepo.findByChurch(id);
+        if (attached.length > 0) {
+          const stamp = nowISO();
+          await personRepo.saveMany(
+            attached.map((p) => ({ ...p, churchName: saved.name, updatedAt: stamp })),
+          );
+        }
+      }
+      return saved;
     },
 
     async deleteUser(actor, id) {
