@@ -85,6 +85,7 @@ Also: `Cache` (313, 30s TTL data cache), `ALLREG/CHURCHES` (~839), `_navToken` (
 | `ICONS` / `ic` | 394 / 414 | SVG icon set + renderer (incl. `edit/at/key/trash` for account rows). **Blank icon = missing key here.** |
 | `toast / modal / closeModal` | 422–424 | Transient UI |
 | `dayLong / timeFmt / dtFmt` | 425 | Date formatting (UTC-anchored). `_addDays / _datesBetween` near `adminSettings` derive check-in days. |
+| `fmtPhone` / `telLink` | ~1259 / ~1267 | **(NEW 2026-07-02)** `fmtPhone` normalizes AU mobiles for display — reformats a 10-digit `04xxxxxxxx` to `0411 928 301` and re-adds a dropped leading 0 on a 9-digit truncated number (common when a CSV mobile column got numeric-coerced upstream in Excel/Elvanto). Passes through anything else unchanged (incl. masked contact numbers like `0411****01`). `telLink` (tel: links) and every other phone-display site (Data tab, first-aid leader/parent contacts, search reveal, Student Info/camper card) call it. **Doesn't touch editable phone `<input>` values** (e.g. ministry-contacts editor `pair()`) — only rendered/read-only text. "Phone shown inconsistently / missing leading 0" → here. |
 | `_initDemoLogin / quick` | 444 / 451 | Demo quick-login (localhost only) |
 | `doLogin / logout / _tryRestoreSession` | 452 / 467 / ~2244 | Auth. `doLogin` saves token+actor to localStorage; `logout` clears localStorage; `_tryRestoreSession` (called at boot) restores session across page reloads. |
 
@@ -115,7 +116,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 | `RENDER.help` | 929 |
 | `RENDER.budget` (prices from per-registrant `registrationCost` — NOT settings prices, which are deprecated) | ~1249 |
 | `RENDER.accom` — classroom **rooms** + allocation map. Helpers: `accomChurches`/`accomGroups` (75% eligibility), `addAlloc` (auto-fill, single-gender guard), `removeAlloc` (cascade), `drawAccom`, `tentDist` (7/tent). | ~1278 |
-| `RENDER.data` (director/admin data view) | 1958 |
+| `RENDER.data` (director/admin data view) | ~2906 | Linked from the "Data, Reset & Exports" admin screen's `dataTableCard` "View ›" pill (`RENDER.adminData` ~2849). **(2026-07-02)** `dataApply` (~2969) now sorts client-side: `_dataCache` defaults to createdAt-ascending (approximates import order — `/registrants` itself returns alphabetical) and headers are clickable (`dataSort` ~2963, `DATA_COLS`/`_dataSortVal` ~2944) cycling unsorted→asc→desc. `Mobile` column runs through `fmtPhone`. |
 
 > **`RENDER.codes` (registration code / self-register) was DELETED** — self-registration is gone
 > (all registrants arrive via CSV). No reg-code screen, home card, or `/r/:slug` link.
@@ -123,7 +124,7 @@ then **parallel-loads** `/home`+`/registrants`+`/notifications`, pre-camp home (
 ### At-camp screens
 | Screen / fn | ~Line | Notes |
 |---|---|---|
-| `RENDER.checkin` | 981 | Daily session check-in. `_ciLabel` 936, `CHECKIN_QUEUE` 946, `drainQueue` 956, `_optimisticState` 975, `rowHtml` 1013. **Sessions = `settings.checkInDays`×AM/PM** (id `${day}~am`), NOT schedule — see backend `checkin-sessions.ts`. The status path `encodeURIComponent`s the id (the `~` delimiter replaced `#`, which broke the URL → "Endpoint not found"). |
+| `RENDER.checkin` | 981 | Daily session check-in. `_ciLabel` 936, `CHECKIN_QUEUE` 946, `drainQueue` 956, `_optimisticState` 975, `rowHtml` ~1481. **Sessions = `settings.checkInDays`×AM/PM** (id `${day}~am`), NOT schedule — see backend `checkin-sessions.ts`. The status path `encodeURIComponent`s the id (the `~` delimiter replaced `#`, which broke the URL → "Endpoint not found"). **(2026-07-02)** `rowHtml` tile decluttered: avatar/initials, med badge, and the always-on grey sync dot removed; Check-in is now a primary solid button (ghost once already checked in) labelled "Check in"/"Check out", bigger than the ghost "Add note" button. Per-row sync state (`_updateSyncDots`/`_markSynced`) is now a harmless no-op — the top `ci-sync` banner is the only sync-status UI. |
 | `_performCheck / confirmCheckOut / doCheck` | 1052 / 1062 / 1086 | Optimistic flip + undo (`undoCheck` 1075) |
 | `notePrompt` | 1087 | Check-in notes |
 | **FIRST AID (Phase 4)** `renderSearchFirstAid / runFaSearch` | ~1375 | firstAid home = student search (no Medical Watch). `_ALLERGY_RE` flags allergy-type dietary items. |
@@ -241,6 +242,9 @@ tolerate absence via `?? false`.
 | **Top loading bar stuck / missing / flashes on cached nav** | SPA `_npStart`/`_npDone` (~586/~594) + `#nprog` CSS (~281). Only `_doFetch` (real network) drives it; cached GETs bypass it by design. Feels unresponsive on button tap = expected serverless latency, now covered by the bar. |
 | **Setup wizard: wrong step order / missing tick / no tooltip** | SPA `WIZARD_STEPS` (~3001) — 9 steps, each with `check()` (tick) + `tip` (`helpTip`). `RENDER.adminWizard` ~3012. |
 | **Schedule-edit Time/Activity inputs overlap on phone** | SPA `_schedRow` (~3048) grid `96px minmax(0,1fr) auto` + `.sched-row input{min-width:0}`. Native `type=time` `min-width:auto` overflows a fixed track without this. |
+| **`.pill` badge ("View ›" etc.) wraps to two lines on phone** | SPA `.pill` CSS (~123) — needs `white-space:nowrap;flex-shrink:0` (fixed 2026-07-02); a long sibling in the same `.rowsb` was squeezing it below its content width. |
+| **Data tab: phone shown inconsistently / missing leading 0** | SPA `fmtPhone` (~1259) — see Infrastructure table above. |
+| **Data tab: can't sort columns / doesn't default to import order** | SPA `RENDER.data`/`dataApply` (~2906/~2969) — see Pre-camp screens table above. |
 | Write silently blocked, "preview" toast | SPA `api()` preview guard (357) + `enterPreview` (483) |
 | **Preview at-camp view won't load** | SPA `RENDER.home` `/settings` re-fetch is guarded by `if(!PREVIEW_MODE)` (~636); `enterPreview` (483) |
 | Mode change didn't reach a logged-in user | SPA `RENDER.home` `/settings` re-fetch (~636, skipped in preview); backend `admin.service` |

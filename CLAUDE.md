@@ -205,6 +205,31 @@ Admin-requested batch (SPA + backend + **migration 016**, applied to prod):
 - **Tooltips:** church auto-creation + override explained on the "Add a church" card and the
   wizard Churches step.
 
+## UI/UX fix batch — deployed 2026-07-02 (at-camp bug list)
+
+Admin-requested batch (at-camp, from "Admin Mode: at camp"). **SPA-only** (`public/index.html`) —
+no backend/schema change, no migration. Verified: SPA `node --check` OK, `npm run typecheck`
+clean, `npm run test` = 275 pass.
+- **Daily check-in tile decluttered:** `rowHtml` (in `RENDER.checkin`) dropped the initials avatar,
+  the "med" medical-flag badge, and the always-visible grey sync dot (per-row sync state is now a
+  silent no-op — the existing top-of-list `ci-sync` banner is the only sync-status UI). The
+  check-in button is now a primary solid pill labelled "Check in"/"Check out" (ghost once already
+  checked in), sized larger than the ghost "Add note" button beside it.
+- **`.pill` badges no longer wrap on phone:** ("View ›" on the Data/Budget/Accommodation nav cards
+  was breaking onto two lines when squeezed by a long sibling in the same `.rowsb`) — `.pill` CSS
+  gained `white-space:nowrap;flex-shrink:0`.
+- **Phone-number display normalized (`fmtPhone`, NEW):** AU mobiles now always render as
+  `0411 928 301` regardless of source formatting, including CSV imports that lost the leading 0 to
+  spreadsheet numeric coercion upstream (a 9-digit `4xxxxxxxx` is re-prefixed with `0`). Applied
+  everywhere a phone number is *displayed* (Data tab, `telLink`, first-aid leader/parent contacts,
+  student search reveal, Student Info/camper detail) — editable phone `<input>` fields (ministry
+  contacts editor) are untouched so admins can still type freely. Masked contact numbers
+  (`0411****01`) pass through unchanged.
+- **Data tab (`RENDER.data`) is sortable:** clicking a column header cycles
+  unsorted→ascending→descending→unsorted (`dataSort`); unsorted is the **default import order**
+  (`_dataCache` sorted by `createdAt` ascending client-side, since `/registrants` itself returns
+  alphabetical order) rather than whatever order the last sort left it in.
+
 ## Commands (run from this folder)
 
 ```bash

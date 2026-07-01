@@ -120,7 +120,7 @@ body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFon
 .h3{font-size:var(--t-xs);font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px;}
 h3.sec{font-size:var(--t-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 2px 9px;}
 .bar7{height:9px;border-radius:999px;background:var(--chip);overflow:hidden;margin:9px 0 8px;}.bar7>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--violet),var(--blue2));}
-.pill{font-size:var(--t-2xs);font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;letter-spacing:.02em;}
+.pill{font-size:var(--t-2xs);font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;letter-spacing:.02em;white-space:nowrap;flex-shrink:0;}
 .pill.ok{background:#dcfce7;color:#15803d;}.pill.warn{background:#fee2e2;color:#b91c1c;}.pill.amb{background:#fef3c7;color:#92400e;}.pill.info{background:var(--chip);color:var(--violet-d);}
 .pills{display:flex;gap:7px;flex-wrap:wrap;}
 /* A4: fluid tile grid — auto-fill gives a continuous 2→3→4 column progression as the
@@ -1252,9 +1252,21 @@ async function renderOversightPulse(){
     return bars?`<div class="card"><div class="lbl" style="margin-top:0">Check-in pulse · ${esc(st.session?.label||'')}</div>${bars}</div>`:'';
   }catch(e){return '';}
 }
+// Displays AU mobile numbers consistently (e.g. CSV imports that dropped the leading 0
+// via spreadsheet numeric coercion show "411928301" — this reformats to "0411 928 301").
+// Anything that isn't a recognisable 9/10-digit AU mobile (incl. masked contact numbers
+// like "0411****01") passes through unchanged.
+function fmtPhone(phone){
+  if(!phone)return phone||'';
+  let d=String(phone).replace(/\D/g,'');
+  if(d.length===11&&d.startsWith('61'))d='0'+d.slice(2);
+  else if(d.length===9&&d.startsWith('4'))d='0'+d;
+  if(d.length===10&&d.startsWith('04'))return d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7);
+  return phone;
+}
 function telLink(phone){
   if(!phone)return esc(phone||'');
-  return `<a href="tel:${esc(phone)}" style="color:#4f46e5">${esc(phone)}</a>`;
+  return `<a href="tel:${esc(phone)}" style="color:#4f46e5">${esc(fmtPhone(phone))}</a>`;
 }
 
 /* ===== PRE-CAMP MY YOUTH ===== */
@@ -1467,17 +1479,13 @@ RENDER.checkin=async function renderCheckin(){
   const zoneSelOpts=zonesOpt.map(z=>`<option value="${z}" ${z===FILTER.zone?'selected':''}>${z==='all'?'All zones':z+' Zone'}</option>`).join('');
   const churchSelOpts=churchesOpt.map(ch=>`<option value="${esc(ch)}" ${ch===FILTER.church?'selected':''}>${ch==='all'?'All churches':esc(ch)}</option>`).join('');
   function rowHtml(c,isDue){
-    const syncClass=CHECKIN_QUEUE.find(e=>e.camperId===c.id)?'pending':'';
     return `<div class="row${c.present?' checked':''}" onclick="_performCheck('${c.id}','${c.present?'out':'in'}','${esc(c.name)}')">
-      <div class="av ${esc(c.gender||'')}">${initials(c.name)}</div>
       <div style="flex:1;min-width:0">
-        <div class="nm">${esc(c.name)}${c.medicalFlag?' <span class="med" style="font-size:.62rem">med</span>':''}</div>
+        <div class="nm">${esc(c.name)}</div>
         <div class="sub">${esc(c.church||c.zone)}${c.grade?' · Yr '+c.grade:''}</div>
       </div>
       <button class="btn ghost sm" style="z-index:1;flex:none" onclick="event.stopPropagation();notePrompt('${c.id}','${esc(c.name)}')">Add note</button>
-      <span class="sync-dot ${syncClass}" data-id="${c.id}"></span>
-      <button class="btn ghost sm" style="z-index:1" aria-label="${c.present?'Check out':'Check in'}" onclick="event.stopPropagation();_performCheck('${c.id}','${c.present?'out':'in'}','${esc(c.name)}')">${icSm('plus')}</button>
-      <span style="color:#94a3b8;margin-left:4px">${c.present?icSm('check'):''}</span>
+      <button class="btn ${c.present?'ghost ':''}sm" style="z-index:1;flex:none;padding:10px 18px;font-size:var(--t-sm)" aria-label="${c.present?'Check out':'Check in'}" onclick="event.stopPropagation();_performCheck('${c.id}','${c.present?'out':'in'}','${esc(c.name)}')">${c.present?'Check out':'Check in'}</button>
     </div>`;
   }
   const completionBanner=dueShown===0?`<div class="card" style="background:#dcfce7;border:1px solid #16a34a;text-align:center;padding:18px 12px">
@@ -1659,7 +1667,7 @@ async function openStudentInfo(id){
     : `<div class="fa-consent no">${ic('alert')}<div>Medical consent — Not granted<div class="sub">Reach the leader / parent before treating</div></div></div>`;
   const leadBtn=(ct,cls)=>ct?`<div class="who"><span class="nm">${esc(ct.name)}</span><span class="ptag${cls==='sec'?' sec':''}">${cls==='sec'?'Secondary':'Primary'}</span></div>
       <div class="sub">${esc(c.churchName)} · ${ct.gender==='female'?'Female':'Male'} ${ct.type==='backup'?'backup':'leader'}</div>
-      <button class="btn fa-call" onclick="faRevealLeader('${c.id}','${esc(ct.role)}',this)">${icSm('phone')} ${esc(ct.phone)}</button>`:'';
+      <button class="btn fa-call" onclick="faRevealLeader('${c.id}','${esc(ct.role)}',this)">${icSm('phone')} ${esc(fmtPhone(ct.phone))}</button>`:'';
   const leadCard=(prim||back)
     ? `<div class="fa-lead"><div class="lh">${icSm('phone')} Ministry leader — contact first</div>
         ${leadBtn(prim,'pri')}${back?`<div style="margin-top:14px">${leadBtn(back,'sec')}</div>`:''}</div>`
@@ -1672,7 +1680,7 @@ async function openStudentInfo(id){
   const parent=(c.parentGuardianName||c.parentPhone)?`<div class="fa-last">
     <div class="lbl">Parent / guardian</div>
     ${c.parentGuardianName?`<div class="kv"><span class="k">${esc(c.parentGuardianName)}${c.parentRelation?' ('+esc(c.parentRelation)+')':''}</span><span class="v"></span></div>`:''}
-    ${c.parentPhone?`<a class="btn fa-parent" href="tel:${esc(c.parentPhone)}">${icSm('phone')} ${esc(c.parentPhone)}</a>`:''}</div>`:'';
+    ${c.parentPhone?`<a class="btn fa-parent" href="tel:${esc(c.parentPhone)}">${icSm('phone')} ${esc(fmtPhone(c.parentPhone))}</a>`:''}</div>`:'';
   paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="renderSearchFirstAid()">${icSm('arrowl')} Back</button></div>
     <div class="fa-id">${_faBubble(c)}<div><h2>${esc(c.firstName+' '+c.lastName)}</h2>
       <div class="meta">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')} · ${esc(c.churchName)} · ${esc(c.zone)} Zone</div>
@@ -1685,8 +1693,8 @@ async function openStudentInfo(id){
 }
 async function faRevealLeader(id,role,btn){
   try{const ct=await api('/search/contact/'+id+'/'+encodeURIComponent(role));
-    if(btn)btn.innerHTML=`${icSm('phone')} ${esc(ct.phone)}`;
-    toast(ct.name+': '+ct.phone);
+    if(btn)btn.innerHTML=`${icSm('phone')} ${esc(fmtPhone(ct.phone))}`;
+    toast(ct.name+': '+fmtPhone(ct.phone));
   }catch(e){toast(e.message);}
 }
 async function _loadStudentRecent(id){
@@ -1803,7 +1811,7 @@ async function runSearch(v){const box=document.getElementById('results');if(!box
         ${back?`<button class="btn alt sm" style="flex:1" onclick="reveal('${c.id}','${esc(back.role)}')">Secondary</button>`:''}
       </div></div>`;}).join(''):'<p class="note-hint">No camper matches.</p>';
   }catch(e){toast(e.message);}}
-async function reveal(id,role){try{const c=await api('/search/contact/'+id+'/'+encodeURIComponent(role));toast(c.name+': '+c.phone);}catch(e){toast(e.message);}}
+async function reveal(id,role){try{const c=await api('/search/contact/'+id+'/'+encodeURIComponent(role));toast(c.name+': '+fmtPhone(c.phone));}catch(e){toast(e.message);}}
 
 /* ===== NOTICES ===== */
 RENDER.notifs=async function(){
@@ -2218,7 +2226,7 @@ async function openCamper(id,push=true){
     <h2>${esc(fullName)}</h2><div style="color:#cfe0ff;font-size:.82rem">${esc(p.zone)} Zone · ${lead?'Leader (18+)':'Grade '+p.grade}</div></div>
     <div class="card">
       <div class="kv"><span class="k">Church</span><span class="v">${esc(p.churchName)}</span></div>
-      <div class="kv"><span class="k">${lead?'Mobile':'Student mobile'}</span><span class="v"><a href="tel:${esc(p.mobile||'')}" style="color:#4f46e5;text-decoration:none">${esc(p.mobile||'—')}</a></span></div>
+      <div class="kv"><span class="k">${lead?'Mobile':'Student mobile'}</span><span class="v"><a href="tel:${esc(p.mobile||'')}" style="color:#4f46e5;text-decoration:none">${esc(fmtPhone(p.mobile)||'—')}</a></span></div>
       ${lead?'':`<div class="kv"><span class="k">Medical</span><span class="v">${(p.medicalConditions||[]).join(', ')||'—'}</span></div>
       <div class="kv"><span class="k">Dietary</span><span class="v">${(p.dietaryRequirements||[]).join(', ')||'—'}</span></div>
       ${p.otherMedications?`<div class="kv"><span class="k">Medication</span><span class="v">${esc(p.otherMedications)}</span></div>`:''}`}
@@ -2227,7 +2235,7 @@ async function openCamper(id,push=true){
     ${camp}
     ${lead?'':`<div class="card"><div class="h3" style="margin-top:0">Parent / guardian</div>
       <div class="kv"><span class="k">Name</span><span class="v">${esc(p.parentGuardianName||'—')}${p.parentRelation?' ('+esc(p.parentRelation)+')':''}</span></div>
-      <div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(p.parentPhone||'')}" style="color:#4f46e5;text-decoration:none">${esc(p.parentPhone||'—')}</a></span></div></div>`}
+      <div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(p.parentPhone||'')}" style="color:#4f46e5;text-decoration:none">${esc(fmtPhone(p.parentPhone)||'—')}</a></span></div></div>`}
     ${notesHtml}`;
   const camperEl=document.getElementById('camper');
   if(camperEl)camperEl.scrollTop=0;
@@ -2893,14 +2901,18 @@ RENDER.import=function(){
 };
 
 /* ===== DATA (director/admin): filterable registration table + Elvanto-format export ===== */
-let _dataCache=null; // cached /registrants for client-side filtering
+let _dataCache=null; // cached /registrants for client-side filtering, default-sorted to import order
+let _dataSortKey=null,_dataSortDir=1; // active column sort; null key = default import order
 RENDER.data=async function(){
   if(!['director','admin'].includes(ACTOR.role)){paint('data','<p class="note-hint">This area is restricted to directors and admins.</p>','Data','');return;}
   const [regs,churches]=await Promise.all([
     api('/registrants').catch(()=>[]),
     api('/accounts/churches').catch(()=>[]),
   ]);
-  _dataCache=regs||[];
+  // Default order = the order records were imported in (createdAt asc) — /registrants
+  // itself returns alphabetical (last name), so re-sort here rather than trust the API order.
+  _dataCache=(regs||[]).slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  _dataSortKey=null;_dataSortDir=1;
   const chOpts=['<option value="">All churches</option>'].concat(
     (churches||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`)).join('');
   const gradeOpts=['<option value="">All grades</option>','<option value="leader">Leaders</option>']
@@ -2929,23 +2941,55 @@ function dataFilters(){
     grade:document.getElementById('dfGr')?.value||'',
   };
 }
+const DATA_COLS=[['Name','name'],['Church','church'],['Gender','gender'],['Grade','grade'],['Reg type','regType'],['Cost','cost'],['Discount code','discount'],['Mobile','mobile'],['Medical','medical'],['Dietary','dietary'],['Other','other'],['Blue card','blueCard']];
+function _dataSortVal(r,key){
+  switch(key){
+    case 'name':return (r.lastName+', '+r.firstName).toLowerCase();
+    case 'church':return (r.churchName||'').toLowerCase();
+    case 'gender':return (r.gender||'').toLowerCase();
+    case 'grade':return r.kind==='leader'?9999:(r.grade??-1);
+    case 'regType':return (r.registrationType||'').toLowerCase();
+    case 'cost':return r.registrationCost??-1;
+    case 'discount':return (r.discountCode||'').toLowerCase();
+    case 'mobile':return (r.mobile||'').replace(/\D/g,'');
+    case 'medical':return (r.medicalConditions||[]).join(', ').toLowerCase();
+    case 'dietary':return (r.dietaryRequirements||[]).join(', ').toLowerCase();
+    case 'other':return (r.otherMedications||'').toLowerCase();
+    case 'blueCard':return (r.blueCardNumber||'').toLowerCase();
+    default:return '';
+  }
+}
+// 3-state header click: unsorted (import order) → asc → desc → back to unsorted.
+function dataSort(key){
+  if(_dataSortKey!==key){_dataSortKey=key;_dataSortDir=1;}
+  else if(_dataSortDir===1){_dataSortDir=-1;}
+  else{_dataSortKey=null;_dataSortDir=1;}
+  dataApply();
+}
 function dataApply(){
-  const f=dataFilters();const rows=(_dataCache||[]).filter(r=>{
+  const f=dataFilters();let rows=(_dataCache||[]).filter(r=>{
     if(f.churchId&&r.churchId!==f.churchId)return false;
     if(f.gender&&r.gender!==f.gender)return false;
     if(f.grade==='leader'){if(r.kind!=='leader')return false;}
     else if(f.grade){if(r.kind==='leader'||String(r.grade??'')!==f.grade)return false;}
     return true;
   });
-  const hdr=['Name','Church','Gender','Grade','Reg type','Cost','Discount code','Mobile','Medical','Dietary','Other','Blue card'];
+  if(_dataSortKey)rows=rows.slice().sort((a,b)=>{
+    const av=_dataSortVal(a,_dataSortKey),bv=_dataSortVal(b,_dataSortKey);
+    if(av<bv)return -1*_dataSortDir;if(av>bv)return 1*_dataSortDir;return 0;
+  });
   const td=v=>`<td style="border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(v||'—')}</td>`;
   const body=rows.map(r=>{
     const grade=r.kind==='leader'?'Leader':(r.grade??'—');
     const cost=r.registrationCost!=null?'$'+r.registrationCost.toLocaleString():'—';
-    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.registrationType)}${td(cost)}${td(r.discountCode)}${td(r.mobile)}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
+    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.registrationType)}${td(cost)}${td(r.discountCode)}${td(fmtPhone(r.mobile))}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
   }).join('');
   const t=document.getElementById('dataTbl');
-  if(t)t.innerHTML=`<thead><tr>${hdr.map(h=>`<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted)">${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="12" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
+  const thead=DATA_COLS.map(([label,key])=>{
+    const arrow=_dataSortKey===key?(_dataSortDir===1?' ▲':' ▼'):'';
+    return `<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap" onclick="dataSort('${key}')">${label}${arrow}</th>`;
+  }).join('');
+  if(t)t.innerHTML=`<thead><tr>${thead}</tr></thead><tbody>${body||'<tr><td colspan="12" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
   const c=document.getElementById('dataCount');if(c)c.textContent=`${rows.length} of ${(_dataCache||[]).length} registrants`;
 }
 async function dataExport(filtered){
