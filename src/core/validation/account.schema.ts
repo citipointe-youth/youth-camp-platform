@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { USER_ROLES, ZONE_NAMES } from '../types/enums';
+import { ACCOMMODATION_KINDS, USER_ROLES, ZONE_NAMES } from '../types/enums';
 
 // Login identifier is a USERNAME (plain string), not an email — e.g. "grade7g",
 // "victory", "director". Letters/digits/. _ - allowed. Password min 6 (matching
@@ -72,6 +72,8 @@ export const UpdateChurchSchema = z.object({
   zone: z.enum(ZONE_NAMES).optional(),
   contactPhone: z.string().optional(),
   contacts: ChurchContactsSchema.optional(),
+  // Applied to STUDENTS at import time only (see Church.accommodationOverride).
+  accommodationOverride: z.enum(ACCOMMODATION_KINDS).nullable().optional(),
 });
 
 export type UpdateChurchInput = z.infer<typeof UpdateChurchSchema>;

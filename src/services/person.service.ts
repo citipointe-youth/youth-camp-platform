@@ -59,7 +59,7 @@ export interface PersonService {
 
   // ----- Step 4 write surface (dormant until the live switchover wires routes) -----
   /** Create a pre-camp registrant (lifecycle 'registered'). */
-  create(actor: Actor, input: { firstName: string; lastName: string; gender: Person['gender']; kind?: Person['kind']; grade?: Person['grade'] | null; churchId: string; churchName: string; zone: string; paymentStatus?: Person['paymentStatus']; accommodationKind?: Person['accommodationKind']; accommodationLabel?: string | null; parentGuardianName?: string | null; parentPhone?: string | null; mobile?: string | null }): Promise<Person>;
+  create(actor: Actor, input: { firstName: string; lastName: string; gender: Person['gender']; kind?: Person['kind']; grade?: Person['grade'] | null; churchId: string; churchName: string; zone: string; paymentStatus?: Person['paymentStatus']; accommodationKind?: Person['accommodationKind']; accommodationLabel?: string | null; parentGuardianName?: string | null; parentPhone?: string | null; mobile?: string | null; medicalConditions?: string[]; dietaryRequirements?: string[] }): Promise<Person>;
   update(actor: Actor, id: string, patch: Partial<Person>): Promise<Person>;
   remove(actor: Actor, id: string): Promise<void>;
   /** Apply a check-in entry — first 'in' promotes registered → arrived (Day-1 sign-in). */
@@ -198,8 +198,8 @@ export function makePersonService(repo: IPersonRepository): PersonService {
         suburb: null,
         postcode: null,
         state: null,
-        medicalConditions: [],
-        dietaryRequirements: [],
+        medicalConditions: input.medicalConditions ?? [],
+        dietaryRequirements: input.dietaryRequirements ?? [],
         otherMedications: null,
         medicareNumber: null,
         churchUnlistedNote: null,

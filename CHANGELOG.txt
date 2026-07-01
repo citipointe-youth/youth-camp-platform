@@ -1,6 +1,41 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-02 — FEATURE BATCH: Account Info consolidation, accommodation override, at-camp student edit
+----------------------------------------------------------------------------------------------------
+Admin-requested batch (Account: admin). SPA + backend + migration 016 (applied to prod BEFORE the
+push). Verified: SPA script syntax OK, npm run typecheck clean, npm run test = 275 pass (5 new).
+
+  * ACCOUNT INFO (SPA) — the Accounts screen's "Rename" and "Change username" actions are merged
+    into one "Account Info" modal (per tile: edit icon = Account Info, key = password, trash =
+    delete). Leadership modal = name + username + zone (zone leaders) + status. Church modal =
+    church name + login username + zone + NEW accommodation override. Username saves ride the same
+    PATCH (/accounts/users/:id); church fields go to PATCH /accounts/churches/:id.
+
+  * ACCOMMODATION OVERRIDE (NEW feature, backend + migration 016) — Church.accommodationOverride
+    ('tent' | 'classroom' | null; churches.accommodation_override in Supabase). When set, every
+    STUDENT of that church is forced to the override kind at CSV import time (both create and
+    update paths) — corrects wrong ticket-type purchases. Leaders are never overridden; churches
+    that deliberately split ticket types (e.g. seniors buy classroom) leave it unset. A per-row
+    import warning is emitted when a CSV value is actually changed. import.service builds a
+    churchOverrideById map; UpdateChurchSchema accepts accommodationOverride; supabase.churches
+    maps the new column. 5 new tests in import.service.test.ts.
+
+  * CHURCH SETUP TOOLTIPS — helpTip on the "Add a church" card + the wizard Churches step
+    explaining that churches are auto-created from registration uploads (zone defaults Yellow)
+    and pointing at Account Info for login/zone/accommodation override.
+
+  * AT-CAMP ADMIN CONSOLE — the Setup Wizard tile is now PRE-CAMP ONLY; in at-camp mode the
+    console instead shows "Individual Student Data Edit" (new screen adminStudents, admin only).
+    Table of ALL students (merges /registrants + /campers, same dual-fetch as firstday) with
+    church/gender/grade filter dropdowns + name search; tap a row to edit core fields (name,
+    church, gender, grade, accommodation, medical, dietary) via PATCH /registrants/:id; "Add
+    student" creates a manual entry via POST /registrants — created as REGISTERED (not at camp),
+    so they appear on the First-day arrivals screen and follow the normal sign-in path.
+    Backend: registrant controller PATCH now accepts churchId/churchName/zone (church move);
+    create now accepts medical/dietary strings; CamperDto gained accommodationKind; the SPA
+    _invalidate mapping for /registrants writes now also clears /campers + /checkin.
+
 2026-07-01 — UI/UX FIX BATCH: schedule-edit overlap, setup wizard, global loading bar
 -------------------------------------------------------------------------------------
 Admin-requested batch (Account: admin, Mode: pre-camp). All changes are in public/index.html

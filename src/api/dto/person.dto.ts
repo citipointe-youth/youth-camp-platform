@@ -61,6 +61,7 @@ export interface CamperDto {
   gender: Person['gender'];
   grade: Person['grade'];
   dateOfBirth: string | null;
+  accommodationKind: Person['accommodationKind'];
   medicalConditions: string[];
   dietaryRequirements: string[];
   otherMedications: string | null;
@@ -151,6 +152,7 @@ export function toCamperDto(p: Person): CamperDto {
     gender: p.gender,
     grade: p.grade ?? null,
     dateOfBirth: p.dateOfBirth ?? null,
+    accommodationKind: p.accommodationKind ?? null,
     medicalConditions: p.medicalConditions,
     dietaryRequirements: p.dietaryRequirements,
     otherMedications: p.otherMedications ?? null,

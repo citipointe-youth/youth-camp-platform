@@ -501,6 +501,7 @@ textarea{min-height:84px;resize:vertical;}
     <section class="screen" id="adminRecords"></section>
     <section class="screen" id="adminCloseOut"></section>
     <section class="screen" id="adminWizard"></section>
+    <section class="screen" id="adminStudents"></section>
     <section class="screen" id="import"></section>
     <section class="screen" id="data"></section>
     <section class="screen" id="adminDevos"></section>
@@ -575,7 +576,9 @@ function _invalidate(path){
   else if(path.startsWith('/attendance')||path.startsWith('/checkin'))Cache.del('/checkin');
   else if(path.startsWith('/notifications'))Cache.del('/notifications');
   else if(path.startsWith('/notes'))Cache.del('/notes');
-  else if(path.startsWith('/registrants'))Cache.del('/registrants');
+  // A per-student edit (adminStudents) can touch an ARRIVED student too — campers +
+  // the check-in roster derive from the same person record.
+  else if(path.startsWith('/registrants'))Cache.del('/registrants','/campers','/checkin');
   else if(path.startsWith('/accommodation'))Cache.del('/accommodation');
   else Cache.del(path);
 }
@@ -876,7 +879,7 @@ function switchDay(){
 const TAB_OF={home:'home',people:'people',student:'people',help:'help',
   admin:'admin',adminAccounts:'admin',adminFaq:'admin',adminSettings:'admin',adminAccom:'admin',adminData:'admin',
   adminDevos:'admin',adminFaqEdit:'admin',adminSchedEdit:'admin',adminContacts:'admin',
-  adminChurchImport:'admin',adminRecords:'admin',adminCloseOut:'admin',adminWizard:'admin',
+  adminChurchImport:'admin',adminRecords:'admin',adminCloseOut:'admin',adminWizard:'admin',adminStudents:'admin',
   checkin:'checkin',search:'search',allstudents:'allstudents',records:'records',notifs:'notifs',compose:'notifs',
   data:'data',
   camper:'home',myyouth:'home',firstday:'home',schedule:'schedule',devotional:'home',faq:'home',notes:'home',testimonies:'home',budget:'home',accom:'home',import:'home'};
@@ -2402,7 +2405,9 @@ RENDER.admin=function(){
   const isAdminOrDirector=['admin','director'].includes(ACTOR.role);
   const modeTile=isAdmin?`<div class="tile" onclick="switchMode()"><div class="l">Switch to ${CAMP_MODE==='pre-camp'?'At-Camp':'Pre-Camp'}</div></div>`:'';
   const dataTile=isAdmin?`<div class="tile" onclick="go('adminData')"><div class="l">Data, Reset &amp; Exports</div></div>`:isAdminOrDirector?`<div class="tile" onclick="go('adminData')"><div class="l">Records &amp; Export</div></div>`:'';
-  const wizardTile=isAdmin?`<div class="tile" onclick="go('adminWizard')"><div class="l">Setup Wizard</div></div>`:'';
+  // At camp, the setup wizard gives way to per-student data edits (no more CSV uploads mid-camp).
+  const wizardTile=isAdmin&&CAMP_MODE==='pre-camp'?`<div class="tile" onclick="go('adminWizard')"><div class="l">Setup Wizard</div></div>`:'';
+  const studentsTile=isAdmin&&CAMP_MODE==='at-camp'?`<div class="tile" onclick="go('adminStudents')"><div class="l">Individual Student Data Edit</div></div>`:'';
   paint('admin',`<div class="infobox">Admin console — configure camp here year-round.</div>
     <div class="tiles">
       <div class="tile" onclick="go('adminAccounts')"><div class="l">Accounts &amp; churches</div></div>
@@ -2412,7 +2417,7 @@ RENDER.admin=function(){
       <div class="tile" onclick="go('adminFaq')"><div class="l">FAQ</div></div>
       <div class="tile" onclick="go('adminDevos')"><div class="l">Devotionals</div></div>
       <div class="tile" onclick="go('adminSchedEdit')"><div class="l">Schedule</div></div>
-      ${dataTile}${wizardTile}${modeTile}
+      ${dataTile}${wizardTile}${studentsTile}${modeTile}
     </div>`,'Admin console','Back office');
 };
 
@@ -2444,8 +2449,7 @@ RENDER.adminAccounts=async function(){
       <div style="font-weight:700;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">${o.title}</div>
       <div style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px">${o.sub}</div>
       <div style="display:flex;gap:4px;margin-top:auto;flex-wrap:nowrap">
-        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Rename" aria-label="Rename" onclick="${o.onName}">${ic('edit')}</button>
-        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Change username" aria-label="Change username" onclick="${o.onUser}">${ic('at')}</button>
+        <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Account Info" aria-label="Account Info" onclick="${o.onName}">${ic('edit')}</button>
         <button class="iconbtn" style="flex:1 1 0;min-width:0" title="Change password" aria-label="Change password" onclick="${o.onPass}">${ic('key')}</button>
         <button class="iconbtn danger" style="flex:1 1 0;min-width:0" title="Delete" aria-label="Delete" onclick="${o.onDel}">${ic('trash')}</button>
       </div></div>`;
@@ -2453,14 +2457,13 @@ RENDER.adminAccounts=async function(){
   const lr=tileGrid(leaders.map(u=>acctTile({
     title:esc(u.firstName+' '+u.lastName),
     sub:roleLabel(u.role)+(u.username?' · @'+esc(u.username):'')+(u.zone?' · '+esc(u.zone):'')+(u.status==='inactive'?' · inactive':''),
-    onName:`editLeaderName('${u.id}')`,onUser:`editUsername('${u.id}')`,onPass:`changePassword('${u.id}')`,onDel:`delAcct('${u.id}')`
+    onName:`editLeaderName('${u.id}')`,onPass:`changePassword('${u.id}')`,onDel:`delAcct('${u.id}')`
   })));
   const cr=tileGrid(churches.map(c=>{const cu=users.find(u=>u.role==='church'&&u.churchId===c.id)||{};
     return acctTile({
       title:esc(c.name),
       sub:'Church · '+esc(c.zone||'—')+(cu.username?' · @'+esc(cu.username):'<span style="color:var(--danger)"> · no login</span>'),
       onName:`editChurchName('${c.id}')`,
-      onUser:cu.id?`editUsername('${cu.id}')`:`toast('No login account for this church')`,
       onPass:cu.id?`changePassword('${cu.id}')`:`toast('No login account for this church')`,
       onDel:`delChurch('${c.id}')`
     });}));
@@ -2476,7 +2479,7 @@ RENDER.adminAccounts=async function(){
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Role</label><select id="aR" onchange="aRoleChange()" style="flex:1">${roleOpts}</select></div>
       <div id="aZoneWrap" style="display:none"><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('aZ')}</div></div></div>
       <button class="btn" onclick="addAcct()" style="margin-top:10px;width:100%">Create account</button></div>
-    <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
+    <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login) ${helpTip('You do not usually need to add churches by hand — any church named in a registration upload is auto-created (zone defaults to Yellow; add its login + zone afterwards via Account Info). Account Info also holds the per-church accommodation override, which corrects wrong ticket types at the next upload.')}</div>
       <div class="warnbox">${icSm('alert')} Church name must match the registration export exactly — registrations are matched by name.</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside" style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('ncZone')}</div></div>
@@ -2498,9 +2501,11 @@ async function addAcct(){const role=sel('aR');const nm=val('aName').trim();const
   try{await api('/accounts/users',{method:'POST',body});toast('Account created');await _rAccts();}catch(e){toast(e.message);}}
 const _findUser=id=>(window._allUsers||[]).find(u=>u.id===id)||{};
 const _findChurch=id=>(window._allChurches||[]).find(c=>c.id===id)||{};
+const _OVERRIDE_TIP='When set, EVERY student of this church is switched to this accommodation type on the next registration upload — use it to correct wrong ticket purchases. Leaders are never changed. Leave as "No override" if this ministry deliberately splits ticket types (e.g. seniors buy classroom).';
 function editLeaderName(id){const u=_findUser(id);
-  modal(`<h3>Rename account</h3>
-    <input class="fld" id="enName" placeholder="Full name" value="${esc(((u.firstName||'')+' '+(u.lastName||'')).trim())}">
+  modal(`<h3>Account Info</h3>
+    <label>Name</label><input class="fld" id="enName" placeholder="Full name" value="${esc(((u.firstName||'')+' '+(u.lastName||'')).trim())}">
+    <label>Username</label><input class="fld" id="enUser" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
     ${u.role==='zoneLeader'?'<label>Zone</label>'+zoneSel('enZ',u.zone):''}
     <label>Status</label><select id="enS"><option value="active"${u.status!=='inactive'?' selected':''}>Active</option><option value="inactive"${u.status==='inactive'?' selected':''}>Inactive</option></select>
     <button class="btn" style="margin-top:10px" onclick="saveLeaderName('${id}','${u.role}')">Save</button>
@@ -2508,26 +2513,40 @@ function editLeaderName(id){const u=_findUser(id);
 async function saveLeaderName(id,role){const nm=val('enName').trim();const sp=nm.indexOf(' ');
   // Bug-8: keep an empty last name for a one-word account name (no duplicated surname).
   const firstName=sp>0?nm.slice(0,sp):nm;const lastName=sp>0?nm.slice(sp+1).trim():'';
+  const username=val('enUser').trim();
   const body={firstName,lastName,status:sel('enS')};
   if(role==='zoneLeader')body.zone=sel('enZ');
   if(!firstName){toast('Enter a name');return;}
+  const u=_findUser(id);
+  if(username!==(u.username||'')){
+    if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username: letters, numbers, . _ - only (min 2 chars)');return;}
+    body.username=username;
+  }
   try{await api('/accounts/users/'+id,{method:'PATCH',body});closeModal();toast('Saved');await _rAccts();}catch(e){toast(e.message);}}
+const _accOvSel=(id,s)=>`<select id="${id}"><option value=""${!s?' selected':''}>No override</option><option value="tent"${s==='tent'?' selected':''}>Tent</option><option value="classroom"${s==='classroom'?' selected':''}>Classroom</option></select>`;
 function editChurchName(id){const c=_findChurch(id);
-  modal(`<h3>Rename church</h3>
+  const cu=(window._allUsers||[]).find(u=>u.role==='church'&&u.churchId===id)||{};
+  modal(`<h3>Account Info</h3>
     <label>Church name</label><input class="fld" id="ecnName" value="${esc(c.name||'')}">
     <div class="warnbox" style="margin-top:8px">${icSm('alert')} Must match the registration export exactly — registrations are matched by name.</div>
+    ${cu.id?`<label>Username</label><input class="fld" id="ecnUser" value="${esc(cu.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">`:'<p class="note-hint" style="margin:6px 0 0">No login account for this church yet.</p>'}
     <label>Zone ${helpTip('Changing zone here does not move students already imported for this church — they keep their current zone until you re-upload the registration CSV.')}</label>${zoneSel('ecnZone',c.zone)}
-    <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}')">Save</button>
+    <label>Accommodation override ${helpTip(_OVERRIDE_TIP)}</label>${_accOvSel('ecnOv',c.accommodationOverride)}
+    <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}','${cu.id||''}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
-async function saveChurchName(id){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
-  try{await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone')}});closeModal();toast('Church updated');await _rAccts();}catch(e){toast(e.message);}}
-function editUsername(id){const u=_findUser(id);
-  modal(`<h3>Change username</h3>
-    <label>Username</label><input class="fld" id="euU" value="${esc(u.username||'')}" autocapitalize="none" autocorrect="off" spellcheck="false">
-    <button class="btn" style="margin-top:10px" onclick="saveUsername('${id}')">Save</button>
-    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
-async function saveUsername(id){const username=val('euU');if(username.length<2){toast('Username too short');return;}
-  try{await api('/accounts/users/'+id,{method:'PATCH',body:{username}});closeModal();toast('Username updated');await _rAccts();}catch(e){toast(e.message);}}
+async function saveChurchName(id,userId){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
+  const accommodationOverride=sel('ecnOv')||null;
+  try{
+    await api('/accounts/churches/'+id,{method:'PATCH',body:{name,zone:sel('ecnZone'),accommodationOverride}});
+    if(userId){
+      const cu=_findUser(userId);const username=val('ecnUser').trim();
+      if(username!==(cu.username||'')){
+        if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Church saved — username invalid (letters, numbers, . _ - only)');await _rAccts();return;}
+        await api('/accounts/users/'+userId,{method:'PATCH',body:{username}});
+      }
+    }
+    closeModal();toast('Church updated');await _rAccts();
+  }catch(e){toast(e.message);}}
 function changePassword(id){const u=_findUser(id);
   modal(`<h3>Change password</h3>
     <div class="sub" style="margin-bottom:8px">${esc(u.firstName?u.firstName+' '+u.lastName:u.username||'Account')}</div>
@@ -2946,6 +2965,109 @@ async function dataExport(filtered){
     document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
   }catch(e){toast(e.message);}
 }
+/* ===== ADMIN: INDIVIDUAL STUDENT DATA EDIT (at-camp) =====
+   After camp commences there are no more spreadsheet uploads, so the admin corrects
+   individual student records here. Students only (leaders unaffected). Merges
+   /registrants (not yet arrived) + /campers (arrived) — same dual-fetch as RENDER.firstday. */
+let _stuCache=[],_stuChurches=[];
+function _stuNorm(r,atCamp){return {id:r.id,firstName:r.firstName,lastName:r.lastName,gender:r.gender,grade:r.grade??null,
+  churchId:r.churchId,churchName:r.churchName,zone:r.zone,accommodationKind:r.accommodationKind??null,
+  medical:(r.medicalConditions||[]).join(', '),dietary:(r.dietaryRequirements||[]).join(', '),atCamp};}
+RENDER.adminStudents=async function(){
+  const [regs,campers,churches]=await Promise.all([
+    api('/registrants').catch(()=>[]),
+    api('/campers').catch(()=>[]),
+    api('/accounts/churches').catch(()=>[]),
+  ]);
+  const byId={};
+  (regs||[]).filter(r=>r.kind==='camper').forEach(r=>{byId[r.id]=_stuNorm(r,false);});
+  (campers||[]).filter(c=>c.kind==='student').forEach(c=>{byId[c.id]=_stuNorm(c,c.atCamp!==false);});
+  _stuCache=Object.values(byId);
+  _stuChurches=churches||[];
+  const chOpts=['<option value="">All churches</option>'].concat(
+    _stuChurches.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`)).join('');
+  const gradeOpts=['<option value="">All grades</option>'].concat(GRADES.map(g=>`<option value="${g}">Grade ${g}</option>`)).join('');
+  paint('adminStudents',`<div class="card">
+    <div class="rowsb" style="align-items:center"><div class="h3" style="margin-top:0">Student data</div>
+      <button class="btn sm" onclick="stuAdd()">${icSm('plus')} Add student</button></div>
+    <p class="sub" style="margin:2px 0 8px">Tap a student to correct their record ${helpTip('Use this once camp is running — later spreadsheet uploads are unlikely, so fixes are made per student here. Changes apply immediately.')}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <select class="fld" id="sfCh" style="flex:1;min-width:140px" onchange="stuApply()">${chOpts}</select>
+      <select class="fld" id="sfGen" style="flex:1;min-width:110px" onchange="stuApply()">
+        <option value="">All genders</option><option value="male">Male</option><option value="female">Female</option></select>
+      <select class="fld" id="sfGr" style="flex:1;min-width:120px" onchange="stuApply()">${gradeOpts}</select>
+    </div>
+    <div class="search"><span>${ic('search')}</span><input id="sfQ" placeholder="Search by name…" oninput="stuApply()"></div>
+    <div id="stuCount" class="note-hint" style="margin-top:6px"></div>
+    <div style="overflow-x:auto;margin-top:8px"><table id="stuTbl" style="min-width:560px;width:100%;border-collapse:collapse;font-size:.8rem"></table></div>
+  </div>`,'Individual Student Data Edit','Admin');
+  stuApply();
+};
+function stuApply(){
+  const ch=sel('sfCh')||'',gen=sel('sfGen')||'',gr=sel('sfGr')||'',q=(val('sfQ')||'').toLowerCase();
+  const rows=_stuCache.filter(s=>{
+    if(ch&&s.churchId!==ch)return false;
+    if(gen&&s.gender!==gen)return false;
+    if(gr&&String(s.grade??'')!==gr)return false;
+    if(q&&!(s.firstName+' '+s.lastName).toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>a.lastName.localeCompare(b.lastName)||a.firstName.localeCompare(b.firstName));
+  const td=v=>`<td style="border-bottom:1px solid var(--line);padding:6px 8px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis">${v}</td>`;
+  const accLbl=k=>k==='tent'?'Tent':k==='classroom'?'Classroom':'—';
+  const body=rows.map(s=>`<tr onclick="stuEdit('${s.id}')" style="cursor:pointer">
+    ${td(esc(s.lastName+', '+s.firstName))}${td(esc(s.churchName||'—'))}${td(s.grade??'—')}${td(esc(s.gender==='male'?'M':s.gender==='female'?'F':'—'))}${td(esc(accLbl(s.accommodationKind)))}${td(s.atCamp?'<span class="pill ok">At camp</span>':'<span class="pill info">Registered</span>')}
+  </tr>`).join('');
+  const hdr=['Name','Church','Gr','M/F','Accom','Status'];
+  const t=document.getElementById('stuTbl');
+  if(t)t.innerHTML=`<thead><tr>${hdr.map(h=>`<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted)">${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="6" style="padding:10px;color:var(--muted)">No matching students</td></tr>'}</tbody>`;
+  const c=document.getElementById('stuCount');if(c)c.textContent=`${rows.length} of ${_stuCache.length} students`;
+}
+function _stuFormFields(s){
+  const chSel=`<select id="seCh">${_stuChurches.map(c=>`<option value="${esc(c.id)}"${s&&c.id===s.churchId?' selected':''}>${esc(c.name)}</option>`).join('')}</select>`;
+  const genSel=`<select id="seGen"><option value="male"${s&&s.gender==='male'?' selected':''}>Male</option><option value="female"${s&&s.gender==='female'?' selected':''}>Female</option><option value="other"${s&&s.gender==='other'?' selected':''}>Other</option></select>`;
+  const grSel=`<select id="seGr"><option value="">—</option>${GRADES.map(g=>`<option value="${g}"${s&&s.grade===g?' selected':''}>Grade ${g}</option>`).join('')}</select>`;
+  const accSel=`<select id="seAcc"><option value=""${s&&!s.accommodationKind?' selected':''}>—</option><option value="tent"${s&&s.accommodationKind==='tent'?' selected':''}>Tent</option><option value="classroom"${s&&s.accommodationKind==='classroom'?' selected':''}>Classroom</option></select>`;
+  return `<label>First name</label><input class="fld" id="seFirst" value="${esc(s?s.firstName:'')}">
+    <label>Last name</label><input class="fld" id="seLast" value="${esc(s?s.lastName:'')}">
+    <label>Church</label>${chSel}
+    <label>Gender</label>${genSel}
+    <label>Grade</label>${grSel}
+    <label>Accommodation</label>${accSel}
+    <label>Medical conditions</label><input class="fld" id="seMed" value="${esc(s?s.medical:'')}" placeholder="e.g. Asthma">
+    <label>Dietary requirements</label><input class="fld" id="seDiet" value="${esc(s?s.dietary:'')}" placeholder="e.g. Gluten free">`;
+}
+function _stuFormBody(){
+  const ch=_stuChurches.find(c=>c.id===sel('seCh'));
+  return {
+    firstName:val('seFirst').trim(),lastName:val('seLast').trim(),
+    gender:sel('seGen'),grade:sel('seGr')?Number(sel('seGr')):null,
+    churchId:ch?ch.id:'',churchName:ch?ch.name:'',zone:ch?ch.zone:'',
+    accommodationKind:sel('seAcc')||null,
+    medical:val('seMed').trim(),dietary:val('seDiet').trim(),
+  };
+}
+function stuEdit(id){const s=_stuCache.find(x=>x.id===id);if(!s){toast('Student not found');return;}
+  modal(`<h3>Edit student</h3>${_stuFormFields(s)}
+    <button class="btn" style="margin-top:10px" onclick="stuSave('${id}')">Save</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function stuSave(id){
+  const b=_stuFormBody();
+  if(!b.firstName||!b.lastName){toast('Enter first + last name');return;}
+  if(!b.churchId){toast('Pick a church');return;}
+  try{await api('/registrants/'+id,{method:'PATCH',body:b});closeModal();toast('Student updated');await _rStu();}catch(e){toast(e.message);}}
+function stuAdd(){
+  modal(`<h3>Add student</h3>
+    <p class="sub" style="margin:2px 0 6px">Created as <b>registered</b> — sign them in on the First-day arrivals screen when they arrive on site.</p>
+    ${_stuFormFields(null)}
+    <button class="btn" style="margin-top:10px" onclick="stuCreate()">Add student</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
+async function stuCreate(){
+  const b=_stuFormBody();
+  if(!b.firstName||!b.lastName){toast('Enter first + last name');return;}
+  if(!b.churchId){toast('Pick a church');return;}
+  try{await api('/registrants',{method:'POST',body:b});closeModal();toast('Student added');await _rStu();}catch(e){toast(e.message);}}
+async function _rStu(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminStudents();if(el)el.scrollTop=y;}
+
 async function adminSaveDefaults(){if(!confirm('Save the current scaffold (churches, accounts, accommodation, FAQ, schedule, devotionals) as the new-year baseline?'))return;
   // Backend returns {ok:true} (no counts).
   try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved');}catch(e){toast(e.message);}}
@@ -3052,7 +3174,7 @@ function _clearImport(){_pendingImportCsv=null;const b=document.getElementById('
 // and carries a short plain-language tip (rendered as a helpTip bubble in the checklist).
 const WIZARD_STEPS=[
   {key:'settings',label:'Camp settings',icon:'gear',screen:'adminSettings',tip:'Set the camp name and dates first — the dates unlock the schedule, devotionals and check-in days.',check:()=>!!(SETTINGS&&SETTINGS.campName&&SETTINGS.startDate)},
-  {key:'churches',label:'Churches',icon:'users',screen:'adminAccounts',tip:'Add every church attending. Registrants are matched to a church by name when you import them.',check:async()=>{try{const c=await api('/accounts/churches');return(c||[]).length>0;}catch(e){return false;}}},
+  {key:'churches',label:'Churches',icon:'users',screen:'adminAccounts',tip:'Add every church attending — or let the registration upload auto-create any church it names (zone defaults to Yellow; set its login and zone afterwards via Account Info, which also holds the per-church accommodation override).',check:async()=>{try{const c=await api('/accounts/churches');return(c||[]).length>0;}catch(e){return false;}}},
   {key:'accounts',label:'Accounts',icon:'users',screen:'adminAccounts',tip:'Create login accounts for church leaders, zone leaders and directors.',check:async()=>{try{const u=await api('/accounts/users');return(u||[]).filter(x=>x.role!=='admin').length>0;}catch(e){return false;}}},
   {key:'accom',label:'Accommodation rooms',icon:'classroom',screen:'adminAccom',tip:'Set up your sleeping rooms and give each one a capacity.',check:async()=>{try{const b=await api('/accommodation/classrooms');return(b||[]).length>0;}catch(e){return false;}}},
   {key:'accomAlloc',label:'Accommodation allocation',icon:'home',screen:'accom',tip:'Assign churches to rooms. Eligible groups auto-fill each room to capacity.',check:async()=>{try{const a=await api('/accommodation/allocations');return Object.values(a||{}).some(arr=>Array.isArray(arr)&&arr.some(e=>e&&Number(e.n)>0));}catch(e){return false;}}},

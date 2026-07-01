@@ -8,6 +8,7 @@ function toChurch(row: Record<string, unknown>): Church {
     name: row['name'] as string,
     zone: row['zone'] as Church['zone'],
     contactPhone: (row['contact_phone'] as string | null) ?? undefined,
+    accommodationOverride: (row['accommodation_override'] as Church['accommodationOverride']) ?? null,
     contacts: (row['contacts'] as Church['contacts']) ?? {
       male: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
       female: { primary: { name: '', phone: '' }, backup: { name: '', phone: '' } },
@@ -23,6 +24,7 @@ function churchColumns(c: Church): Record<string, unknown> {
     name: c.name,
     zone: c.zone,
     contact_phone: c.contactPhone ?? null,
+    accommodation_override: c.accommodationOverride ?? null,
     contacts: c.contacts,
     created_at: c.createdAt,
     updated_at: c.updatedAt,
@@ -30,7 +32,7 @@ function churchColumns(c: Church): Record<string, unknown> {
 }
 
 const UPDATE_COLS = [
-  'name', 'zone', 'contact_phone', 'contacts', 'updated_at',
+  'name', 'zone', 'contact_phone', 'accommodation_override', 'contacts', 'updated_at',
 ] as const;
 
 export class SupabaseChurchRepository implements IChurchRepository {

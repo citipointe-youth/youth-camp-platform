@@ -43,6 +43,9 @@ export function makeRegistrantController(services: RegistrantControllerServices)
         parentGuardianName: ((b['parentGuardianName'] ?? b['parentName']) as string) ?? null,
         parentPhone: (b['parentPhone'] as string) ?? null,
         mobile: (b['mobile'] as string) ?? null,
+        // Legacy Registrant shape: medical/dietary arrive as strings, stored as arrays.
+        medicalConditions: b['medical'] ? [b['medical'] as string] : [],
+        dietaryRequirements: b['dietary'] ? [b['dietary'] as string] : [],
       });
       return toRegistrantDto(p);
     },
@@ -71,6 +74,11 @@ export function makeRegistrantController(services: RegistrantControllerServices)
         ...(b['gender'] !== undefined && { gender: b['gender'] as Person['gender'] }),
         ...(b['kind'] !== undefined && { kind: b['kind'] === 'leader' ? 'leader' : 'youth' }),
         ...(b['grade'] !== undefined && { grade: b['grade'] as Person['grade'] }),
+        // Church move (at-camp student edit): the SPA sends all three of churchId/churchName/zone
+        // together from its /accounts/churches list so the denormalized snapshot stays consistent.
+        ...(b['churchId'] !== undefined && { churchId: b['churchId'] as string }),
+        ...(b['churchName'] !== undefined && { churchName: b['churchName'] as string }),
+        ...(b['zone'] !== undefined && { zone: b['zone'] as string }),
         ...(b['paymentStatus'] !== undefined && { paymentStatus: b['paymentStatus'] as Person['paymentStatus'] }),
         ...(b['accommodationKind'] !== undefined && { accommodationKind: b['accommodationKind'] as Person['accommodationKind'] }),
         ...(b['accommodationLabel'] !== undefined && { accommodationLabel: b['accommodationLabel'] as string }),

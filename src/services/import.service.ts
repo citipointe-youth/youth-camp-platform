@@ -65,9 +65,11 @@ export function makeImportService(
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
       const churchZoneById = new Map<string, string>();
+      const churchOverrideById = new Map<string, Person['accommodationKind']>();
       for (const c of churches) {
         churchIdByName.set(c.name.toLowerCase(), c.id);
         churchZoneById.set(c.id, c.zone);
+        if (c.accommodationOverride) churchOverrideById.set(c.id, c.accommodationOverride);
       }
       const newlyCreated = new Map<string, string>(); // lowercased name -> id
 
@@ -201,10 +203,20 @@ export function makeImportService(
           const registrationType = typeRaw || null;
           // 'Type' values 'Classroom'/'Tent' drive accommodation grouping
           const accommodationKindRaw = typeRaw.toLowerCase();
-          const accommodationKind: Person['accommodationKind'] =
+          const csvAccommodationKind: Person['accommodationKind'] =
             accommodationKindRaw === 'classroom' ? 'classroom'
             : accommodationKindRaw === 'tent' ? 'tent'
             : null;
+          // Church accommodation override: STUDENTS of a church with an override always get
+          // the override kind (corrects wrong ticket-type purchases). Leaders keep the CSV value.
+          const churchOverride = kind === 'youth' ? churchOverrideById.get(resolvedChurchId) : undefined;
+          const accommodationKind: Person['accommodationKind'] = churchOverride ?? csvAccommodationKind;
+          if (churchOverride && csvAccommodationKind && csvAccommodationKind !== churchOverride) {
+            warnings.push({
+              row: rowNum,
+              message: `Accommodation "${csvAccommodationKind}" overridden to "${churchOverride}" (church override)`,
+            });
+          }
           const registrationCostRaw = field(row, 'Cost', 'Registration Cost', 'registrationCost', 'registration_cost') || '';
           const registrationCost = registrationCostRaw
             ? parseFloat(registrationCostRaw.replace(/[^0-9.]/g, '')) || null

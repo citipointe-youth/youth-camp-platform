@@ -193,6 +193,49 @@ describe('ImportService.importCsv — dryRun', () => {
   });
 });
 
+describe('ImportService.importCsv — church accommodation override', () => {
+  const HDR = 'First Name,Last Name,Church,Gender,School Grade,Type';
+
+  it('forces a STUDENT to the church override when the CSV kind differs (with a warning)', async () => {
+    const h = await build([church({ id: 'c1', name: 'Victory', accommodationOverride: 'classroom' })]);
+    const res = await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAda,Lovelace,Victory,Female,9,Tent` });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.accommodationKind).toBe('classroom');
+    expect(res.warnings.some((w) => w.message.includes('overridden'))).toBe(true);
+  });
+
+  it('applies the override even when the CSV has no Type value (no warning)', async () => {
+    const h = await build([church({ id: 'c1', name: 'Victory', accommodationOverride: 'tent' })]);
+    const res = await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAda,Lovelace,Victory,Female,9,` });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.accommodationKind).toBe('tent');
+    expect(res.warnings.some((w) => w.message.includes('overridden'))).toBe(false);
+  });
+
+  it('never overrides a LEADER', async () => {
+    const h = await build([church({ id: 'c1', name: 'Victory', accommodationOverride: 'classroom' })]);
+    await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAlelia,Ino,Victory,Female,18+ Leader,Tent` });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.kind).toBe('leader');
+    expect(p.accommodationKind).toBe('tent');
+  });
+
+  it('keeps the CSV kind when the church has no override', async () => {
+    const h = await build(); // default church, no override
+    await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAda,Lovelace,Victory,Female,9,Tent` });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.accommodationKind).toBe('tent');
+  });
+
+  it('applies the override on a re-import update (updateExisting:true)', async () => {
+    const h = await build([church({ id: 'c1', name: 'Victory', accommodationOverride: 'classroom' })]);
+    await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAda,Lovelace,Victory,Female,9,Tent` });
+    await h.svc.importCsv(actor('admin'), { csvData: `${HDR}\nAda,Lovelace,Victory,Female,9,Tent`, updateExisting: true });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.accommodationKind).toBe('classroom');
+  });
+});
+
 describe('ImportService.importCsv — Elvanto export shape', () => {
   const ELVANTO_HEADER =
     'Date Submitted,Submission Status,Person,Person Status,First Name,Last Name,Gender,Date of Birth,School Grade,Mobile Number,Email Address,Suburb,Postcode,State,Medicare Number,Medical Conditions,Dietary Requirements,List Other Medical Conditions or Medication Taken,Attendee\'s Church,"If from a church not listed, please specify church name & Youth Pastor",Blue Card/Working with Children Card Number,Blue Card/Working with Children Card Expiry,I give medical consent for my child as listed above.,I give photography and video consent for my child as listed above.,I understand and agree to the Supervision policy.,Parent/Guardian Name,Relation to Child,Parent/Guardian Phone Number,Today\'s Date';

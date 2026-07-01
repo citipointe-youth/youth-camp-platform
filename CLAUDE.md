@@ -180,6 +180,31 @@ no migration. Verified: SPA `node --check` OK, `npm run typecheck` clean, `npm r
 - **Latency quick-win:** `_prefetch` now also warms `/accounts/churches` + `/accounts/users` for
   admin/director on login (the Accounts, Ministry-contacts and Wizard screens then open from cache).
 
+## Feature batch — deployed 2026-07-02
+
+Admin-requested batch (SPA + backend + **migration 016**, applied to prod):
+- **Account Info (Accounts screen):** "Rename" + "Change username" are consolidated into one
+  **Account Info** modal per tile (edit icon; key = password, trash = delete — the separate @
+  username action is gone, `editUsername`/`saveUsername` deleted). Leadership modal = name +
+  username + zone (zoneLeader) + status; church modal = church name + login username + zone +
+  **accommodation override**.
+- **Accommodation override (NEW):** `Church.accommodationOverride: 'tent'|'classroom'|null`
+  (`churches.accommodation_override`, migration `016`). At **CSV import**, every **student** of a
+  church with an override is forced to that kind (create + update paths, `churchOverrideById` map
+  in `import.service`); leaders never overridden; a warning row is emitted when a CSV value is
+  actually changed. Churches that deliberately split ticket types leave it unset. Set via Account
+  Info; `UpdateChurchSchema.accommodationOverride`.
+- **At-camp admin console:** Setup Wizard tile is **pre-camp only**; at-camp shows **"Individual
+  Student Data Edit"** (`RENDER.adminStudents`, admin only): all students (merged
+  `/registrants`+`/campers`), church/gender/grade filters + name search, row-tap edit of core
+  fields (name, church, gender, grade, accommodation, medical, dietary) via
+  `PATCH /registrants/:id`, and manual **Add student** (`POST /registrants`) created as
+  `registered`/not-at-camp (signs in via First-day arrivals). Backend: registrant PATCH accepts
+  `churchId/churchName/zone`; create accepts `medical`/`dietary`; **`CamperDto` gained
+  `accommodationKind`**; SPA `_invalidate('/registrants')` now also clears `/campers`+`/checkin`.
+- **Tooltips:** church auto-creation + override explained on the "Add a church" card and the
+  wizard Churches step.
+
 ## Commands (run from this folder)
 
 ```bash
