@@ -1,6 +1,25 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-02 — GO-LIVE HARDENING: login throttle rework + Sydney function region
+------------------------------------------------------------------------------
+Two fixes from the go-live readiness analysis (camp = ~200 leaders on ONE venue WiFi IP):
+
+  * LOGIN THROTTLE — was 10 attempts per bare IP per 15 min, counting EVERY attempt
+    (successes included, incremented before the password check). Behind the venue NAT all
+    leaders share one public IP, and the 12h token TTL forces a whole-camp re-login every
+    morning — a guaranteed Day-1 lockout. Now: keyed by ip+username AND counts FAILURES
+    only (RateLimiter.isLimited is non-mutating; recordFailure called from the adapter's
+    catch path only). Brute-force protection per account is unchanged (10 failed tries /
+    15 min). rate-limiter.test.ts rewritten to the new API (5 tests).
+
+  * FUNCTION REGION — vercel.json now pins "regions": ["syd1"]. Functions ran in iad1
+    (US East, the Vercel default) while Supabase is in Sydney, so every DB query paid a
+    ~200ms trans-Pacific round trip (the documented "screen sits still 1-1.5s" latency).
+    Co-locating the function with the DB should cut typical request latency by >50%.
+    NOTE: verify the first post-deploy request feels faster on-device; the loading bar
+    (2026-07-01) remains as the visual fallback.
+
 2026-07-02 — FEATURE BATCH: Account Info consolidation, accommodation override, at-camp student edit
 ----------------------------------------------------------------------------------------------------
 Admin-requested batch (Account: admin). SPA + backend + migration 016 (applied to prod BEFORE the

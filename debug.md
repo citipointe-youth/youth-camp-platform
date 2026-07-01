@@ -277,4 +277,6 @@ tolerate absence via `?? false`.
 | New-year / reset / wipe guard | SPA `adminCloseOut`/`doNewYear` (1843/1867), `adminReset` (2038); backend `admin.service` |
 | 403 / permission denied | backend `access-control.ts` (one file) |
 | 401 / kicked to login | SPA `sessionExpired` (429) `api()` (357); check `SESSION_SECRET` env |
+| **"Too many login attempts" (429 on login)** | `express-adapter.ts` `loginLimiter` + `loginKeyOf` — 10 FAILED attempts per **ip+username** per 15 min (2026-07-02 rework; successes don't count, so shared camp WiFi can't lock the site out). Per-instance in-memory — a retry a minute later often lands on a fresh instance. |
+| **Every request slow (~1s+) even on good WiFi** | `vercel.json` `"regions": ["syd1"]` must be present — without it functions run in iad1 (US East) while Supabase is in Sydney and every query pays a trans-Pacific round trip. |
 | **Church / zone leader can't log in ("disabled by the camp administrator")** | Working as designed — admin toggled a login lock in **Settings** (`churchLoginLocked` / `zoneLeaderLoginLocked`). Backend check is `auth.service.login` (after the password). Locks block **new logins only**; existing sessions persist to the 12h TTL. admin/director/firstAid never blocked. Toggles: `RENDER.adminSettings`/`saveSettings`. |

@@ -10,8 +10,18 @@ import { RateLimiter } from '../../utils/rate-limiter';
 
 const logger = createLogger('http');
 
-// Login throttle: 10 attempts per IP per 15-minute window (matches CMS).
+// Login throttle: 10 FAILED attempts per (IP + username) per 15-minute window.
+// Keyed by ip+username (not bare IP) and counting failures only — at a camp venue all
+// ~200 leaders share ONE public IP behind the WiFi NAT and re-log-in every morning
+// (12h token TTL), so a bare-IP any-attempt bucket locked out the whole site.
 const loginLimiter = new RateLimiter(10, 15 * 60 * 1000);
+
+/** Rate-limit key for a login attempt: client IP + submitted username (lowercased). */
+function loginKeyOf(req: Request): string {
+  const body = req.body as { username?: unknown } | undefined;
+  const uname = typeof body?.username === 'string' ? body.username.trim().toLowerCase() : '';
+  return `${req.ip ?? 'unknown'}|${uname}`;
+}
 
 export function createApp(routes: (Route | BufferRoute)[], authService: AuthService): Express {
   const app = express();
@@ -60,12 +70,13 @@ export function createApp(routes: (Route | BufferRoute)[], authService: AuthServ
     const method = route.method.toLowerCase() as 'get' | 'post' | 'patch' | 'delete';
 
     app[method](expressPath, async (req: Request, res: Response) => {
+      const isLogin = route.method === 'POST' && route.path === '/auth/login';
       try {
-        // Throttle login attempts per IP (brute-force backstop).
-        if (route.method === 'POST' && route.path === '/auth/login') {
-          const ip = req.ip ?? 'unknown';
-          if (loginLimiter.isBlocked(ip)) {
-            const retryAfter = loginLimiter.retryAfterSeconds(ip);
+        // Throttle FAILED login attempts per IP+username (brute-force backstop).
+        if (isLogin) {
+          const key = loginKeyOf(req);
+          if (loginLimiter.isLimited(key)) {
+            const retryAfter = loginLimiter.retryAfterSeconds(key);
             res.setHeader('Retry-After', String(retryAfter));
             res.status(429).json({ code: 'RATE_LIMITED', message: 'Too many login attempts. Try again later.' });
             return;
@@ -94,6 +105,9 @@ export function createApp(routes: (Route | BufferRoute)[], authService: AuthServ
         const result = await route.handler(httpReq);
         res.json(result);
       } catch (err) {
+        // A login that threw (bad password, locked role, validation) consumes budget;
+        // successful logins never do.
+        if (isLogin) loginLimiter.recordFailure(loginKeyOf(req));
         sendError(res, err);
       }
     });
