@@ -61,7 +61,7 @@ function settings(): CampSettings {
     // (first day is PM-only, last day AM-only). See checkin-sessions.buildSessions.
     id: SETTINGS_ID, campName: 'Camp', year: 2026, startDate: '2026-06-30', endDate: '2026-07-05',
     timezone: 'UTC', checkInDays: ['2026-06-30', DATE, '2026-07-02'],
-    accommodationLocked: false, tentPrice: 80, classroomPrice: 120, churchLoginLocked: false, zoneLeaderLoginLocked: false, campMode: 'at-camp', createdAt: now, updatedAt: now,
+    accommodationLocked: false, tentPrice: 80, classroomPrice: 120, churchLoginLocked: false, zoneLeaderLoginLocked: false, churchCheckinTimeRestricted: false, campMode: 'at-camp', createdAt: now, updatedAt: now,
   };
 }
 

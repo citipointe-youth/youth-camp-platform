@@ -33,6 +33,8 @@ export function makeCheckInController(services: CheckInControllerServices) {
       if (!b.sessionId) throw new BadRequestError('Missing sessionId');
       if (!b.type) throw new BadRequestError('Missing type');
 
+      await services.checkIn.assertSessionAllowed(req.ctx.actor, b.sessionId);
+
       // Look up session label from the schedule so the check-in history is readable.
       const sessions = await services.checkIn.getSessions();
       const session = sessions.find((s) => s.id === b.sessionId);

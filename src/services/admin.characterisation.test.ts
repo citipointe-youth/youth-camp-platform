@@ -161,6 +161,7 @@ function settings(over: Partial<CampSettings> = {}): CampSettings {
     classroomPrice: 120,
     churchLoginLocked: false,
     zoneLeaderLoginLocked: false,
+    churchCheckinTimeRestricted: false,
     campMode: 'pre-camp',
     // Default to exported so tests pass the wipe guard without needing force opts.
     lastExportedAt: NOW,

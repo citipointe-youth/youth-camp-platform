@@ -22,6 +22,11 @@ export interface CampSettings {
   // Default false; admin/director/firstAid are never affected.
   churchLoginLocked: boolean;
   zoneLeaderLoginLocked: boolean;
+  // When true, church accounts (only) may only submit a daily check-in for the CURRENT
+  // session (by real clock time) — not other days/sessions. Before camp starts, the first
+  // session (day 1 PM) is treated as "current" so churches aren't locked out entirely.
+  // zoneLeader/director/admin are never restricted. Default false.
+  churchCheckinTimeRestricted: boolean;
   // Mode switch
   campMode: CampMode;
   // Temp passwords from the most recent new-year rollover, cleared after export.

@@ -3,7 +3,7 @@ import type { Actor } from '../core/entities/user';
 import { assertCan } from './access-control';
 import { canAccessPerson } from './person.service';
 import { toRosterEntry, type RosterEntry } from '../api/dto/person.dto';
-import { NotFoundError } from '../core/errors/app-error';
+import { NotFoundError, ForbiddenError } from '../core/errors/app-error';
 import { zonedNow } from '../utils/date';
 import {
   buildSessions,
@@ -28,6 +28,10 @@ export interface CheckInService {
   getSessions(): Promise<CheckInSession[]>;
   getCurrentSession(): Promise<CheckInSession | null>;
   getSessionStatus(actor: Actor, sessionId: string): Promise<SessionStatus>;
+  /** Throws if a church account is submitting a check-in for a non-current session while
+   * the "restrict church check-in to current session" setting is on. No-op for every other
+   * role, and a no-op when the setting is off. */
+  assertSessionAllowed(actor: Actor, sessionId: string): Promise<void>;
 }
 
 // Sessions come from the camp's check-in days (settings), NOT the schedule — two per
@@ -66,6 +70,20 @@ export function makeCheckInService(
       const checkedInCount = roster.filter((r) => r.checkedIn).length;
 
       return { session, roster, checkedInCount, totalCount: roster.length };
+    },
+
+    async assertSessionAllowed(actor, sessionId) {
+      if (actor.role !== 'church') return;
+      const settings = await settingsRepo.getSingleton();
+      if (!settings?.churchCheckinTimeRestricted) return;
+      const { days, tz } = await ctx();
+      const { date, time } = zonedNow(tz);
+      const current = pickCurrentSession(days, date, time);
+      if (current && sessionId !== current.id) {
+        throw new ForbiddenError(
+          `Check-in is currently restricted to the ${current.label} session — ask your admin if you need to record a different session.`,
+        );
+      }
     },
   };
 }

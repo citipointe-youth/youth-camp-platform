@@ -7,9 +7,6 @@ import { isCamper, isRegistrant } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
 import { NotFoundError } from '../core/errors/app-error';
 import { maskPhone } from '../utils/mask';
-import { createLogger } from '../utils/logger';
-
-const logger = createLogger('search');
 
 export interface SearchResult {
   camper: Person;
@@ -139,8 +136,6 @@ export function makeSearchService(
       if (!rawContact) throw new NotFoundError('Contact role not found');
       const maskedEntry = masked.find((m) => m.role === contactRole);
       if (!maskedEntry) throw new NotFoundError('Contact not available');
-
-      logger.info(`Contact revealed: camper=${camperId} role=${contactRole} by actor=${actor.id}`);
 
       return {
         ...maskedEntry,

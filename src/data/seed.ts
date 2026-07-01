@@ -139,6 +139,7 @@ export async function seedAll(container: Container): Promise<void> {
     classroomPrice: 120,
     churchLoginLocked: false,
     zoneLeaderLoginLocked: false,
+    churchCheckinTimeRestricted: false,
     campMode: 'pre-camp',
     createdAt: now,
     updatedAt: now,

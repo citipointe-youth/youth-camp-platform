@@ -16,7 +16,6 @@ import { z } from 'zod';
 const ImportOptionsSchema = z.object({
   csvData: z.string().min(1),
   churchId: z.string().optional(),
-  defaultZone: z.string().optional(),
   updateExisting: z.boolean().optional().default(false),
   dryRun: z.boolean().optional().default(false),
 });
@@ -65,7 +64,11 @@ export function makeImportService(
 
       const churches = await churchRepo.findAll();
       const churchIdByName = new Map<string, string>();
-      for (const c of churches) churchIdByName.set(c.name.toLowerCase(), c.id);
+      const churchZoneById = new Map<string, string>();
+      for (const c of churches) {
+        churchIdByName.set(c.name.toLowerCase(), c.id);
+        churchZoneById.set(c.id, c.zone);
+      }
       const newlyCreated = new Map<string, string>(); // lowercased name -> id
 
       const allPersons = await personRepo.findAll();
@@ -119,6 +122,7 @@ export function makeImportService(
         };
         await churchRepo.save(church);
         newlyCreated.set(key, id);
+        churchZoneById.set(id, church.zone);
         churchesCreated.push(name);
         warnings.push({ row: rowNum, message: `Church "${name}" not found — created (zone defaulted to Yellow)` });
         return id;
@@ -188,7 +192,10 @@ export function makeImportService(
           const parentName = field(row, 'Parent/Guardian Name', 'parentGuardianName', 'parent_name', 'Parent') || null;
           const parentRelation = field(row, 'Relation to Child', 'parentRelation') || null;
           const parentPhone = field(row, 'Parent/Guardian Phone Number', 'parentPhone', 'parent_phone') || null;
-          const zone = field(row, 'zone', 'Zone') || opts.defaultZone || '';
+          // Zone is a property of the church, not the CSV row — a person's zone always follows
+          // their (resolved) church's current zone. There is no per-row zone override: if the
+          // church's zone is changed later, re-importing is what brings people's zone up to date.
+          const zone = churchZoneById.get(resolvedChurchId) ?? 'Yellow';
           // 'Type' is the canonical Elvanto column; fall back to explicit aliases
           const typeRaw = field(row, 'Type', 'Registration Type', 'registrationType', 'registration_type');
           const registrationType = typeRaw || null;
@@ -247,7 +254,7 @@ export function makeImportService(
               postcode,
               state,
               medicareNumber,
-              zone: zone || match.zone,
+              zone,
               kind,
               medicalConditions: medical ? [medical] : match.medicalConditions,
               dietaryRequirements: dietary ? [dietary] : match.dietaryRequirements,

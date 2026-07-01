@@ -71,7 +71,7 @@ body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFon
    the base bar is white with dark text and a hairline bottom border, and the badges/sign-out
    are restyled to read on white. The ≥980px block keeps only the wide-specific tweaks
    (subtitle hidden, no wrap). The purple camp identity still lives in the hero cards. */
-.bar{background:#fff;color:var(--ink);border-bottom:1px solid var(--line);padding:max(14px,env(safe-area-inset-top)) 14px 6px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px;flex:none;z-index:20;}
+.bar{background:#fff;color:var(--ink);border-bottom:1px solid var(--line);padding:max(14px,env(safe-area-inset-top)) 14px 6px;display:flex;align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px;flex:none;z-index:20;position:relative;}
 .bar .bk{width:34px;height:34px;border-radius:50%;display:none;place-items:center;background:var(--chip);color:var(--violet-d);font-size:var(--t-h3);flex:none;cursor:pointer;align-self:center;}
 .bar.canback .bk{display:grid;}
 /* Title + subtitle share one line ("My Church Hub — All churches"); the subtitle
@@ -83,7 +83,7 @@ body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFon
 /* Badges/sign-out: smaller and dropped to the bottom of the bar so they don't
    crowd the title's vertical space. */
 .bar-actions{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto;}
-.mode-badge{font-size:var(--t-micro);font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.04em;}
+.mode-badge{font-size:var(--t-micro);font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none;letter-spacing:.03em;border:1px solid rgba(0,0,0,.12);}
 .role-badge{font-size:var(--t-micro);font-weight:800;background:var(--chip);color:var(--violet-d);border:1px solid var(--lav);border-radius:999px;padding:2px 8px;white-space:nowrap;flex:none;letter-spacing:.03em;}
 .sign-out{padding:3px 10px;border-radius:999px;background:#fff;color:var(--ink);font-size:var(--t-2xs);font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid var(--line);}
 .stage{flex:1;position:relative;overflow:hidden;}
@@ -275,10 +275,11 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,te
 /* Schedule-edit rows: let native time/text inputs shrink to their grid track (min-width:auto
    on inputs was overflowing the Time field into the Activity field on narrow phones). */
 .sched-row input{min-width:0;}
-/* Top loading bar (#nprog): a thin accent bar under the top edge that animates whenever a real
-   network request is in flight (cache hits skip it). Gives instant "it's working" feedback on
-   button/tab taps that otherwise sat still during the 1–1.5s serverless round-trip. */
-#nprog{position:absolute;top:0;left:0;height:3px;width:0;z-index:60;background:linear-gradient(90deg,var(--violet),var(--blue2));border-radius:0 2px 2px 0;opacity:0;transition:width .18s ease,opacity .3s ease;pointer-events:none;box-shadow:0 0 8px rgba(124,58,237,.55);}
+/* Top loading bar (#nprog): a thin accent bar that animates whenever a real network request
+   is in flight (cache hits skip it). Gives instant "it's working" feedback on button/tab taps
+   that otherwise sat still during the 1–1.5s serverless round-trip. Anchored to the BOTTOM edge
+   of the header bar (.bar, its positioned parent) rather than the very top of the screen. */
+#nprog{position:absolute;bottom:-1px;left:0;height:3px;width:0;z-index:60;background:linear-gradient(90deg,var(--violet),var(--blue2));border-radius:0 2px 2px 0;opacity:0;transition:width .18s ease,opacity .3s ease;pointer-events:none;box-shadow:0 0 8px rgba(124,58,237,.55);}
 #nprog.on{opacity:1;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;}
@@ -454,12 +455,12 @@ textarea{min-height:84px;resize:vertical;}
 </head>
 <body>
 <div class="app" id="app">
-  <div id="nprog"></div>
   <div id="previewBanner">
     <span class="pb-label">${ic('preview')} PREVIEW — at-camp view is read-only</span>
     <button class="pb-exit" onclick="exitPreview()">Exit preview ×</button>
   </div>
   <header class="bar" id="bar" style="display:none">
+    <div id="nprog"></div>
     <div class="bk" onclick="back()">&#8249;</div>
     <div class="ttl"><span class="t" id="barT">Camp Platform</span><span class="s" id="barS"></span></div>
     <div class="bar-actions">
@@ -787,14 +788,40 @@ function logout(){
   localStorage.removeItem('ycp_token');localStorage.removeItem('ycp_actor');
   TOKEN=null;ACTOR=null;location.reload();
 }
+// Real (non-preview) current camp day number, 1-based, from the actual check-in day dates —
+// today's day if camp is underway, day 1 before camp starts, the last day after it ends.
+function _realCampDayNumber(){
+  const days=(SETTINGS&&SETTINGS.checkInDays)||[];
+  if(!days.length)return 1;
+  const sorted=[...days].sort();
+  const today=new Date().toISOString().slice(0,10);
+  let idx=sorted.findIndex(d=>d>=today);
+  if(idx===-1)idx=sorted.length-1;
+  return idx+1;
+}
 function updateModeUI(){
   const b=document.getElementById('modeBadge'),r=document.getElementById('roleBadge');
-  if(PREVIEW_MODE){b.textContent='PREVIEW';b.style.background='#92400e';b.style.color='#fff';}
-  else if(CAMP_MODE==='at-camp'){b.textContent='AT CAMP';b.style.background='#16a34a';b.style.color='#fff';}
-  else{b.textContent='PRE-CAMP';b.style.background='#9333ea';b.style.color='#fff';}
+  if(PREVIEW_MODE){b.textContent='Preview';b.style.background='#92400e';b.style.color='#fff';}
+  else if(CAMP_MODE==='at-camp'){b.textContent='At Camp';b.style.background='#16a34a';b.style.color='#fff';}
+  else{b.textContent='Pre-Camp';b.style.background='#9333ea';b.style.color='#fff';}
   if(r&&ACTOR)r.textContent=ACTOR.role==='admin'?'Admin':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?'Zone·'+ACTOR.zone:'Church';
   const db=document.getElementById('dayBadge');
-  if(db){if(CAMP_MODE==='at-camp'){db.style.display='';const day=(SETTINGS&&SETTINGS.campDay)||1;db.innerHTML='DAY '+day+' <span style="opacity:.75">'+icSm('arrowr')+'</span>';db.style.background='#4f46e5';db.style.color='#fff';}else db.style.display='none';}
+  if(db){
+    if(CAMP_MODE==='at-camp'){
+      db.style.display='';db.style.background='#4f46e5';db.style.color='#fff';
+      if(PREVIEW_MODE){
+        // Lead-up-to-camp preview: still a manual, pressable toggle between Day 1/Day 2 so an
+        // admin can eyeball both views before the real thing starts.
+        const day=(SETTINGS&&SETTINGS.campDay)||1;
+        db.innerHTML='Day '+day+' <span style="opacity:.75">'+icSm('arrowr')+'</span>';
+        db.style.cursor='pointer';db.title='Tap to preview a different day';
+      }else{
+        // Real at-camp: a plain computed label, not interactive.
+        db.innerHTML='Day '+_realCampDayNumber();
+        db.style.cursor='default';db.removeAttribute('title');
+      }
+    }else db.style.display='none';
+  }
 }
 /* ===== AT-CAMP PREVIEW ===== */
 function enterPreview(){
@@ -828,8 +855,12 @@ function _applyModeChange(mode){
   if(!tabs.has(owner)){STACK=['home'];gotoTab('home');}
 }
 
-/* campDay is client-side only — the backend has no campDay field. Per-device view state. */
-function switchDay(){const cur=(SETTINGS&&SETTINGS.campDay)||1;const next=cur===1?2:1;
+/* campDay is client-side only — the backend has no campDay field. Per-device view state, used
+   ONLY during the pre-camp preview of the at-camp view (real at-camp shows a computed, non-
+   clickable day label instead — see updateModeUI/_realCampDayNumber). */
+function switchDay(){
+  if(!PREVIEW_MODE)return;
+  const cur=(SETTINGS&&SETTINGS.campDay)||1;const next=cur===1?2:1;
   if(SETTINGS)SETTINGS.campDay=next;updateModeUI();
   toast(next===1?'Day 1 — First Day Sign In':'Day '+next+' — testimonies open');STACK=['home'];RENDER.home();}
 
@@ -1098,16 +1129,17 @@ async function renderHomeAtCamp(){
     myAccom=rooms.length?rooms.map(r=>r.name+' — '+(r.gender==='male'?'Guys':'Girls')+' ('+r.n+')').join(' · '):'To be confirmed';
   }catch(e){myAccom='To be confirmed';}}
   const tiles=[];
-  const day1=((SETTINGS&&SETTINGS.campDay)||1)===1;
+  const day1=PREVIEW_MODE?(((SETTINGS&&SETTINGS.campDay)||1)===1):(_realCampDayNumber()===1);
   tiles.push(day1?`<div class="tile" onclick="go('firstday')"><div class="ic">${ic('check')}</div><div class="l">First Day Sign In</div></div>`:`<div class="tile" onclick="go('testimonies')"><div class="ic">${ic('star')}</div><div class="l">Submit Testimonies</div></div>`);
   tiles.push(`<div class="tile" onclick="go('myyouth')"><div class="ic">${ic('users')}</div><div class="l">My Youth Details</div></div>`);
   if(canReadNotes())tiles.push(`<div class="tile" onclick="go('notes')"><div class="ic">${ic('note')}</div><div class="l">Testimonies &amp; Notes</div></div>`);
   tiles.push(`<div class="tile" onclick="go('schedule')"><div class="ic">${ic('calendar')}</div><div class="l">Schedule</div></div>`);
   tiles.push(`<div class="tile" onclick="go('devotional')"><div class="ic">${ic('book')}</div><div class="l">Devotional</div></div>`);
+  tiles.push(`<div class="tile" onclick="gotoTab('notifs')"><div class="ic">${ic('bell')}</div><div class="l">Notices</div></div>`);
   if(ACTOR.role==='church'&&!PREVIEW_MODE)tiles.push(`<div class="tile" style="cursor:default"><div class="ic">${ic('classroom')}</div><div class="l">Your Accommodation</div><div class="sub" style="font-size:.62rem;margin-top:2px">${esc(myAccom)}</div></div>`);
-  // Director has import:run but the Admin tab (where the importer lives) is admin-only;
-  // surface a direct import entry point so the capability is reachable.
-  if(ACTOR.role==='director')tiles.push(`<div class="tile" onclick="go('import')"><div class="ic">${ic('users')}</div><div class="l">Import Students</div></div>`);
+  // Director has no Data tab at-camp (only pre-camp) — surface a direct entry point to the
+  // raw registration data table so the capability is reachable in either mode.
+  if(ACTOR.role==='director')tiles.push(`<div class="tile" onclick="go('data')"><div class="ic">${ic('note')}</div><div class="l">Student Data Table</div></div>`);
   // PC-7: FAQ/Help is a PRE-CAMP aid only — no FAQ tile in at-camp home for any role.
   // (Admin can still edit FAQ anytime via the Admin console.)
   const notices=(feed||[]).slice(0,3);
@@ -1383,7 +1415,15 @@ function _retryFailedCheckins(){
 
 RENDER.checkin=async function renderCheckin(){
   if(SESSIONS.length===0)SESSIONS=await api('/checkin/sessions');
-  if(!SEL_SESSION){const cur=await api('/checkin/sessions/current').catch(()=>null);SEL_SESSION=(cur&&cur.id)||(SESSIONS[0]&&SESSIONS[0].id);}
+  // When the admin has restricted church check-in to the current session, a church login
+  // is always pinned to whatever session is current right now — it can't linger on an
+  // earlier/later one it picked before the restriction kicked in.
+  const churchRestricted=ACTOR.role==='church'&&!!(SETTINGS&&SETTINGS.churchCheckinTimeRestricted);
+  if(!SEL_SESSION||churchRestricted){
+    const cur=await api('/checkin/sessions/current').catch(()=>null);
+    if(churchRestricted&&cur&&cur.id)SEL_SESSION=cur.id;
+    else if(!SEL_SESSION)SEL_SESSION=(cur&&cur.id)||(SESSIONS[0]&&SESSIONS[0].id);
+  }
   if(!SEL_SESSION){paint('checkin','<p class="note-hint">No check-in sessions configured. Set camp dates in admin settings.</p>','Daily Check-in','');return;}
   // Enriched RosterEntry now includes gender, grade, medicalFlag — no second /campers fetch needed.
   const st=await api('/checkin/sessions/'+encodeURIComponent(SEL_SESSION)+'/status');
@@ -1409,7 +1449,9 @@ RENDER.checkin=async function renderCheckin(){
   const doneList=list.filter(c=>c.present);
   const dueShown=dueList.length,presentShown=doneList.length;
   const label=_ciLabel(st.session||SESSIONS.find(x=>x.id===SEL_SESSION)||{});
-  const dayBtns=SESSIONS.map(s=>`<button class="${s.id===SEL_SESSION?'on':''}" onclick="selDay('${s.id}')">${esc(_ciLabel(s))}</button>`).join('');
+  const dayBtns=churchRestricted
+    ?`<span class="sub" style="padding:7px 4px;display:inline-flex;align-items:center;gap:4px">${esc(label)} only ${helpTip('Your admin has restricted check-in to the session that\'s currently happening.')}</span>`
+    :SESSIONS.map(s=>`<button class="${s.id===SEL_SESSION?'on':''}" onclick="selDay('${s.id}')">${esc(_ciLabel(s))}</button>`).join('');
   const gradeOpts=['all',...GRADES].map(g=>`<option value="${g}" ${String(g)===FILTER.grade?'selected':''}>${g==='all'?'All grades':'Grade '+g}</option>`).join('');
   const zoneSelOpts=zonesOpt.map(z=>`<option value="${z}" ${z===FILTER.zone?'selected':''}>${z==='all'?'All zones':z+' Zone'}</option>`).join('');
   const churchSelOpts=churchesOpt.map(ch=>`<option value="${esc(ch)}" ${ch===FILTER.church?'selected':''}>${ch==='all'?'All churches':esc(ch)}</option>`).join('');
@@ -1421,8 +1463,9 @@ RENDER.checkin=async function renderCheckin(){
         <div class="nm">${esc(c.name)}${c.medicalFlag?' <span class="med" style="font-size:.62rem">med</span>':''}</div>
         <div class="sub">${esc(c.church||c.zone)}${c.grade?' · Yr '+c.grade:''}</div>
       </div>
+      <button class="btn ghost sm" style="z-index:1;flex:none" onclick="event.stopPropagation();notePrompt('${c.id}','${esc(c.name)}')">Add note</button>
       <span class="sync-dot ${syncClass}" data-id="${c.id}"></span>
-      <button class="btn ghost sm" style="z-index:1" aria-label="Add note" onclick="event.stopPropagation();notePrompt('${c.id}','${esc(c.name)}')">${icSm('plus')}</button>
+      <button class="btn ghost sm" style="z-index:1" aria-label="${c.present?'Check out':'Check in'}" onclick="event.stopPropagation();_performCheck('${c.id}','${c.present?'out':'in'}','${esc(c.name)}')">${icSm('plus')}</button>
       <span style="color:#94a3b8;margin-left:4px">${c.present?icSm('check'):''}</span>
     </div>`;
   }
@@ -1455,13 +1498,14 @@ RENDER.checkin=async function renderCheckin(){
     <p class="note-hint">Tap a row to check in/out. Notes visible to zone leaders &amp; directors only.</p>`;
   paint('checkin',html,'Daily Check-in',label);
   // Show undo toast if pending
-  if(_undoCamperId)_showUndoToast();
+  if(_undoCamperId)_showUndoToast(_undoType);
 };
 function selDay(id){SEL_SESSION=id;RENDER.checkin();}
 function setFilter(k,v){FILTER[k]=v;if(k==='zone')FILTER.church='all';RENDER.checkin();}
 
 function _performCheck(camperId,type,name){
-  if(type==='out'){confirmCheckOut(camperId,name);return;}
+  // Check-out no longer asks for confirmation — reaching this point already required
+  // actively opening the "Done" section and tapping the row, which is deliberate enough.
   // Optimistic flip
   _queueEntry(camperId,type);
   // Start undo window
@@ -1470,16 +1514,10 @@ function _performCheck(camperId,type,name){
   // Immediate local re-render
   RENDER.checkin();
 }
-function confirmCheckOut(camperId,name){
-  modal(`<h3>Check out ${esc(name)}?</h3>
-    <p class="sub" style="margin:6px 0 14px">This will mark them as not yet in for this session.</p>
-    <button class="btn" onclick="_queueEntry('${camperId}','out');CHECKIN_QUEUE.length&&drainQueue();closeModal();">Confirm check-out</button>
-    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
-}
-function _showUndoToast(){
+function _showUndoToast(type){
   let el=document.getElementById('undoToast');
   if(!el){el=document.createElement('div');el.id='undoToast';el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:.9rem';document.body.appendChild(el);}
-  el.innerHTML=`${icSm('check')} Checked in <button onclick="undoCheck()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:5px 11px;cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:700">Undo</button>`;
+  el.innerHTML=`${icSm('check')} ${type==='out'?'Checked out':'Checked in'} <button onclick="undoCheck()" style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:5px 11px;cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:700">Undo</button>`;
   el.style.display='flex';
 }
 function _hideUndoToast(){const el=document.getElementById('undoToast');if(el)el.style.display='none';}
@@ -1734,7 +1772,7 @@ function drawFaRecords(){
 /* ===== SEARCH ===== */
 RENDER.search=function(){
   if(ACTOR&&ACTOR.role==='firstAid'){renderSearchFirstAid();return;}
-  paint('search',`<div class="rowsb" style="margin-bottom:8px"><span class="lbl" style="margin:0">Student search</span>${helpTip('Search any camper or leader by name. Tap a result to reveal masked contact details — each reveal is logged.')}</div><div class="search"><span>${ic('search')}</span><input id="q" placeholder="Type a student's name…" oninput="doSearch(this.value)"></div><div id="results"><p class="note-hint">Type a name to find any camper or leader across the camp.</p></div>`,'Search Student Details','Find any camper');
+  paint('search',`<div class="rowsb" style="margin-bottom:8px"><span class="lbl" style="margin:0">Student search</span>${helpTip('Search any camper or leader by name. Tap a result to reveal masked contact details.')}</div><div class="search"><span>${ic('search')}</span><input id="q" placeholder="Type a student's name…" oninput="doSearch(this.value)"></div><div id="results"><p class="note-hint">Type a name to find any camper or leader across the camp.</p></div>`,'Search Student Details','Find any camper');
 };
 let sT;function doSearch(v){clearTimeout(sT);sT=setTimeout(()=>runSearch(v),200);}
 async function runSearch(v){const box=document.getElementById('results');if(!box)return;
@@ -2470,7 +2508,7 @@ function editChurchName(id){const c=_findChurch(id);
   modal(`<h3>Rename church</h3>
     <label>Church name</label><input class="fld" id="ecnName" value="${esc(c.name||'')}">
     <div class="warnbox" style="margin-top:8px">${icSm('alert')} Must match the registration export exactly — registrations are matched by name.</div>
-    <label>Zone</label>${zoneSel('ecnZone',c.zone)}
+    <label>Zone ${helpTip('Changing zone here does not move students already imported for this church — they keep their current zone until you re-upload the registration CSV.')}</label>${zoneSel('ecnZone',c.zone)}
     <button class="btn" style="margin-top:10px" onclick="saveChurchName('${id}')">Save</button>
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function saveChurchName(id){const name=val('ecnName');if(!name){toast('Enter a church name');return;}
@@ -2728,12 +2766,16 @@ RENDER.adminSettings=async function(){
          data (per-registrant Cost), surfaced in Budget — not from settings. -->
     <label style="margin-top:16px">Account access</label>
     <div class="tglrow">
-      <div><div class="tgl-l">Lock church logins ${helpTip('Stops church accounts signing in. People already signed in stay until they log out.')}</div><div class="sub">Turn on after camp to close church access.</div></div>
+      <div><div class="tgl-l">Lock church logins ${helpTip('Stops church accounts signing in. People already signed in stay signed in until they log out or their session expires (up to 12 hours).')}</div><div class="sub">Turn on after camp to close church access.</div></div>
       <label class="tgl"><input type="checkbox" id="stChurchLock" ${s.churchLoginLocked?'checked':''}><span class="track"></span></label>
     </div>
     <div class="tglrow">
-      <div><div class="tgl-l">Lock zone leader logins ${helpTip('Stops zone leader accounts signing in. People already signed in stay until they log out.')}</div><div class="sub">Manual only — toggle on or off whenever you need.</div></div>
+      <div><div class="tgl-l">Lock zone leader logins ${helpTip('Stops zone leader accounts signing in. People already signed in stay signed in until they log out or their session expires (up to 12 hours).')}</div><div class="sub">Manual only — toggle on or off whenever you need.</div></div>
       <label class="tgl"><input type="checkbox" id="stZoneLock" ${s.zoneLeaderLoginLocked?'checked':''}><span class="track"></span></label>
+    </div>
+    <div class="tglrow">
+      <div><div class="tgl-l">Restrict church check-in to current session ${helpTip('When on, church accounts can only submit the check-in that\'s actually happening right now — not an earlier or later session. Before camp starts, they can still complete the very first session (Mon PM). Zone leaders, directors and admin are never restricted.')}</div><div class="sub">Stops early/late check-ins from church accounts — toggle off any time.</div></div>
+      <label class="tgl"><input type="checkbox" id="stChurchCheckinRestrict" ${s.churchCheckinTimeRestricted?'checked':''}><span class="track"></span></label>
     </div>
     <button class="btn" style="margin-top:14px" onclick="saveSettings()">Save camp settings</button>
     <p class="note-hint">Setting the start date pre-fills the end date to the 4th day; you can adjust it. Check-in days are generated from the date range automatically — one Morning and one Afternoon session per day.</p></div>`,'Camp settings','Dates & details');
@@ -2762,7 +2804,8 @@ async function saveSettings(){
     // a developer changes. Drives compliance-export timestamp localisation (audit-export.service).
     const churchLock=!!document.getElementById('stChurchLock')?.checked;
     const zoneLock=!!document.getElementById('stZoneLock')?.checked;
-    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days,churchLoginLocked:churchLock,zoneLeaderLoginLocked:zoneLock}});
+    const churchCheckinRestrict=!!document.getElementById('stChurchCheckinRestrict')?.checked;
+    await api('/settings',{method:'PATCH',body:{campName:val('stName'),year:Number(val('stYear'))||new Date().getFullYear(),startDate:val('stStart'),endDate:val('stEnd'),timezone:'Australia/Brisbane',checkInDays:days,churchLoginLocked:churchLock,zoneLeaderLoginLocked:zoneLock,churchCheckinTimeRestricted:churchCheckinRestrict}});
     SETTINGS=await api('/settings',{noCache:true});SESSIONS=[];SEL_SESSION=null;SCHED_DAY=null;DEVO_DAY=null;
     toast('Settings saved');
   }catch(e){toast(e.message);}
@@ -2776,6 +2819,7 @@ RENDER.adminData=async function(){
   // passwords are redacted there — they live only in the admin-authenticated audit export).
   try{const s=await api('/settings');if(s){if(s.lastExportedAt)exported=dtFmt(s.lastExportedAt);pendingTemps=s.pendingTempPasswordCount||0;}}catch(e){}
   const isAdmin=ACTOR.role==='admin';
+  const dataTableCard=`<div class="card tap" onclick="go('data')"><div class="rowsb"><div><div style="font-weight:600">Student data table</div><div class="sub">Filterable registration table &amp; Elvanto-format export</div></div><span class="pill info">View ›</span></div></div>`;
   const uploadSection=`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
     <input type="file" id="fileIn" accept=".csv" class="fld">
     <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
@@ -2807,7 +2851,7 @@ RENDER.adminData=async function(){
       <p class="note-hint" style="text-align:left">Deletes ALL data and every non-admin account, keeping only this admin account &amp; the camp settings. No restore. Signs you out.</p></div>`:'';
   // PC-1: order = 1. Upload, 2. Save Defaults, 3. Compliance Export, 4. Close-Out, 5. Factory Reset.
   paint('adminData',
-    `${uploadSection}${saveDefaultsCard}${complianceCard}${closeOutCard}${factoryResetCard}`,
+    `${dataTableCard}${uploadSection}${saveDefaultsCard}${complianceCard}${closeOutCard}${factoryResetCard}`,
     'Data, Reset & Exports','Upload / export / reset');
 };
 /* Standalone import screen — gives director (who has import:run but not the Admin

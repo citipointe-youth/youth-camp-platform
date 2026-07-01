@@ -66,6 +66,7 @@ export const UpdateSettingsSchema = z.object({
   accommodationLocked: z.boolean().optional(),
   churchLoginLocked: z.boolean().optional(),
   zoneLeaderLoginLocked: z.boolean().optional(),
+  churchCheckinTimeRestricted: z.boolean().optional(),
   campMode: z.enum(CAMP_MODES).optional(),
   tentPrice: z.number().min(0).optional(),
   classroomPrice: z.number().min(0).optional(),
