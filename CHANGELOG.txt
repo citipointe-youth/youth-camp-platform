@@ -1,6 +1,39 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-01 — UI/UX FIX BATCH: schedule-edit overlap, setup wizard, global loading bar
+-------------------------------------------------------------------------------------
+Admin-requested batch (Account: admin, Mode: pre-camp). All changes are in public/index.html
+(SPA only — no backend/schema change, no migration). Verified: node --check on the extracted
+SPA script (OK), npm run typecheck clean, npm run test = 270 pass.
+
+  * BUG 1 — Schedule edit boxes overlapped on a phone. _schedRow's grid used a fixed 92px Time
+    column with 1fr Activity, but native <input type="time"> keeps min-width:auto and overflowed
+    its track into the Activity field on narrow screens. FIX: track is now `96px minmax(0,1fr) auto`
+    (both the row and its header) + a `.sched-row input{min-width:0}` rule so the inputs shrink to
+    their tracks instead of overlapping.
+
+  * BUG 2 — Setup wizard expanded + reordered into a logical camp-setup flow:
+    Camp settings -> Churches -> Accounts -> Accommodation rooms -> Accommodation allocation (NEW)
+    -> Schedule -> Devotionals (NEW) -> FAQ (NEW) -> Ministry contacts (NEW). The four new steps
+    auto-detect "done" like the originals: allocation = any room has an occupant; devotionals = any
+    camp day has verse/reflection/prayer; FAQ = >=1 entry; ministry contacts = any church has >=1
+    named leader. ("Accommodation" renamed to "Accommodation rooms" to distinguish it from the new
+    allocation step, which links to RENDER.accom.)
+
+  * BUG 3 — Every wizard step now carries a short plain-language tooltip (helpTip "?" bubble beside
+    the label; tap-to-toggle, stopPropagation so it doesn't trigger the row's navigation).
+
+  * BUG 4 — "Screen sits still 1–1.5s after a button push." Root cause is genuine serverless +
+    Supabase round-trip latency (not a code stall); on stale-while-revalidate revisits the old
+    screen stayed put with no loading hint, so it read as "button didn't register." FIX:
+      - Added a global top loading bar (#nprog) driven from _doFetch via a reference-counted
+        _npStart/_npDone (creeps to 90%, snaps to 100% and fades). Only REAL network requests drive
+        it — cached GETs bypass _doFetch, so instant navigations never flash the bar.
+      - Latency quick-win: _prefetch now also warms /accounts/churches + /accounts/users for
+        admin/director on login, so Accounts, Ministry-contacts and the Setup wizard open from cache
+        instead of a cold round-trip.
+
 2026-07-01 — FIX: church rename now propagates to attached people (NOT YET DEPLOYED)
 -----------------------------------------------------------------------------------
 A Person carries a denormalized churchName snapshot alongside churchId (person.ts). updateChurch
