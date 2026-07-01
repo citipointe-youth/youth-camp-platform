@@ -583,11 +583,16 @@ function _invalidate(path){
    Promise.all) hold the bar until the LAST one finishes. It creeps toward 90% while in flight,
    then snaps to 100% and fades — classic "nprogress" feel. Only real network requests call this
    (from _doFetch); cached GETs never reach here, so instant navigations don't flash the bar. */
-let _npCount=0,_npTimer=null,_npVal=0;
+let _npCount=0,_npTimer=null,_npVal=0,_npFadeTimer=null,_npResetTimer=null;
 function _npStart(){
   _npCount++;
   if(_npCount>1)return;
   const el=document.getElementById('nprog');if(!el)return;
+  // A fade-out/reset from the immediately-previous cycle can still be queued (setTimeout)
+  // when a new request starts right after the last one finished — cancel it so it can't
+  // yank opacity/width out from under this new cycle (was causing a visible flash or the
+  // bar snapping backward partway through a load).
+  clearTimeout(_npFadeTimer);clearTimeout(_npResetTimer);
   _npVal=8;el.classList.add('on');el.style.width=_npVal+'%';
   clearInterval(_npTimer);
   _npTimer=setInterval(()=>{_npVal+=Math.max(0.4,(90-_npVal)*0.09);if(_npVal>=90){_npVal=90;}el.style.width=_npVal+'%';},170);
@@ -598,7 +603,10 @@ function _npDone(){
   const el=document.getElementById('nprog');if(!el)return;
   clearInterval(_npTimer);_npTimer=null;
   el.style.width='100%';
-  setTimeout(()=>{el.classList.remove('on');setTimeout(()=>{if(_npCount===0)el.style.width='0';},320);},180);
+  _npFadeTimer=setTimeout(()=>{
+    if(_npCount===0)el.classList.remove('on');
+    _npResetTimer=setTimeout(()=>{if(_npCount===0)el.style.width='0';},320);
+  },180);
 }
 async function _doFetch(path,opt){
   _npStart();
