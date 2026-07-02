@@ -326,6 +326,31 @@ at both full size and realistic 60/76px home-screen size before picking one).
   else — if a fifth hero-style card gets added later (budget, devotional) and should also carry
   the mark, call `heroMark()` there too rather than duplicating the SVG markup.
 
+## Security & perf hardening ported from CMS — 2026-07-02
+
+- **CSP meta tag** (`public/index.html` `<head>`): defence-in-depth alongside the SPA's escaping
+  discipline. `'unsafe-inline'` stays for script-src/style-src (required by the inline-script/
+  onclick architecture); the policy blocks external script/resource loads it doesn't need.
+  `style-src`/`font-src` allow Google Fonts (`fonts.googleapis.com`/`fonts.gstatic.com` — Plus
+  Jakarta Sans, the app's only external resource); `connect-src 'self'` covers all API calls
+  (relative paths only). **A CSP typo isn't caught by tsc/vitest** — after any change to the
+  policy, hard-load the prod URL and check the browser console for CSP violations. `sw.js`
+  `CACHE` bumped to `camp-v9` alongside this change (HTML changed).
+- **Server-side response cache** (`src/utils/response-cache.ts` + `src/services/dashboard-cache.ts`,
+  ported from CMS): a 30s-TTL in-memory cache wraps the `/home` dashboard DTO
+  (`dashboard.service.ts`). Cache key is `${role}:${churchId ?? '_'}:${zone ?? '_'}` — **must**
+  include actor scope, since the DTO is role/church/zone-scoped and a shared key would leak one
+  church's data to another. `invalidateDashboardCache()` is called from every write that can
+  change the DTO (person create/update/remove/checkIn/signEvent, all 4 import services,
+  admin reset/newYear/clearNotifications, settings update/setMode, notification send/remove/
+  clearAll, account church create/update/delete) — when in doubt the rule was invalidateAll,
+  correctness over hit rate. **Lives in its own module** (`dashboard-cache.ts`, not inside
+  `dashboard.service.ts`) to avoid a circular import: `dashboard.service.ts` already imports
+  `canAccessPerson` from `person.service.ts`, so a writer-side import back from
+  `dashboard.service.ts` would cycle. Deliberately **not** applied to
+  `checkin.service.getSessionStatus` — the at-camp roster must stay live. Same serverless
+  caveat as CMS: only helps within a warm instance.
+
 ## Commands (run from this folder)
 
 ```bash

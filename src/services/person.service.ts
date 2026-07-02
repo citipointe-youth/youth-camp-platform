@@ -8,6 +8,7 @@ import { NotFoundError, BadRequestError } from '../core/errors/app-error';
 import { ageFromDob, nowISO } from '../utils/date';
 import { newId } from '../utils/id';
 import { withCheckIn, withSignEvent } from './person-lifecycle';
+import { invalidateDashboardCache } from './dashboard-cache';
 
 /**
  * PersonService — the unified registrant + camper service (design D2), operating
@@ -225,7 +226,9 @@ export function makePersonService(repo: IPersonRepository): PersonService {
         createdAt: now,
         updatedAt: now,
       };
-      return repo.save(person);
+      const saved = await repo.save(person);
+      invalidateDashboardCache();
+      return saved;
     },
 
     async update(actor, id, patch) {
@@ -237,13 +240,16 @@ export function makePersonService(repo: IPersonRepository): PersonService {
       const nextLifecycle =
         lifecycle === 'cancelled' || lifecycle === 'registered' ? lifecycle : existing.lifecycle;
       const updated: Person = { ...existing, ...safeRest, id: existing.id, lifecycle: nextLifecycle, updatedAt: nowISO() };
-      return repo.save(updated);
+      const saved = await repo.save(updated);
+      invalidateDashboardCache();
+      return saved;
     },
 
     async remove(actor, id) {
       assertCan(actor, 'registrant:write');
       await getOwned(actor, id);
       await repo.delete(id);
+      invalidateDashboardCache();
     },
 
     async checkIn(actor, personId, entry) {
@@ -256,14 +262,18 @@ export function makePersonService(repo: IPersonRepository): PersonService {
         throw new BadRequestError('Cannot check in a person who is not currently at camp');
       }
       const full: CheckInEntry = { ...entry, id: newId('ci') };
-      return repo.save(withCheckIn(person, full, nowISO()));
+      const saved = await repo.save(withCheckIn(person, full, nowISO()));
+      invalidateDashboardCache();
+      return saved;
     },
 
     async signEvent(actor, personId, event) {
       assertCan(actor, 'attendance:write');
       const person = await getOwned(actor, personId);
       const full: SignOutEvent = { ...event, id: newId('so') };
-      return repo.save(withSignEvent(person, full, nowISO()));
+      const saved = await repo.save(withSignEvent(person, full, nowISO()));
+      invalidateDashboardCache();
+      return saved;
     },
 
     async chase(actor) {

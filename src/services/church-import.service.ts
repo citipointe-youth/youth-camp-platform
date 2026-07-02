@@ -9,6 +9,7 @@ import { parseCsv } from '../utils/csv';
 import { hashPassword } from '../utils/crypto';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
+import { invalidateDashboardCache } from './dashboard-cache';
 import { z } from 'zod';
 
 const ChurchImportOptionsSchema = z.object({
@@ -127,6 +128,7 @@ export function makeChurchImportService(
         }
       }
 
+      if (!opts.dryRun && created > 0) invalidateDashboardCache();
       return { created, skipped, dryRun: opts.dryRun, errors, warnings, preview };
     },
   };

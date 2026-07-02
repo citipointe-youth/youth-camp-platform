@@ -19,6 +19,7 @@ import { hashPassword } from '../utils/crypto';
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
 import { toSafeUser } from './auth.service';
+import { invalidateDashboardCache } from './dashboard-cache';
 
 export interface AccountService {
   listUsers(actor: Actor): Promise<SafeUser[]>;
@@ -160,6 +161,7 @@ export function makeAccountService(
       };
       const savedUser = await userRepo.save(user);
 
+      invalidateDashboardCache(); // new church affects PreCampDashboard.perChurchBreakdown
       return { church, user: toSafeUser(savedUser) };
     },
 
@@ -192,6 +194,7 @@ export function makeAccountService(
           );
         }
       }
+      invalidateDashboardCache();
       return saved;
     },
 
@@ -214,6 +217,7 @@ export function makeAccountService(
         await userRepo.delete(u.id);
       }
       await churchRepo.delete(id);
+      invalidateDashboardCache();
       return { deleted: id };
     },
   };

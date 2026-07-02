@@ -7,6 +7,7 @@ import { assertCan } from './access-control';
 import { NotFoundError } from '../core/errors/app-error';
 import { UpdateSettingsSchema } from '../core/validation/content.schema';
 import { nowISO } from '../utils/date';
+import { invalidateDashboardCache } from './dashboard-cache';
 
 export interface SettingsService {
   get(): Promise<CampSettings>;
@@ -35,7 +36,9 @@ export function makeSettingsService(repo: ISettingsRepository): SettingsService 
         id: SETTINGS_ID,
         updatedAt: nowISO(),
       };
-      return repo.saveSingleton(updated);
+      const saved = await repo.saveSingleton(updated);
+      invalidateDashboardCache();
+      return saved;
     },
 
     async getMode() {
@@ -46,7 +49,9 @@ export function makeSettingsService(repo: ISettingsRepository): SettingsService 
     async setMode(actor, mode) {
       assertCan(actor, 'admin:manage');
       const current = await get();
-      return repo.saveSingleton({ ...current, campMode: mode, updatedAt: nowISO() });
+      const saved = await repo.saveSingleton({ ...current, campMode: mode, updatedAt: nowISO() });
+      invalidateDashboardCache();
+      return saved;
     },
   };
 }

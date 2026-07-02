@@ -27,6 +27,7 @@ import { nowISO } from '../utils/date';
 import { makeSettingsService } from './settings.service';
 import { generateTempPassword } from '../utils/temp-password';
 import { hashPassword } from '../utils/crypto';
+import { invalidateDashboardCache } from './dashboard-cache';
 
 export interface TempPasswordEntry {
   username: string;
@@ -115,6 +116,7 @@ export function makeAdminService(
       const users = await userRepo.findAll();
       await Promise.all(users.filter((u) => u.role !== 'admin').map((u) => userRepo.delete(u.id)));
 
+      invalidateDashboardCache();
       return { ok: true };
     },
 
@@ -201,12 +203,14 @@ export function makeAdminService(
         lastTempPasswords: tempPasswords,
         updatedAt: nowISO(),
       });
+      invalidateDashboardCache();
       return { ...updated, tempPasswords };
     },
 
     async clearNotifications(actor) {
       assertCan(actor, 'admin:manage');
       const deleted = await notifRepo.deleteAll();
+      invalidateDashboardCache();
       return { deleted };
     },
 

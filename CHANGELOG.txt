@@ -1,6 +1,46 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-02 — HARDENING/PERF PORT FROM CMS: CSP meta tag + server-side dashboard cache
+--------------------------------------------------------------------------------------
+Two defence-in-depth/perf improvements ported from Connection Made Simple (SPA + backend,
+no schema change). Verified: sw.js syntax OK, npm run typecheck clean, npm run test = 389 pass
+(11 new: 5 ResponseCache unit tests + 6 dashboard-cache scoping/invalidation tests, plus the
+existing dashboard.service.test.ts suite gained a beforeEach cache-clear guard).
+
+  * CSP META TAG (SPA, public/index.html <head>) — same inline-script/onclick architecture as
+    CMS, so 'unsafe-inline' stays for script-src/style-src, but the policy now blocks external
+    script/resource loads it doesn't need. Adjusted from CMS's policy for this app's actual
+    external resource: style-src adds https://fonts.googleapis.com, font-src adds
+    https://fonts.gstatic.com (Plus Jakarta Sans, already loaded via <link> — no other external
+    URL exists in index.html, confirmed by grep). connect-src 'self' covers all API calls
+    (relative paths, same origin). sw.js CACHE bumped camp-v8 -> camp-v9 (HTML changed).
+    CSP typos aren't caught by tsc/vitest — hard-load the prod URL post-deploy and check the
+    browser console for CSP violations before considering this done.
+
+  * SERVER-SIDE RESPONSE CACHE (backend) — src/utils/response-cache.ts (NEW, ported verbatim
+    from CMS): a tiny in-memory Map<key,{value,expiresAt}> with get/set/invalidateAll, no
+    external deps. src/services/dashboard-cache.ts (NEW) wraps it around the /home dashboard
+    DTO with a 30s TTL, kept in its OWN module (not inside dashboard.service.ts) so writer
+    services can invalidate it without a circular import — dashboard.service.ts already imports
+    canAccessPerson from person.service.ts, so if the cache lived there, person.service.ts
+    importing it back would cycle.
+    - Cache key = `${role}:${churchId ?? '_'}:${zone ?? '_'}` — MUST include actor scope, since
+      responses are role/church/zone-scoped and a shared key would leak one church's counts to
+      another (verified by two new tests: church-scoped and zone-scoped isolation).
+    - Invalidated (invalidateDashboardCache()) on every write that can change the DTO: person.
+      service (create/update/remove/checkIn/signEvent), all four import services (import,
+      church-import, ticket-import, invoice-import — church-import's new churches also feed
+      perChurchBreakdown), admin.service (reset/newYear/clearNotifications), settings.service
+      (update/setMode — mode switch flips the DTO shape entirely), notification.service
+      (send/remove/clearAll — feeds AtCampDashboard.latestNotification), account.service
+      (createChurchWithAccount/updateChurch/deleteChurch — feeds perChurchBreakdown). When in
+      doubt the rule was invalidateAll over hit rate; the 30s TTL keeps the cost of a miss low.
+    - Deliberately NOT applied to checkin.service.getSessionStatus — the at-camp roster must
+      stay live (twice-daily check-in needs real-time state, not a 30s-stale view).
+    - Serverless caveat (same as CMS): only helps within a warm instance; a cold start still
+      hits the DB. Accepted, matching CMS's documented tradeoff.
+
 2026-07-02 — GO-LIVE HARDENING: login throttle rework + Sydney function region
 ------------------------------------------------------------------------------
 Two fixes from the go-live readiness analysis (camp = ~200 leaders on ONE venue WiFi IP):

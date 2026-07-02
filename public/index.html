@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Content-Security-Policy: defence-in-depth alongside per-field HTML escaping (ported
+     from Connection Made Simple). 'unsafe-inline' is required because the whole app is
+     inline <script>/<style> with onclick handlers; the value of CSP here is blocking
+     EXTERNAL script/resource loading, base-uri hijacks and form-action exfiltration.
+     style-src/font-src allow Google Fonts (Plus Jakarta Sans, loaded below) — the only
+     external resource this app loads; connect-src 'self' covers all API calls (relative
+     paths, same origin). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1e1b4b">
 <meta name="apple-mobile-web-app-capable" content="yes">

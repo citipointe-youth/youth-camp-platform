@@ -11,6 +11,7 @@ import { nowISO } from '../utils/date';
 import {
   cleanCareText, field, normalizeDate, parseGradeOrLeader, yesToConsent,
 } from './elvanto-mapping';
+import { invalidateDashboardCache } from './dashboard-cache';
 import { z } from 'zod';
 
 const ImportOptionsSchema = z.object({
@@ -378,6 +379,7 @@ export function makeImportService(
       if (!opts.dryRun) {
         if (touched.size > 0) await personRepo.saveMany([...touched.values()]);
         for (const id of absentIds) await personRepo.delete(id);
+        invalidateDashboardCache();
       }
 
       return { created, updated, skipped, deleted, dryRun: opts.dryRun, errors, warnings, churchesCreated, phantomChurches };

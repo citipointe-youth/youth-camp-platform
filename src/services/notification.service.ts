@@ -7,6 +7,7 @@ import { CreateNotificationSchema } from '../core/validation/notification.schema
 import { newId } from '../utils/id';
 import { nowISO } from '../utils/date';
 import { ForbiddenError, NotFoundError } from '../core/errors/app-error';
+import { invalidateDashboardCache } from './dashboard-cache';
 
 export interface NotificationService {
   send(actor: Actor, input: unknown): Promise<Notification>;
@@ -78,7 +79,9 @@ export function makeNotificationService(
         expiresAt: data.expiresAt ?? null,
         createdAt: nowISO(),
       };
-      return notifRepo.save(notif);
+      const saved = await notifRepo.save(notif);
+      invalidateDashboardCache(); // affects AtCampDashboard.latestNotification
+      return saved;
     },
 
     async feed(actor) {
@@ -100,6 +103,7 @@ export function makeNotificationService(
         throw new ForbiddenError('Zone leaders can only delete notices for their own zone');
       }
       await notifRepo.delete(id);
+      invalidateDashboardCache();
       return { ok: true };
     },
 
@@ -111,6 +115,7 @@ export function makeNotificationService(
       for (const n of all) {
         await notifRepo.delete(n.id);
       }
+      invalidateDashboardCache();
       return { deleted: all.length };
     },
   };

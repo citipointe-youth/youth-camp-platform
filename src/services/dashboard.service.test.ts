@@ -1,5 +1,7 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { makeDashboardService } from './dashboard.service';
+import { invalidateDashboardCache } from './dashboard-cache';
+import { makePersonService } from './person.service';
 import {
   InMemoryPersonRepository,
   InMemoryNotificationRepository,
@@ -10,6 +12,12 @@ import type { CheckInEntry } from '../core/entities/person';
 import type { CampSettings } from '../core/entities/settings';
 import { SETTINGS_ID } from '../core/entities/settings';
 import type { Actor } from '../core/entities/user';
+
+// The dashboard service keeps a module-level response cache keyed by actor
+// scope (see dashboard-cache.ts). Each test below builds fresh repositories,
+// so clear the cache to avoid one test's result leaking into another via a
+// shared actor key (e.g. the many `actor('admin')` calls in this file).
+beforeEach(() => invalidateDashboardCache());
 
 // ---------------------------------------------------------------------------
 // At-camp dashboard calculation audit fixes:
@@ -181,5 +189,125 @@ describe('at-camp dashboard — D3 checkInsDue (current session, respects check-
     if (res.mode !== 'at-camp') throw new Error('expected at-camp');
     expect(res.currentSession?.id).toBe(PM);
     expect(res.checkInsDue).toBe(1); // checked into AM, but PM is current -> still due
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Server-side response cache (dashboard-cache.ts). ~30s TTL, keyed by actor
+// scope (role + churchId + zone). Two hard requirements verified below:
+//  1. A cached response must never leak from one church/zone scope to another.
+//  2. Every write that changes the DTO must invalidate the cache immediately —
+//     no manual invalidateDashboardCache() call should be needed from a caller.
+// ---------------------------------------------------------------------------
+
+describe('dashboard response cache', () => {
+  it('serves a cached result on a repeat call within TTL (proves the cache is hit)', async () => {
+    pinClock('2026-07-01T15:00:00Z');
+    const h = await build();
+    const a = actor('admin');
+    await h.personRepo.save(camper({ id: 'x', atCamp: true }));
+    const first = await h.svc.home(a, settings());
+    // Mutate the underlying store directly (bypassing person.service, so no
+    // invalidation fires) — a cache hit must still return the OLD count.
+    await h.personRepo.save(camper({ id: 'y', atCamp: true }));
+    const second = await h.svc.home(a, settings());
+    if (first.mode !== 'at-camp' || second.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(second.totalExpected).toBe(first.totalExpected);
+  });
+
+  it('scopes the cache key by church — one church can never see another church cached in its slot', async () => {
+    pinClock('2026-07-01T15:00:00Z');
+    const h = await build();
+    await h.personRepo.save(camper({ id: 'c1a', churchId: 'c1', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c2a', churchId: 'c2', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'c2b', churchId: 'c2', atCamp: true }));
+    const resA = await h.svc.home(actor('church', { churchId: 'c1' }), settings());
+    const resB = await h.svc.home(actor('church', { churchId: 'c2' }), settings());
+    if (resA.mode !== 'at-camp' || resB.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(resA.totalExpected).toBe(1);
+    expect(resB.totalExpected).toBe(2); // not resA's cached value, not a mix of both
+  });
+
+  it('scopes the cache key by zone — a zoneLeader never sees another zone cached in its slot', async () => {
+    pinClock('2026-07-01T15:00:00Z');
+    const h = await build();
+    await h.personRepo.save(camper({ id: 'y1', zone: 'Yellow', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'b1', zone: 'Blue', atCamp: true }));
+    await h.personRepo.save(camper({ id: 'b2', zone: 'Blue', atCamp: true }));
+    const resYellow = await h.svc.home(actor('zoneLeader', { zone: 'Yellow' }), settings());
+    const resBlue = await h.svc.home(actor('zoneLeader', { zone: 'Blue' }), settings());
+    if (resYellow.mode !== 'at-camp' || resBlue.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(resYellow.totalExpected).toBe(1);
+    expect(resBlue.totalExpected).toBe(2);
+  });
+
+  it('invalidateDashboardCache() forces the next call to re-read fresh data', async () => {
+    pinClock('2026-07-01T15:00:00Z');
+    const h = await build();
+    const a = actor('admin');
+    await h.personRepo.save(camper({ id: 'x', atCamp: true }));
+    const first = await h.svc.home(a, settings());
+    await h.personRepo.save(camper({ id: 'y', atCamp: true }));
+    invalidateDashboardCache();
+    const second = await h.svc.home(a, settings());
+    if (first.mode !== 'at-camp' || second.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(second.totalExpected).toBe(first.totalExpected + 1);
+  });
+
+  it('a daily check-in (person.service.checkIn) invalidates the cache automatically', async () => {
+    pinClock('2026-07-01T15:00:00Z'); // PM current
+    const h = await build();
+    const personSvc = makePersonService(h.personRepo);
+    const a = actor('admin');
+    await h.personRepo.save(camper({ id: 'x', atCamp: true }));
+    const before = await h.svc.home(a, settings());
+    if (before.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(before.checkInsDue).toBe(1);
+
+    // No manual invalidateDashboardCache() call here — person.service must do it.
+    await personSvc.checkIn(a, 'x', {
+      sessionId: PM, sessionLabel: 'PM', type: 'in', leaderId: 'u', timestamp: '2026-07-01T15:05:00.000Z',
+    });
+
+    const after = await h.svc.home(a, settings());
+    if (after.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(after.checkInsDue).toBe(0);
+  });
+
+  it('an attendance sign-out (person.service.signEvent) invalidates the cache automatically', async () => {
+    pinClock('2026-07-01T15:00:00Z');
+    const h = await build();
+    const personSvc = makePersonService(h.personRepo);
+    const a = actor('admin');
+    await h.personRepo.save(camper({ id: 'x', atCamp: true }));
+    const before = await h.svc.home(a, settings());
+    if (before.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(before.totalAtCamp).toBe(1);
+
+    await personSvc.signEvent(a, 'x', {
+      type: 'out', leaderName: 'Leader', authorId: 'u', timestamp: '2026-07-01T15:05:00.000Z',
+    });
+
+    const after = await h.svc.home(a, settings());
+    if (after.mode !== 'at-camp') throw new Error('expected at-camp');
+    expect(after.totalAtCamp).toBe(0);
+  });
+
+  it('a registrant create (person.service.create) invalidates the pre-camp cache automatically', async () => {
+    const h = await build();
+    const personSvc = makePersonService(h.personRepo);
+    const preCampSettings: CampSettings = { ...settings(), campMode: 'pre-camp' };
+    const a = actor('admin');
+    const before = await h.svc.home(a, preCampSettings);
+    if (before.mode !== 'pre-camp') throw new Error('expected pre-camp');
+    expect(before.totalRegistrants).toBe(0);
+
+    await personSvc.create(a, {
+      firstName: 'New', lastName: 'Kid', gender: 'male', churchId: 'c1', churchName: 'Victory', zone: 'Yellow',
+    });
+
+    const after = await h.svc.home(a, preCampSettings);
+    if (after.mode !== 'pre-camp') throw new Error('expected pre-camp');
+    expect(after.totalRegistrants).toBe(1);
   });
 });

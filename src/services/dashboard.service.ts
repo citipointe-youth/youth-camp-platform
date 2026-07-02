@@ -9,6 +9,9 @@ import { daysUntil, zonedNow } from '../utils/date';
 import { buildSessions, currentSession as pickCurrentSession } from './checkin-sessions';
 import { isRegistrant, isCamper } from '../core/entities/person';
 import { canAccessPerson } from './person.service';
+import { getCachedDashboard, setCachedDashboard } from './dashboard-cache';
+
+export { invalidateDashboardCache } from './dashboard-cache';
 
 export interface PreCampDashboard {
   mode: 'pre-camp';
@@ -61,6 +64,9 @@ export function makeDashboardService(
 ): DashboardService {
   return {
     async home(actor, settings) {
+      const cached = getCachedDashboard(actor);
+      if (cached) return cached;
+
       if (settings.campMode === 'pre-camp') {
         // Pre-camp dashboard
         const allPersons = await personRepo.findAll();
@@ -110,6 +116,7 @@ export function makeDashboardService(
           dashboard.perChurchBreakdown = breakdown;
         }
 
+        setCachedDashboard(actor, dashboard);
         return dashboard;
       } else {
         // At-camp dashboard.
@@ -183,6 +190,7 @@ export function makeDashboardService(
             : null,
         };
 
+        setCachedDashboard(actor, dashboard);
         return dashboard;
       }
     },
