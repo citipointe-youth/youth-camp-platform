@@ -296,6 +296,23 @@ additive changes — no matching/merge logic needed to change.
   `PERSON_UPDATE_COLS` (Supabase `on conflict do update set` list) was missing `elvanto_meta`/
   `medicare_number`/`church_unlisted_note`, so those three fields silently never updated on save.
 
+## First-aid export + login-enumeration hardening — deployed 2026-07-03
+
+- **First-aid Records CSV export (SPA):** `RENDER.records` gained an **Export** button →
+  `exportFaRecords()`, which builds a CSV client-side from the already-loaded `window._faRecsAll`
+  (via `_faParse`) — columns Student/Problem/Treatment/First-aider/Brought by/Logged by/Logged at,
+  filename via `_exportName`. **No backend or permission change** (firstAid holds only
+  `note:read:firstaid`). Exports the loaded records (`/notes/firstaid?limit=100`), not just the
+  on-screen filter.
+- **Login user-enumeration hardening (backend, `auth.service.login`):** a missing / inactive /
+  passwordless account now runs an **equal-cost dummy scrypt** (`DUMMY_PASSWORD_HASH`) and returns
+  the same `Invalid credentials` as a wrong password — previously an unknown username skipped
+  scrypt (fast) and a passwordless account had a distinct message, which (with the login limiter
+  keyed per ip+username) was a usable timing/message oracle. `auth.service.test.ts` +3 (395 pass).
+  **Deliberately NOT changed:** the stateless-token trade-off where a deactivated user's existing
+  token stays valid to its 12h TTL — closing it needs a per-request DB lookup (user-facing latency).
+- **`sw.js` is now `camp-v13`** (v9→v10→v11 import/Excel →v12 security headers/CSP →v13 first-aid export).
+
 ## Bug-list + import redesign + Excel + security headers — deployed 2026-07-02 (late)
 
 Large admin batch (SPA + backend + **migration 018**). `npm run typecheck` clean, `npm run test`
