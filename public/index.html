@@ -68,7 +68,7 @@ html,body{height:100%;height:100dvh;}
 /* A1: explicit root size (= the previous implicit 16px), scaled up at tablet/laptop so
    every rem-based size grows proportionally. This is the core fluid-type mechanism. */
 html{font-size:16px;}
-body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;height:100dvh;overflow:hidden;}
+body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#0b0a1a;display:flex;justify-content:center;height:100dvh;overflow:hidden;overscroll-behavior:none;}
 /* height:100dvh on body+app (not 100% of the layout viewport): on mobile the layout
    viewport can be shorter than the visual viewport when the URL bar is hidden, which
    left a strip of dark body background BELOW the bottom nav ("nav not at the bottom").
@@ -95,7 +95,12 @@ body{font:var(--t-body)/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFon
 .role-badge{font-size:var(--t-micro);font-weight:800;background:var(--chip);color:var(--violet-d);border:1px solid var(--lav);border-radius:999px;padding:2px 8px;white-space:nowrap;flex:none;letter-spacing:.03em;}
 .sign-out{padding:3px 10px;border-radius:999px;background:#fff;color:var(--ink);font-size:var(--t-2xs);font-weight:700;flex:none;cursor:pointer;white-space:nowrap;border:1px solid var(--line);}
 .stage{flex:1;position:relative;overflow:hidden;}
-.screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--pad) var(--pad) 26px;display:none;}
+/* overflow-x:hidden is explicit: a bare overflow-y:auto computes overflow-x to `auto`, which let
+   each screen pan sideways on a phone whenever any child slightly overran the width (the "drag
+   left/right on empty space" bug). Wide tables keep their OWN overflow-x:auto wrappers, so they
+   still scroll. overscroll-behavior:contain kills the vertical rubber-band chaining to the body.
+   Neither affects the desktop/web layout. */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:var(--pad) var(--pad) 26px;display:none;}
 .screen.active{display:block;animation:rise .25s ease;}
 @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .tabs{display:flex;background:#fff;border-top:1px solid var(--line);flex:none;padding:4px 6px calc(4px + env(safe-area-inset-bottom));gap:2px;z-index:20;}
@@ -351,6 +356,10 @@ textarea{min-height:84px;resize:vertical;}
 /* Keep the bubble on-screen near the right edge (e.g. icon at end of a heading row). */
 .htip.tip-left .htip-pop{left:auto;right:0;transform:none;}
 .htip.tip-left .htip-pop::before{left:auto;right:6px;transform:none;}
+/* Flip the bubble ABOVE the "?" when it would run off the bottom of the viewport
+   (common on short laptop screens for tips low on the page). Set by _clampTip. */
+.htip-pop.flip-up{top:auto;bottom:calc(100% + 8px);}
+.htip-pop.flip-up::before{bottom:auto;top:100%;border-bottom-color:transparent;border-top-color:#1e1b4b;}
 /* On/off toggle switch (admin Settings login locks). */
 .tglrow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid var(--line);}
 .tglrow .tgl-l{font-weight:700;display:flex;align-items:center;gap:6px;}
@@ -764,10 +773,15 @@ function _toggleTip(e,btn){e.stopPropagation();const open=btn.classList.contains
 function _clampTip(btn){const pop=btn.querySelector('.htip-pop');if(!pop)return;
   const left=btn.classList.contains('tip-left');
   pop.style.transform=left?'none':'translateX(-50%)';
-  const r=pop.getBoundingClientRect(),m=8,vw=document.documentElement.clientWidth;let shift=0;
+  pop.classList.remove('flip-up');
+  const m=8,vw=document.documentElement.clientWidth,vh=document.documentElement.clientHeight;
+  const r=pop.getBoundingClientRect();let shift=0;
   if(r.right>vw-m)shift=(vw-m)-r.right;
   if(r.left+shift<m)shift=m-(r.left+shift);
   if(shift)pop.style.transform=left?`translateX(${shift}px)`:`translateX(calc(-50% + ${shift}px))`;
+  // Vertical: the bubble sits below the "?"; if that runs off the bottom (short laptop
+  // viewport, tip low on the page) and there's more room above, flip it up.
+  if(r.bottom>vh-m){const btnTop=btn.getBoundingClientRect().top;if(btnTop>r.height+m)pop.classList.add('flip-up');}
 }
 // Tapping anywhere else closes any open tooltip.
 document.addEventListener('click',e=>{if(!e.target.closest('.htip'))document.querySelectorAll('.htip.open').forEach(t=>t.classList.remove('open'));});
@@ -1170,7 +1184,9 @@ async function renderHomeAtCamp(){
   if(canReadNotes())tiles.push(`<div class="tile" onclick="go('notes')"><div class="ic">${ic('note')}</div><div class="l">Testimonies &amp; Notes</div></div>`);
   tiles.push(`<div class="tile" onclick="go('schedule')"><div class="ic">${ic('calendar')}</div><div class="l">Schedule</div></div>`);
   tiles.push(`<div class="tile" onclick="go('devotional')"><div class="ic">${ic('book')}</div><div class="l">Devotional</div></div>`);
-  tiles.push(`<div class="tile" onclick="gotoTab('notifs')"><div class="ic">${ic('bell')}</div><div class="l">Notices</div></div>`);
+  // Director's at-camp home hides the Notices tile (they reach notices via the nav tab); every
+  // other role keeps the quick tile.
+  if(ACTOR.role!=='director')tiles.push(`<div class="tile" onclick="gotoTab('notifs')"><div class="ic">${ic('bell')}</div><div class="l">Notices</div></div>`);
   if(ACTOR.role==='church'&&!PREVIEW_MODE)tiles.push(`<div class="tile" style="cursor:default"><div class="ic">${ic('classroom')}</div><div class="l">Your Accommodation</div><div class="sub" style="font-size:.62rem;margin-top:2px">${esc(myAccom)}</div></div>`);
   // Director has no Data tab at-camp (only pre-camp) — surface a direct entry point to the
   // raw registration data table so the capability is reachable in either mode.
@@ -1669,7 +1685,14 @@ function drawAllStudents(){
   box.innerHTML=list.length?list.map(faResultRow).join(''):'<p class="note-hint">No one matches these filters.</p>';
 }
 let _currentStudent=null;
+/* The first-aid detail flow (Student Info + Log action) is painted onto whichever first-aid
+   list screen the user came from — Search OR All Students. Painting into a non-active screen
+   is silently dropped by paint()'s stale-guard, which is why opening a student from All
+   Students previously "did nothing". Derive the origin from the active nav id. */
+function _faScreen(){return _navId==='allstudents'?'allstudents':'search';}
+function _faBackExpr(scr){return scr==='allstudents'?'RENDER.allstudents()':'renderSearchFirstAid()';}
 async function openStudentInfo(id){
+  const scr=_faScreen();
   let c;try{c=await api('/campers/'+id);}catch(e){toast(e.message);return;}
   _currentStudent=c;
   // Leader contacts (the focus) — masked; fetched in parallel, rendered into #faLead when ready.
@@ -1705,7 +1728,7 @@ async function openStudentInfo(id){
     <div class="lbl">Parent / guardian</div>
     ${c.parentGuardianName?`<div class="kv"><span class="k">${esc(c.parentGuardianName)}${c.parentRelation?' ('+esc(c.parentRelation)+')':''}</span><span class="v"></span></div>`:''}
     ${c.parentPhone?`<a class="btn fa-parent" href="tel:${esc(c.parentPhone)}">${icSm('phone')} ${esc(fmtPhone(c.parentPhone))}</a>`:''}</div>`:'';
-  paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="renderSearchFirstAid()">${icSm('arrowl')} Back</button></div>
+  paint(scr,`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="${_faBackExpr(scr)}">${icSm('arrowl')} Back</button></div>
     <div class="fa-id">${_faBubble(c)}<div><h2>${esc(c.firstName+' '+c.lastName)}</h2>
       <div class="meta">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')} · ${esc(c.churchName)} · ${esc(c.zone)} Zone</div>
       <span class="fa-status ${c.atCamp?'on':'off'}">${c.atCamp?'On site':'Not on site'}</span></div></div>
@@ -1747,9 +1770,9 @@ function _faParse(body){const o={problem:'',treatment:'',firstAider:'',broughtBy
 function openFirstAidLog(id){
   const c=_currentStudent&&_currentStudent.id===id?_currentStudent:null;
   const who=c?esc(c.firstName+' '+c.lastName):'student';
-  // The log form is a transient view painted onto the 'search' screen (same pattern as Student Info);
-  // the in-content Back button returns to Student Info. No separate screen/route needed.
-  paint('search',`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="openStudentInfo('${id}')">${icSm('arrowl')} Back</button></div>
+  // The log form is a transient view painted onto the active first-aid screen (Search or All
+  // Students — same pattern as Student Info); the in-content Back button returns to Student Info.
+  paint(_faScreen(),`<div style="padding:12px 0 4px 0"><button class="btn ghost sm" onclick="openStudentInfo('${id}')">${icSm('arrowl')} Back</button></div>
     <div class="card">
       ${c?`<div class="fa-id" style="margin-bottom:8px">${_faBubble(c)}<div><h2 style="font-size:var(--t-h3)">${who}</h2><div class="meta">${c.kind==='leader'?'Leader':'Student'+(c.grade?' · Grade '+c.grade:'')} · ${esc(c.churchName)}</div></div></div>`:''}
       <label class="lbl" style="margin-top:4px">What happened?</label>
@@ -2260,7 +2283,8 @@ async function openCamper(id,push=true){
     ${lead?'':`<div class="card"><div class="h3" style="margin-top:0">Parent / guardian</div>
       <div class="kv"><span class="k">Name</span><span class="v">${esc(p.parentGuardianName||'—')}${p.parentRelation?' ('+esc(p.parentRelation)+')':''}</span></div>
       <div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(p.parentPhone||'')}" style="color:#4f46e5;text-decoration:none">${esc(fmtPhone(p.parentPhone)||'—')}</a></span></div></div>`}
-    ${notesHtml}`;
+    ${notesHtml}
+    ${canReadCamperNotes()&&['arrived','checked_out','departed'].includes(p.lifecycle)?`<button class="btn alt" style="margin-top:12px;width:100%" onclick="notePrompt('${id}','${esc(fullName)}')">${icSm('note')} Add a note</button>`:''}`;
   const camperEl=document.getElementById('camper');
   if(camperEl)camperEl.scrollTop=0;
   if(push&&STACK[STACK.length-1]!=='camper')STACK.push('camper');
@@ -2502,7 +2526,7 @@ RENDER.adminAccounts=async function(){
   const roleOpts=`<option value="director">Director</option><option value="zoneLeader">Zone leader</option><option value="firstAid">First aid</option>`;
   paint('adminAccounts',`
     <div class="card"><div class="lbl" style="margin-top:0">Leadership accounts</div>${lr}</div>
-    <div class="card"><div class="rowsb" style="align-items:center"><div class="lbl" style="margin-top:0">Churches</div>
+    <div class="card"><div class="rowsb" style="align-items:center"><div class="lbl" style="margin-top:0">Churches ${helpTip('You do not usually need to add churches by hand — any church named in a registration upload is auto-created (zone defaults to Yellow; add its login + zone afterwards via Account Info). Account Info also holds the per-church accommodation override, which corrects wrong ticket types at the next upload.')}</div>
       <button class="btn ghost sm" onclick="bulkChurchUpdate()">${icSm('key')} Bulk Church Update</button></div>${cr}</div>
     <div class="card"><div class="lbl" style="margin-top:0">Add leadership account</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Name</label><input class="fld" id="aName" placeholder="Full name" style="flex:1"></div>
@@ -2511,7 +2535,7 @@ RENDER.adminAccounts=async function(){
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Role</label><select id="aR" onchange="aRoleChange()" style="flex:1">${roleOpts}</select></div>
       <div id="aZoneWrap" style="display:none"><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('aZ')}</div></div></div>
       <button class="btn" onclick="addAcct()" style="margin-top:10px;width:100%">Create account</button></div>
-    <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login) ${helpTip('You do not usually need to add churches by hand — any church named in a registration upload is auto-created (zone defaults to Yellow; add its login + zone afterwards via Account Info). Account Info also holds the per-church accommodation override, which corrects wrong ticket types at the next upload.')}</div>
+    <div class="card"><div class="lbl" style="margin-top:0">Add a church (with its login)</div>
       <div class="warnbox">${icSm('alert')} Church name must match the registration export exactly — registrations are matched by name.</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Church name</label><input class="fld" id="ncName" placeholder="e.g. Northside" style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><label style="flex:0 0 78px;font-size:.72rem">Zone</label><div style="flex:1">${zoneSel('ncZone')}</div></div>
@@ -2724,13 +2748,20 @@ async function addFaqAt(){if(!val('fqNewQ')||!val('fqNewA')){toast('Enter questi
 /* ===== ADMIN SETTINGS ===== */
 /* ===== RECORDS & EXPORT (redirects to adminData) ===== */
 RENDER.adminRecords=function(){go('adminData');};
+/* Compliance downloads are named with the camp YEAR + export DATE so a folder of them stays
+   sorted and self-documenting, e.g. youth-camp-2026-audit-workbook-2026-07-02.xlsx. */
+function _exportName(base,ext){
+  const y=(SETTINGS&&SETTINGS.year)||new Date().getFullYear();
+  const d=new Date().toISOString().slice(0,10);
+  return `youth-camp-${y}-${base}-${d}.${ext}`;
+}
 async function downloadAuditExport(){
   try{
     const resp=await fetch('/export/audit',{headers:{Authorization:'Bearer '+TOKEN}});
     if(!resp.ok){const e=await resp.json().catch(()=>({}));toast(e.message||'Export failed');return;}
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
-    a.href=url;a.download='camp-audit-export.xlsx';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    a.href=url;a.download=_exportName('audit-workbook','xlsx');document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
     toast('Audit workbook downloaded');
   }catch(e){toast(e.message||'Export failed');}
 }
@@ -2745,12 +2776,18 @@ async function downloadCsvExport(path,filename){
   }catch(e){toast(e.message||'Export failed');}
 }
 
-RENDER.adminCloseOut=function(){
+RENDER.adminCloseOut=async function(){
+  let defaultsSaved=null;
+  try{const s=await api('/settings');if(s&&s.defaultsSavedAt)defaultsSaved=dtFmt(s.defaultsSavedAt);}catch(e){}
+  const defItem=defaultsSaved
+    ? `<div class="kv" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:9px 11px;margin-bottom:12px"><span class="k" style="color:#065f46">${icSm('check')} Defaults saved</span><span class="v" style="color:#065f46">${esc(defaultsSaved)}</span></div>`
+    : `<div class="warnbox" style="margin-bottom:12px">${icSm('alert')} <b>Defaults not saved yet.</b> Run <b>Save Defaults</b> on the Data screen before rolling over — the rollover restores from that baseline. <button class="btn alt sm" style="margin-top:6px" onclick="go('adminData')">Go to Data</button></div>`;
   paint('adminCloseOut',`
     <div style="padding:12px 0 4px"><button class="btn ghost sm" onclick="go('adminData')">${icSm('arrowl')} Back</button></div>
     <div class="card">
       <div class="lbl" style="margin-top:0">Close-out checklist</div>
       <div class="note-hint" style="text-align:left;margin:-2px 0 12px">Before you roll over: make sure you've run <b>Save Defaults</b> (on the Data screen) at least once this setup — the rollover restores your churches, accounts &amp; content from that baseline. If you haven't, it'll stop and send you there (nothing is purged).</div>
+      ${defItem}
       <div style="margin-bottom:14px">
         <label class="checkbox-label" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <input type="checkbox" id="co1" onchange="onCloseOutConfirmChange()"> Step 1: Download the audit workbook
@@ -2870,48 +2907,99 @@ async function saveSettings(){
   }catch(e){toast(e.message);}
 }
 
-/* ===== IMPORT SOURCE SELECTOR (shared by RENDER.adminData + RENDER.import) =====
-   Three CSV sources hit different backend endpoints but share the same dry-run
-   preview / phantom-church / confirm flow — only the endpoint + display copy differ. */
-let _importSource='form';
-const IMPORT_SOURCES={
-  form:    {label:'Form',        endpoint:'/import/csv',      help:'Matches existing students by name (and phone when names clash) — adds new ones and updates changed fields.'},
-  tickets: {label:'Ticket List', endpoint:'/import/tickets',  help:'Matches tickets to existing registrants where possible. Low-confidence matches create a new record flagged "Needs review" instead of guessing wrong.'},
-  invoices:{label:'Invoice',     endpoint:'/import/invoices', help:'Matches invoices to existing registrants and fills in payment fields. Unmatched invoices are listed for manual reconciliation rather than guessed.'},
+/* ===== MULTI-FILE IMPORT (auto-detect Form / Ticket List / Invoice) =====
+   One upload field accepts 1–3 Elvanto exports at once. Each file's TYPE is detected from its
+   column headers, so there is no manual source picker to get wrong (the old segmented selector +
+   a stale file input was how a Ticket List could be sent to the Form importer). Files are always
+   imported in dependency order Form → Ticket → Invoice (tickets/invoices match against the people
+   the Form import creates) via a single combined preview → confirm. A file whose headers match
+   none of the three is rejected with its columns shown, so nothing is silently mis-imported.
+   No file is mandatory — import just the Form now and add the Ticket List / Invoice later. */
+const IMPORT_TYPES={
+  form:    {label:'Form',        endpoint:'/import/csv',     order:0},
+  tickets: {label:'Ticket List', endpoint:'/import/tickets', order:1},
+  invoices:{label:'Invoice',     endpoint:'/import/invoices',order:2},
 };
-IMPORT_SOURCES.tickets.extraLine=r=>r.created?`${icSm('alert')} <b>${r.created}</b> new record${r.created===1?'':'s'} created from a low-confidence match — flagged "Needs review" on the Data tab.`:null;
-IMPORT_SOURCES.invoices.extraLine=r=>{
-  const parts=[];
-  if(r.guessedAccommodationCount)parts.push(`${r.guessedAccommodationCount} accommodation type${r.guessedAccommodationCount===1?'':'s'} guessed from price`);
-  if(r.ambiguousGroupInvoices)parts.push(`${r.ambiguousGroupInvoices} invoice${r.ambiguousGroupInvoices===1?'':'s'} cover multiple people — amounts withheld, needs manual split`);
-  if(r.unmatchedInvoices&&r.unmatchedInvoices.length)parts.push(`${r.unmatchedInvoices.length} invoice${r.unmatchedInvoices.length===1?'':'s'} couldn't be matched to anyone`);
-  return parts.length?`${icSm('alert')} ${parts.join(' · ')}.`:null;
+// Unique-ish column markers per export (lowercased). Detection scores each type by how many of
+// its markers a file's headers contain; the top scorer with >=2 markers wins, else "unknown".
+const _IMPORT_SIGNATURES={
+  form:["attendee's church","submission status","date submitted","school grade","parent/guardian name","list other medical conditions or medication taken"],
+  tickets:["ticket type","ticket status","event occurrence information","ticket number"],
+  invoices:["ticket total","amount paid","invoice date","registrants","fees paid","invoice status","total tax"],
 };
-function _importSegHtml(){
-  return Object.keys(IMPORT_SOURCES).map(k=>`<button class="${k===_importSource?'on':''}" onclick="setImportSource('${k}')">${esc(IMPORT_SOURCES[k].label)}</button>`).join('');
+// Read the first CSV row into trimmed, lowercased header names (respects quotes; strips a BOM).
+function _parseHeaderRow(text){
+  let s=text&&text.charCodeAt(0)===0xfeff?text.slice(1):(text||'');
+  const out=[];let cur='',q=false;
+  for(let i=0;i<s.length;i++){const ch=s[i];
+    if(ch==='"'){if(q&&s[i+1]==='"'){cur+='"';i++;}else q=!q;}
+    else if(ch===','&&!q){out.push(cur);cur='';}
+    else if((ch==='\n'||ch==='\r')&&!q){break;}
+    else cur+=ch;}
+  out.push(cur);
+  return out.map(h=>h.trim().toLowerCase()).filter(Boolean);
 }
+function _detectImportType(headers){
+  const set=new Set(headers);let best=null,bestScore=0;
+  for(const t of Object.keys(_IMPORT_SIGNATURES)){
+    const score=_IMPORT_SIGNATURES[t].reduce((n,m)=>n+(set.has(m)?1:0),0);
+    if(score>bestScore){bestScore=score;best=t;}
+  }
+  return bestScore>=2?best:null;
+}
+// Read one file to CSV text. CSV is read directly; .xlsx is converted to CSV via the vendored
+// SheetJS parser (Phase B, _xlsxToCsv) so the rest of the pipeline is source-agnostic.
+function _readImportFile(file){
+  return new Promise((resolve,reject)=>{
+    const isXlsx=/\.x(lsx|ls)$/i.test(file.name);
+    const r=new FileReader();
+    r.onerror=()=>reject(new Error('Could not read '+file.name));
+    if(isXlsx&&typeof _xlsxToCsv==='function'){
+      r.onload=()=>{try{resolve({name:file.name,text:_xlsxToCsv(r.result)});}catch(e){reject(new Error(file.name+': '+(e.message||'could not read spreadsheet')));}};
+      r.readAsArrayBuffer(file);
+    }else{
+      r.onload=()=>resolve({name:file.name,text:String(r.result)});
+      r.readAsText(file);
+    }
+  });
+}
+// Per-type "extra" warning line for the preview/result (orphans, guessed accommodation, unmatched).
+function _importExtraLine(type,r){
+  if(type==='tickets')return r.created?`${icSm('alert')} <b>${r.created}</b> ticket${r.created===1?'':'s'} didn't match an existing student — created as "Needs review". Import the <b>Form</b> file first so tickets attach to real students.`:null;
+  if(type==='invoices'){
+    const parts=[];
+    if(r.guessedAccommodationCount)parts.push(`${r.guessedAccommodationCount} accommodation type${r.guessedAccommodationCount===1?'':'s'} guessed from price`);
+    if(r.ambiguousGroupInvoices)parts.push(`${r.ambiguousGroupInvoices} invoice${r.ambiguousGroupInvoices===1?'':'s'} cover multiple people — amounts withheld`);
+    if(r.unmatchedInvoices&&r.unmatchedInvoices.length)parts.push(`${r.unmatchedInvoices.length} invoice${r.unmatchedInvoices.length===1?'':'s'} couldn't be matched to anyone`);
+    return parts.length?`${icSm('alert')} ${parts.join(' · ')}.`:null;
+  }
+  return null;
+}
+let _importAccept='.csv'; // Phase B (Excel) flips this to '.csv,.xlsx' once _xlsxToCsv is vendored
 function _importUploadCardHtml(){
-  return `<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
-    <div class="seg" id="impSourceSeg">${_importSegHtml()}</div>
-    <input type="file" id="fileIn" accept=".csv" class="fld">
+  return `<div class="card"><div class="h3" style="margin-top:0">Import registrations</div>
+    <div id="impLastUploads" class="imp-stamps"></div>
+    <input type="file" id="fileIn" accept="${_importAccept}" multiple class="fld">
     <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
-    <p class="note-hint" id="impSourceHelp">${esc(IMPORT_SOURCES[_importSource].help)}</p>
+    <p class="note-hint">Add your <b>Form</b>, <b>Ticket List</b> and/or <b>Invoice</b> export — one or all at once. Each file is detected automatically and imported in the right order. You can import just the Form now and add the others later.</p>
     <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`;
 }
-function setImportSource(key){
-  if(!IMPORT_SOURCES[key])return;
-  _importSource=key;_clearImport();
-  const seg=document.getElementById('impSourceSeg');if(seg)seg.innerHTML=_importSegHtml();
-  const help=document.getElementById('impSourceHelp');if(help)help.textContent=IMPORT_SOURCES[_importSource].help;
+// Per-source "last imported" lines, loaded after the upload card paints (from /settings stamps).
+async function _loadImportStamps(){
+  const box=document.getElementById('impLastUploads');if(!box)return;
+  let s=null;try{s=await api('/settings');}catch(e){}
+  const row=(label,ts)=>`<div class="kv" style="padding:2px 0"><span class="k">${label}</span><span class="v">${ts?dtFmt(ts):'<span style="color:var(--muted)">Not yet imported</span>'}</span></div>`;
+  box.innerHTML=`<div class="lbl" style="margin-top:0;font-size:.7rem;color:var(--muted)">Last imported</div>${row('Form',s&&s.formImportedAt)}${row('Ticket List',s&&s.ticketsImportedAt)}${row('Invoice',s&&s.invoicesImportedAt)}`;
 }
 
 /* ===== ADMIN DATA ===== */
 RENDER.adminData=async function(){
   let exported='Never';
   let pendingTemps=0;
+  let defaultsSaved='Never';
   // pendingTempPasswordCount is a SAFE count from the public /settings (the plaintext temp
   // passwords are redacted there — they live only in the admin-authenticated audit export).
-  try{const s=await api('/settings');if(s){if(s.lastExportedAt)exported=dtFmt(s.lastExportedAt);pendingTemps=s.pendingTempPasswordCount||0;}}catch(e){}
+  try{const s=await api('/settings');if(s){if(s.lastExportedAt)exported=dtFmt(s.lastExportedAt);pendingTemps=s.pendingTempPasswordCount||0;if(s.defaultsSavedAt)defaultsSaved=dtFmt(s.defaultsSavedAt);}}catch(e){}
   const isAdmin=ACTOR.role==='admin';
   const dataTableCard=`<div class="card tap" onclick="go('data')"><div class="rowsb"><div><div style="font-weight:600">Student data table</div><div class="sub">Filterable registration table &amp; Elvanto-format export</div></div><span class="pill info">View ›</span></div></div>`;
   const uploadSection=_importUploadCardHtml()
@@ -2925,7 +3013,7 @@ RENDER.adminData=async function(){
     ${tempBanner}
     <p class="note-hint" style="text-align:left">Download the full audit workbook (xlsx) or the sign-in/out log (CSV) as standalone files. The xlsx includes: Summary, Attendees, Sign-in/Sign-out Log, Daily Check-in Log, Notes &amp; Testimonies, and Temp Passwords (if applicable).</p>
     <button class="btn" style="width:100%;margin-top:8px" onclick="downloadAuditExport()">${icSm('download')} Download audit workbook (.xlsx)</button>
-    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out','sign-in-out-log.csv')">${icSm('download')} Sign-in/out log (.csv)</button>
+    <button class="btn alt" style="width:100%;margin-top:8px" onclick="downloadCsvExport('/export/signin-out',_exportName('sign-in-out-log','csv'))">${icSm('download')} Sign-in/out log (.csv)</button>
   </div>`;
   const closeOutCard=`<div class="card" style="border:1px solid #fbbf24">
     <div class="lbl" style="margin-top:0;color:#92400e">Close-out camp</div>
@@ -2934,7 +3022,8 @@ RENDER.adminData=async function(){
     <button class="btn" onclick="go('adminCloseOut')">Start close-out ${icSm('arrowr')}</button>
   </div>`;
   const saveDefaultsCard=isAdmin?`<div class="card"><div class="h3" style="margin-top:0">Save Defaults</div>
-      <button class="btn" onclick="adminSaveDefaults()">Save Defaults</button>
+      <div class="kv"><span class="k">Last saved</span><span class="v">${esc(defaultsSaved)}</span></div>
+      <button class="btn" style="margin-top:8px" onclick="adminSaveDefaults()">Save Defaults</button>
       <p class="note-hint" style="text-align:left">Snapshots the current churches, accounts, accommodation, FAQ, schedule &amp; devotionals as the reusable baseline. Run this once camp is fully configured. The end-of-camp purge &amp; restore is the separate <b>Close-Out Camp</b> step below.</p></div>`:'';
   const factoryResetCard=isAdmin?`<div class="card"><div class="h3" style="margin-top:0">Factory reset</div>
       <button class="btn red" onclick="adminReset()">Full reset (wipe to bare)</button>
@@ -2943,12 +3032,14 @@ RENDER.adminData=async function(){
   paint('adminData',
     `${dataTableCard}${uploadSection}${saveDefaultsCard}${complianceCard}${closeOutCard}${factoryResetCard}`,
     'Data, Reset & Exports','Upload / export / reset');
+  _loadImportStamps();
 };
 /* Standalone import screen — gives director (who has import:run but not the Admin
    tab) a way to import. Reuses adminUpload()'s #fileIn/#impResult elements. */
 RENDER.import=function(){
   if(!['director','admin'].includes(ACTOR.role)){paint('import','<p class="note-hint">Importing is restricted to directors and admins.</p>','Import','');return;}
-  paint('import',_importUploadCardHtml(),'Import students','CSV upload');
+  paint('import',_importUploadCardHtml(),'Import registrations','Form · Ticket · Invoice');
+  _loadImportStamps();
 };
 
 /* ===== DATA (director/admin): filterable registration table + Elvanto-format export ===== */
@@ -3178,6 +3269,7 @@ function _stuFormBody(){
 function stuEdit(id){const s=_stuCache.find(x=>x.id===id);if(!s){toast('Student not found');return;}
   modal(`<h3>Edit student</h3>${_stuFormFields(s)}
     <button class="btn" style="margin-top:10px" onclick="stuSave('${id}')">Save</button>
+    ${s.atCamp?`<button class="btn alt" style="margin-top:6px" onclick="notePrompt('${id}','${esc(s.firstName+' '+s.lastName)}')">${icSm('note')} Add a note</button>`:''}
     <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);}
 async function stuSave(id){
   const b=_stuFormBody();
@@ -3198,8 +3290,9 @@ async function stuCreate(){
 async function _rStu(){const el=document.getElementById('stage');const y=el?el.scrollTop:0;await RENDER.adminStudents();if(el)el.scrollTop=y;}
 
 async function adminSaveDefaults(){if(!confirm('Save the current scaffold (churches, accounts, accommodation, FAQ, schedule, devotionals) as the new-year baseline?'))return;
-  // Backend returns {ok:true} (no counts).
-  try{await api('/admin/defaults',{method:'POST'});toast('Baseline saved');}catch(e){toast(e.message);}}
+  // Backend returns {ok:true} (no counts). Drop the cached /settings so the "Last saved"
+  // stamp on the Data screen + close-out checklist reflects this save immediately.
+  try{await api('/admin/defaults',{method:'POST'});Cache.del('/settings');toast('Baseline saved');if(_navId==='adminData')RENDER.adminData();}catch(e){toast(e.message);}}
 function adminNewYear(){
   // Route through the guided close-out flow which enforces export + confirmWipe.
   modal(`<h3>New year rollover</h3>
@@ -3224,28 +3317,89 @@ async function adminReset(){
 }
 async function adminClear(){if(!confirm('Clear all notifications?'))return;
   try{const r=await api('/admin/notifications',{method:'DELETE'});toast('Cleared '+(r.deleted||r.cleared||0)+' notices');}catch(e){toast(e.message);}}
-let _pendingImportCsv=null;
-function adminUpload(){
-  const f=document.getElementById('fileIn')?.files[0];if(!f){toast('Choose a CSV file first');return;}
-  if(!f.name.toLowerCase().endsWith('.csv')){toast('Only CSV files are supported');return;}
-  const reader=new FileReader();
-  reader.onload=async()=>{try{
-    const csvData=reader.result;
-    // Step 1: dry-run preview
-    const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData,updateExisting:true,dryRun:true}});
-    _pendingImportCsv=csvData;
-    _renderImportPreview(r,_importSource);
-  }catch(e){toast(e.message);}};
-  reader.readAsText(f);
+let _importBatch=null;        // [{type,name,csvData}] ordered Form→Ticket→Invoice, awaiting confirm
+let _importPendingParsed=null; // parsed files awaiting manual type resolution (unknowns)
+async function adminUpload(){
+  const input=document.getElementById('fileIn');
+  const files=input&&input.files?Array.prototype.slice.call(input.files):[];
+  if(!files.length){toast('Choose one or more files first');return;}
+  const box=document.getElementById('impResult');if(box){box.style.display='block';box.innerHTML='<div class="loading"><div class="spin"></div><div class="lt">Reading files…</div></div>';}
+  try{
+    const parsed=[];
+    for(const f of files){
+      if(!/\.(csv|xlsx|xls)$/i.test(f.name)){toast('Unsupported file (CSV or Excel only): '+f.name);_clearImport();return;}
+      const rd=await _readImportFile(f);
+      const headers=_parseHeaderRow(rd.text);
+      parsed.push({name:f.name,csvData:rd.text,headers,type:_detectImportType(headers)});
+    }
+    if(parsed.some(p=>!p.type)){_importPendingParsed=parsed;_renderImportUnknown(parsed.filter(p=>!p.type));return;}
+    const ordered=_orderImportBatch(parsed);
+    if(!ordered)return; // dup-type toast already shown
+    _importBatch=ordered;
+    await _renderImportPreview();
+  }catch(e){toast(e.message);_clearImport();}
 }
-function _renderImportPreview(r,source){
-  source=source||_importSource;
-  const box=document.getElementById('impResult');if(!box)return;
-  box.style.display='block';
-  // Only the Form source resolves a church-name column (resolveChurch) — Ticket List/Invoice
-  // responses never carry phantomChurches, so this guard is naturally a no-op for them.
-  const phantoms=r.phantomChurches||[];
-  const errHtml=(r.errors||[]).slice(0,5).map(e=>`<div style="color:#b91c1c;font-size:.8rem">Row ${e.row}: ${esc(e.message)}</div>`).join('');
+// Reject unknowns but let the admin manually assign a type (or skip the file) rather than guessing.
+function _renderImportUnknown(unknown){
+  const box=document.getElementById('impResult');if(!box)return;box.style.display='block';
+  const rows=unknown.map((u,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px">
+    <div style="font-weight:700">${esc(u.name)}</div>
+    <div class="sub" style="margin:2px 0 6px">Couldn't identify this file. Columns found: ${esc(u.headers.slice(0,8).join(', '))}${u.headers.length>8?'…':''}</div>
+    <label style="font-size:.7rem">Treat as</label>
+    <select class="fld" id="impUnk_${i}"><option value="">— skip this file —</option><option value="form">Form</option><option value="tickets">Ticket List</option><option value="invoices">Invoice</option></select>
+  </div>`).join('');
+  box.innerHTML=`<div class="warnbox">${icSm('alert')} ${unknown.length} file${unknown.length===1?'':'s'} not recognised as a Form, Ticket List or Invoice export. Pick a type (or skip), then continue.</div>
+    ${rows}
+    <button class="btn" onclick="_resolveImportUnknown()">Continue ${icSm('arrowr')}</button>
+    <button class="btn ghost" style="margin-left:6px" onclick="_clearImport()">Cancel</button>`;
+}
+function _resolveImportUnknown(){
+  const parsed=_importPendingParsed||[];
+  const unknown=parsed.filter(p=>!p.type);
+  unknown.forEach((u,i)=>{u.type=sel('impUnk_'+i)||null;});
+  const kept=parsed.filter(p=>p.type);
+  if(!kept.length){toast('Pick a type for at least one file, or cancel');return;}
+  const ordered=_orderImportBatch(kept);if(!ordered)return;
+  _importPendingParsed=null;_importBatch=ordered;_renderImportPreview();
+}
+// Sort Form→Ticket→Invoice; reject two files of the same type (can't import the same source twice).
+function _orderImportBatch(list){
+  const seen={};
+  for(const p of list){if(seen[p.type]){toast('Two files look like the same type ('+IMPORT_TYPES[p.type].label+'): '+seen[p.type]+' and '+p.name);return null;}seen[p.type]=p.name;}
+  return list.slice().sort((a,b)=>IMPORT_TYPES[a.type].order-IMPORT_TYPES[b.type].order);
+}
+// Combined dry-run preview across all files in the batch, then a single confirm.
+async function _renderImportPreview(){
+  const box=document.getElementById('impResult');if(!box||!_importBatch)return;box.style.display='block';
+  box.innerHTML='<div class="loading"><div class="spin"></div><div class="lt">Checking files…</div></div>';
+  const formInBatch=_importBatch.some(b=>b.type==='form');
+  let formImported=false;try{const s=await api('/settings');formImported=!!(s&&s.formImportedAt);}catch(e){}
+  const results=[];
+  for(const b of _importBatch){
+    try{const r=await api(IMPORT_TYPES[b.type].endpoint,{method:'POST',body:{csvData:b.csvData,updateExisting:true,dryRun:true}});results.push({b,r});}
+    catch(e){results.push({b,err:e.message||'error'});}
+  }
+  const formRes=results.find(x=>x.b.type==='form'&&x.r);
+  const phantoms=(formRes&&formRes.r.phantomChurches)||[];
+  // Per-file summary cards.
+  const cards=results.map(({b,r,err})=>{
+    if(err)return `<div class="warnbox">${esc(b.name)} (${IMPORT_TYPES[b.type].label}): ${esc(err)}</div>`;
+    const del=r.deleted?` \xb7 <b style="color:#b91c1c">${r.deleted} to delete</b>`:'';
+    // A Ticket/Invoice orphan/unmatched warning is misleading while an unrun Form sits in the same
+    // batch (matches only happen once the Form is committed first), so suppress it in that case.
+    const extra=(b.type!=='form'&&formInBatch)?`<span style="color:var(--muted)">Matches finalise after the Form import runs first.</span>`:_importExtraLine(b.type,r);
+    const errs=(r.errors||[]);
+    const errList=errs.length?`<div style="margin-top:4px">${errs.slice(0,8).map(e=>`<div style="color:#b91c1c;font-size:.76rem">Row ${e.row}: ${esc(e.message)}</div>`).join('')}${errs.length>8?`<div class="sub">+${errs.length-8} more error${errs.length-8===1?'':'s'}</div>`:''}</div>`:'';
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px">
+      <div class="rowsb" style="align-items:center"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.name)}</b><span class="pill info" style="flex:none">${IMPORT_TYPES[b.type].label}</span></div>
+      <div class="sub" style="margin-top:2px">${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip${del} \xb7 ${errs.length} error${errs.length===1?'':'s'}</div>
+      ${extra?`<div class="sub" style="margin-top:2px">${extra}</div>`:''}${errList}</div>`;
+  }).join('');
+  // Bug-11 guard: importing Ticket/Invoice with no Form ever imported (and none in this batch) means
+  // rows can't match a student and become "Needs review" orphans. Warn loudly.
+  const needsForm=!formInBatch&&!formImported&&_importBatch.some(b=>b.type==='tickets'||b.type==='invoices');
+  const guardHtml=needsForm?`<div class="warnbox">${icSm('alert')} No <b>Form</b> registrations have been imported yet, so these tickets/invoices have no students to attach to — they'll be flagged "Needs review". Import the <b>Form</b> export first for them to match.</div>`:'';
+  // Phantom churches from the Form file must be created before we can confirm.
   let phantomHtml='';
   if(phantoms.length){
     const autoUser=n=>n.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,30)||'church';
@@ -3256,26 +3410,17 @@ function _renderImportPreview(r,source){
         <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Username</label><input class="fld" id="pzUser_${i}" value="${esc(autoUser(n))}" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
         <div style="flex:2;min-width:140px"><label style="font-size:.7rem">Password (min 6)</label><input class="fld" id="pzPass_${i}" placeholder="min 6 chars"></div>
       </div></div>`).join('');
-    const btnLabel=`Create ${phantoms.length} church${phantoms.length===1?'':'es'} ${icSm('arrowr')}`;
-    phantomHtml=`<div class="warnbox">${icSm('alert')} ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the CSV — set zone, username &amp; password to create them first:</div>
+    phantomHtml=`<div class="warnbox">${icSm('alert')} ${phantoms.length} unrecognised church${phantoms.length===1?'':'es'} in the Form file — set zone, username &amp; password to create them first:</div>
       ${rows}
-      <button class="btn" style="margin-top:6px" onclick="_createPhantomChurches(${esc(JSON.stringify(phantoms))})">${btnLabel}</button>
-      <button class="btn ghost" style="margin-top:6px;margin-left:6px" onclick="_clearImport()">Cancel</button>`;
+      <button class="btn" onclick="_createPhantomChurches(${esc(JSON.stringify(phantoms))})">Create ${phantoms.length} church${phantoms.length===1?'':'es'} ${icSm('arrowr')}</button>`;
   }
-  const confirmHtml=_pendingImportCsv&&!phantoms.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:'';
-  const delCount=r.deleted||0;
-  const delNote=delCount?` · <b style="color:#b91c1c">${delCount} to delete</b>`:'';
-  const extraFn=IMPORT_SOURCES[source]&&IMPORT_SOURCES[source].extraLine;
-  const extra=extraFn?extraFn(r):null;
-  const extraHtml=extra?`<div class="warnbox">${extra}</div>`:'';
-  const unmatched=(source==='invoices'&&r.unmatchedInvoices)||[];
-  const unmatchedHtml=unmatched.length?unmatched.slice(0,5).map(u=>`<div style="color:#92400e;font-size:.8rem">Row ${u.row}: ${esc(u.invoiceNumber||'—')} \xb7 ${esc(u.billingName||'—')} \xb7 $${((u.amountPaid??u.ticketTotal)??0).toLocaleString()}</div>`).join(''):'';
-  box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip${delNote} \xb7 ${(r.errors||[]).length} errors</div>
-    ${extraHtml}${phantomHtml}${errHtml}${unmatchedHtml}${confirmHtml}`;
+  const confirmHtml=phantoms.length?'':`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import ${_importBatch.length>1?'all '+_importBatch.length+' files':''}</button>`;
+  box.innerHTML=`<div class="infobox"><b>Preview (nothing saved yet)</b> — ${_importBatch.length} file${_importBatch.length===1?'':'s'}, imported Form → Ticket → Invoice.</div>
+    ${cards}${guardHtml}${phantomHtml}${confirmHtml}
+    <button class="btn ghost" style="margin-top:8px${confirmHtml||phantomHtml?';margin-left:6px':''}" onclick="_clearImport()">Cancel</button>`;
 }
 async function _createPhantomChurches(names){
-  const btn=event.currentTarget||event.target;
-  const origLabel=btn?btn.textContent:'';
+  const btn=event&&(event.currentTarget||event.target);
   if(btn){btn.disabled=true;btn.textContent='Creating…';}
   const autoUser=n=>n.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,30)||'church';
   for(let i=0;i<names.length;i++){
@@ -3283,28 +3428,37 @@ async function _createPhantomChurches(names){
     const zone=sel('pzZone_'+i)||'Yellow';
     const username=(document.getElementById('pzUser_'+i)?.value||'').trim()||autoUser(name);
     const pass=(document.getElementById('pzPass_'+i)?.value||'').trim();
-    if(pass.length<6){toast('Password for "'+name+'" must be 6+ chars');if(btn){btn.disabled=false;btn.textContent=origLabel;}return;}
-    if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username for "'+name+'" is invalid — use letters, numbers, . _ - only (min 2 chars)');if(btn){btn.disabled=false;btn.textContent=origLabel;}return;}
+    if(pass.length<6){toast('Password for "'+name+'" must be 6+ chars');if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
+    if(!/^[A-Za-z0-9._-]{2,40}$/.test(username)){toast('Username for "'+name+'" is invalid — use letters, numbers, . _ - only (min 2 chars)');if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
     try{await api('/accounts/churches',{method:'POST',body:{churchName:name,zone,accountFirstName:name,accountLastName:'Team',accountUsername:username,accountPassword:pass}});}
     catch(e){toast('Failed to create "'+name+'": '+(e.message||'error'));if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
   }
   toast(names.length+' church'+(names.length===1?'':'es')+' created');
-  try{const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:true}});_renderImportPreview(r,_importSource);}catch(e){toast(e.message);}
+  _renderImportPreview(); // re-dry-run: the Form file no longer reports these as phantom
 }
 async function _confirmImport(){
-  if(!_pendingImportCsv){toast('No import pending');return;}
+  if(!_importBatch||!_importBatch.length){toast('No import pending');return;}
+  const box=document.getElementById('impResult');
+  if(box){box.innerHTML='<div class="loading"><div class="spin"></div><div class="lt">Importing…</div></div>';}
+  const done=[];let flagged=0,unmatched=0;
   try{
-    const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:false}});
-    _pendingImportCsv=null;
-    const box=document.getElementById('impResult');if(box){box.style.display='block';
-      const extraFn=IMPORT_SOURCES[_importSource]&&IMPORT_SOURCES[_importSource].extraLine;
-      const extra=extraFn?extraFn(r):null;
-      box.innerHTML=`<div class="callbox"><b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors</div>`
-        +(extra?`<div class="warnbox">${extra}</div>`:'');}
-    toast('Import complete');
-  }catch(e){toast(e.message);}
+    // Run for real in dependency order — Form persists first so Ticket/Invoice can match its people.
+    for(const b of _importBatch){
+      const r=await api(IMPORT_TYPES[b.type].endpoint,{method:'POST',body:{csvData:b.csvData,updateExisting:true,dryRun:false}});
+      done.push({b,r});
+      if(b.type==='tickets')flagged+=r.created||0;
+      if(b.type==='invoices')unmatched+=(r.unmatchedInvoices&&r.unmatchedInvoices.length)||0;
+    }
+  }catch(e){toast(e.message);if(box)_renderImportPreview();return;}
+  _importBatch=null;
+  const lines=done.map(({b,r})=>`<div class="sub"><b>${IMPORT_TYPES[b.type].label}:</b> <b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped${r.deleted?' · '+r.deleted+' removed':''} · ${(r.errors||[]).length} errors</div>`).join('');
+  const reviewBtn=(flagged||unmatched)?`<button class="btn alt" style="margin-top:8px" onclick="_goReviewData()">${icSm('alert')} Review ${flagged+unmatched} flagged record${flagged+unmatched===1?'':'s'} ${icSm('arrowr')}</button>`:'';
+  if(box){box.style.display='block';box.innerHTML=`<div class="callbox"><b>Import complete</b></div>${lines}${reviewBtn}`;}
+  _loadImportStamps(); // refresh the per-source "last imported" lines
+  toast('Import complete');
 }
-function _clearImport(){_pendingImportCsv=null;const b=document.getElementById('impResult');if(b)b.style.display='none';}
+async function _goReviewData(){await go('data');const r=document.getElementById('dfReview');if(r){r.value='1';dataApply();}}
+function _clearImport(){_importBatch=null;_importPendingParsed=null;const fi=document.getElementById('fileIn');if(fi)fi.value='';const b=document.getElementById('impResult');if(b){b.style.display='none';b.innerHTML='';}}
 
 
 /* ===== SETUP WIZARD ===== */

@@ -37,10 +37,10 @@ export function buildRoutes(services: Services): (Route | BufferRoute)[] {
   const note = makeNoteController({ note: services.note });
   const attendance = makeAttendanceController({ person: services.person });
   const content = makeContentController({ content: services.content });
-  const importCtrl = makeImportController({ importService: services.importService });
+  const importCtrl = makeImportController({ importService: services.importService, settingsRepo: services.settingsRepo });
   const churchImportCtrl = makeChurchImportController({ churchImport: services.churchImport });
-  const ticketImportCtrl = makeTicketImportController({ ticketImport: services.ticketImport });
-  const invoiceImportCtrl = makeInvoiceImportController({ invoiceImport: services.invoiceImport });
+  const ticketImportCtrl = makeTicketImportController({ ticketImport: services.ticketImport, settingsRepo: services.settingsRepo });
+  const invoiceImportCtrl = makeInvoiceImportController({ invoiceImport: services.invoiceImport, settingsRepo: services.settingsRepo });
   const auditCtrl = makeAuditController({ auditExport: services.auditExport, settingsRepo: services.settingsRepo });
   const exportCtrl = makeExportController({ exportService: services.exportService });
   const account = makeAccountController({ account: services.account });

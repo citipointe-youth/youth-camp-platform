@@ -13,6 +13,24 @@ export interface AuditExportService {
   exportCheckInLogCsv(actor: Actor): Promise<string>;
 }
 
+/** Parse a first-aid note's 4-line body into columns (mirrors the SPA's _faParse). */
+function parseFirstAidBody(body: string): {
+  problem: string; treatment: string; firstAider: string; broughtBy: string;
+} {
+  const out = { problem: '', treatment: '', firstAider: '', broughtBy: '' };
+  for (const line of (body || '').split('\n')) {
+    const m = /^(Problem|Treatment|First-aider|Brought by):\s*(.*)$/i.exec(line);
+    if (!m) continue;
+    const k = m[1]!.toLowerCase();
+    const v = m[2] ?? '';
+    if (k === 'problem') out.problem = v;
+    else if (k === 'treatment') out.treatment = v;
+    else if (k === 'first-aider') out.firstAider = v;
+    else if (k === 'brought by') out.broughtBy = v;
+  }
+  return out;
+}
+
 function toLocalTs(isoTs: string, tz: string): string {
   try {
     return new Intl.DateTimeFormat('en-AU', {
@@ -74,7 +92,9 @@ export function makeAuditExportService(
       }
 
       // ----- Sign-in/Sign-out Log (compliance centrepiece) -----
-      const signLog = wb.addWorksheet('Sign-in/Sign-out Log');
+      // NB: worksheet names cannot contain any of * ? : \ / [ ] — a '/' here made
+      // ExcelJS throw on addWorksheet, so the whole download 500'd. Use ' & ' instead.
+      const signLog = wb.addWorksheet('Sign-in & Sign-out Log');
       signLog.addRow([
         'Student', 'Church', 'Zone', 'Gender', 'Grade',
         'Event Type', 'Timestamp (local)', 'Reason', 'Parents Met', 'Authorised By',
@@ -116,12 +136,14 @@ export function makeAuditExportService(
         }
       }
 
-      // ----- Notes & Testimonies -----
+      const personMap = new Map(people.map((p) => [p.id, p]));
+
+      // ----- Notes & Testimonies (first-aid records get their own sheet below) -----
       const notesSheet = wb.addWorksheet('Notes & Testimonies');
       notesSheet.addRow(['Student', 'Church', 'Zone', 'Category', 'Note', 'Session', 'Created At']);
       notesSheet.getRow(1).font = { bold: true };
-      const personMap = new Map(people.map((p) => [p.id, p]));
       for (const note of notes) {
+        if (note.category === 'firstaid') continue; // → dedicated First-Aid Records sheet
         const p = note.camperId ? personMap.get(note.camperId) : undefined;
         notesSheet.addRow([
           p ? `${p.firstName} ${p.lastName}` : 'No specific student',
@@ -130,6 +152,27 @@ export function makeAuditExportService(
           note.category || 'note',
           note.body,
           note.sessionId || '',
+          toLocalTs(note.createdAt, tz),
+        ]);
+      }
+
+      // ----- First-Aid Records (parsed 4-line body: Problem / Treatment / First-aider / Brought by) -----
+      const faSheet = wb.addWorksheet('First-Aid Records');
+      faSheet.addRow(['Student', 'Church', 'Zone', 'Problem', 'Treatment', 'First-aider', 'Brought by', 'Logged At']);
+      faSheet.getRow(1).font = { bold: true };
+      faSheet.columns = [
+        { width: 22 }, { width: 20 }, { width: 10 }, { width: 30 },
+        { width: 30 }, { width: 18 }, { width: 18 }, { width: 20 },
+      ];
+      for (const note of notes) {
+        if (note.category !== 'firstaid') continue;
+        const p = note.camperId ? personMap.get(note.camperId) : undefined;
+        const fa = parseFirstAidBody(note.body);
+        faSheet.addRow([
+          p ? `${p.firstName} ${p.lastName}` : 'No specific student',
+          p?.churchName || '',
+          p?.zone || '',
+          fa.problem, fa.treatment, fa.firstAider, fa.broughtBy,
           toLocalTs(note.createdAt, tz),
         ]);
       }

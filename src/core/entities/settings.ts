@@ -33,6 +33,14 @@ export interface CampSettings {
   lastTempPasswords?: Array<{ username: string; tempPassword: string }> | null;
   // Timestamp of the last successful audit export; wipe guard requires this to be set.
   lastExportedAt?: string | null;
+  // Timestamp of the last successful "Save Defaults" snapshot (shown on the Data screen +
+  // the close-out checklist). Null until the admin has saved a baseline this setup.
+  defaultsSavedAt?: string | null;
+  // Timestamp of the last successful import of each source (shown on the upload screen so the
+  // admin can see which files have been brought in and when). Null until first imported.
+  formImportedAt?: string | null;
+  ticketsImportedAt?: string | null;
+  invoicesImportedAt?: string | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

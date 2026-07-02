@@ -145,6 +145,13 @@ export function makeAdminService(
         createdAt: nowISO(),
       });
 
+      // Stamp when defaults were last saved so the Data screen + close-out checklist can
+      // show it (bugs 6 & 10). Tolerate a missing settings row (first-run/tests).
+      const settings = await settingsRepo.getSingleton();
+      if (settings) {
+        await settingsRepo.saveSingleton({ ...settings, defaultsSavedAt: nowISO(), updatedAt: nowISO() });
+      }
+
       return { ok: true };
     },
 

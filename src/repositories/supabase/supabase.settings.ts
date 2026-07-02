@@ -22,6 +22,10 @@ function toSettings(r: Record<string, unknown>): CampSettings {
     campMode: r['camp_mode'] as CampSettings['campMode'],
     lastTempPasswords: (r['last_temp_passwords'] as CampSettings['lastTempPasswords']) ?? null,
     lastExportedAt: (r['last_exported_at'] as Date | null)?.toISOString() ?? null,
+    defaultsSavedAt: (r['defaults_saved_at'] as Date | null)?.toISOString() ?? null,
+    formImportedAt: (r['form_imported_at'] as Date | null)?.toISOString() ?? null,
+    ticketsImportedAt: (r['tickets_imported_at'] as Date | null)?.toISOString() ?? null,
+    invoicesImportedAt: (r['invoices_imported_at'] as Date | null)?.toISOString() ?? null,
     createdAt: (r['created_at'] as Date).toISOString(),
     updatedAt: (r['updated_at'] as Date).toISOString(),
   };
@@ -46,6 +50,10 @@ function settingsCols(s: CampSettings): Record<string, unknown> {
     camp_mode: s.campMode,
     last_temp_passwords: s.lastTempPasswords ?? null,
     last_exported_at: s.lastExportedAt ?? null,
+    defaults_saved_at: s.defaultsSavedAt ?? null,
+    form_imported_at: s.formImportedAt ?? null,
+    tickets_imported_at: s.ticketsImportedAt ?? null,
+    invoices_imported_at: s.invoicesImportedAt ?? null,
     created_at: s.createdAt,
     updated_at: s.updatedAt,
   };
@@ -56,7 +64,9 @@ const UPDATE_COLS = [
   'check_in_banner', 'check_in_days', 'accommodation_locked',
   'tent_price', 'classroom_price',
   'church_login_locked', 'zone_leader_login_locked', 'church_checkin_time_restricted', 'camp_mode',
-  'last_temp_passwords', 'last_exported_at', 'updated_at',
+  'last_temp_passwords', 'last_exported_at',
+  'defaults_saved_at', 'form_imported_at', 'tickets_imported_at', 'invoices_imported_at',
+  'updated_at',
 ] as const;
 
 export class SupabaseSettingsRepository implements ISettingsRepository {
