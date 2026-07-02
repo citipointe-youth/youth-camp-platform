@@ -1,6 +1,16 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-03 — FIRST-AID RECORDS EXPORT
+-------------------------------------
+  * The first-aid Records page (RENDER.records) gained an "Export" button that downloads the
+    loaded first-aid records as CSV (Student, Problem, Treatment, First-aider, Brought by, Logged
+    by, Logged at), built client-side from window._faRecsAll via _faParse — no backend or
+    permission change (firstAid holds note:read:firstaid only). Filename via _exportName
+    (youth-camp-<year>-first-aid-records-<date>.csv). sw.js -> camp-v13.
+  * (Separately, Connection Made Simple's Excel reader was swapped to lazy-loaded SheetJS to match
+    this app — committed in the CMS repo, not here.)
+
 2026-07-02 (late) — BUG-LIST FIXES + MULTI-FILE AUTO-DETECT IMPORT + EXCEL + SECURITY HEADERS
 ---------------------------------------------------------------------------------------------
 A large admin-requested batch. Verified: SPA main-script `node --check` OK, npm run typecheck

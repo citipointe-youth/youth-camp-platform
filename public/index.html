@@ -1811,10 +1811,28 @@ RENDER.records=async function(){
   window._faRecsAll=recs||[];
   const camps=Array.isArray(page)?page:page.items||[];const cmap={};camps.forEach(c=>{cmap[c.id]=c.firstName+' '+c.lastName+(c.grade?' · Gr '+c.grade:'');});window._faCamperMap=cmap;
   paint('records',`<div class="search" style="padding:9px 14px"><span>${ic('search')}</span><input id="faRecQ" placeholder="Filter by student…" oninput="drawFaRecords()" aria-label="Filter records"></div>
-    <div class="seg" style="margin-bottom:12px"><button id="faSegToday" class="${_faRecFilter==='today'?'on':''}" onclick="faRecSeg('today')">Today</button><button id="faSegAll" class="${_faRecFilter==='all'?'on':''}" onclick="faRecSeg('all')">All</button></div>
+    <div class="rowsb" style="margin-bottom:12px;align-items:center">
+      <div class="seg" style="margin:0"><button id="faSegToday" class="${_faRecFilter==='today'?'on':''}" onclick="faRecSeg('today')">Today</button><button id="faSegAll" class="${_faRecFilter==='all'?'on':''}" onclick="faRecSeg('all')">All</button></div>
+      <button class="btn alt sm" style="flex:none" onclick="exportFaRecords()">${icSm('download')} Export</button></div>
     <div id="faRecList"></div>`,'First-aid records','Logged actions');
   drawFaRecords();
 };
+// Client-side CSV of the loaded first-aid records (the 4-line body split into columns). Uses data
+// already on the page, so no backend/permission change — firstAid has note:read:firstaid only.
+function exportFaRecords(){
+  const recs=window._faRecsAll||[];
+  if(!recs.length){toast('No first-aid records to export yet');return;}
+  const cmap=window._faCamperMap||{};
+  const q=v=>{v=String(v==null?'':v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const header=['Student','Problem','Treatment','First-aider','Brought by','Logged by','Logged at'];
+  const rows=recs.map(n=>{const p=_faParse(n.body);const name=(cmap[n.camperId]||'').split(' · ')[0]||'Student';
+    return [name,p.problem,p.treatment,p.firstAider||n.authorName||'',p.broughtBy,n.authorName||'',n.createdAt||''];});
+  const csv='﻿'+[header,...rows].map(r=>r.map(q).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  const a=document.createElement('a');a.href=url;a.download=_exportName('first-aid-records','csv');
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  toast('First-aid records exported');
+}
 function faRecSeg(f){_faRecFilter=f;const a=document.getElementById('faSegToday'),b=document.getElementById('faSegAll');if(a)a.classList.toggle('on',f==='today');if(b)b.classList.toggle('on',f==='all');drawFaRecords();}
 function drawFaRecords(){
   const box=document.getElementById('faRecList');if(!box)return;
