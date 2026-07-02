@@ -56,6 +56,7 @@ function reg(over: Partial<Person> & { status?: 'registered' | 'cancelled' }): P
     churchName: 'Victory',
     zone: 'Yellow',
     accommodationKind: 'classroom',
+    needsReview: false,
     lifecycle: status === 'cancelled' ? 'cancelled' : 'registered',
     atCamp: false,
     medicalConditions: [],

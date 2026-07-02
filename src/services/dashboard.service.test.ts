@@ -49,6 +49,7 @@ function camper(over: Partial<Person> = {}): Person {
     consents: { medical: { granted: false, timestamp: null }, media: { granted: false, timestamp: null }, supervision: { granted: false, timestamp: null } },
     churchId: 'c1', churchName: 'Victory', atCamp: false,
     paymentStatus: 'unpaid', accommodationKind: null, accommodationLabel: null,
+    needsReview: false,
     lifecycle: 'arrived', // at-camp default so isCamper() returns true
     checkInHistory: [], signOutHistory: [], createdAt: now, updatedAt: now, ...over,
   };

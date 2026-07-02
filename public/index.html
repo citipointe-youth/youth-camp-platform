@@ -2846,6 +2846,41 @@ async function saveSettings(){
   }catch(e){toast(e.message);}
 }
 
+/* ===== IMPORT SOURCE SELECTOR (shared by RENDER.adminData + RENDER.import) =====
+   Three CSV sources hit different backend endpoints but share the same dry-run
+   preview / phantom-church / confirm flow — only the endpoint + display copy differ. */
+let _importSource='form';
+const IMPORT_SOURCES={
+  form:    {label:'Form',        endpoint:'/import/csv',      help:'Matches existing students by name (and phone when names clash) — adds new ones and updates changed fields.'},
+  tickets: {label:'Ticket List', endpoint:'/import/tickets',  help:'Matches tickets to existing registrants where possible. Low-confidence matches create a new record flagged "Needs review" instead of guessing wrong.'},
+  invoices:{label:'Invoice',     endpoint:'/import/invoices', help:'Matches invoices to existing registrants and fills in payment fields. Unmatched invoices are listed for manual reconciliation rather than guessed.'},
+};
+IMPORT_SOURCES.tickets.extraLine=r=>r.created?`${icSm('alert')} <b>${r.created}</b> new record${r.created===1?'':'s'} created from a low-confidence match — flagged "Needs review" on the Data tab.`:null;
+IMPORT_SOURCES.invoices.extraLine=r=>{
+  const parts=[];
+  if(r.guessedAccommodationCount)parts.push(`${r.guessedAccommodationCount} accommodation type${r.guessedAccommodationCount===1?'':'s'} guessed from price`);
+  if(r.ambiguousGroupInvoices)parts.push(`${r.ambiguousGroupInvoices} invoice${r.ambiguousGroupInvoices===1?'':'s'} cover multiple people — amounts withheld, needs manual split`);
+  if(r.unmatchedInvoices&&r.unmatchedInvoices.length)parts.push(`${r.unmatchedInvoices.length} invoice${r.unmatchedInvoices.length===1?'':'s'} couldn't be matched to anyone`);
+  return parts.length?`${icSm('alert')} ${parts.join(' · ')}.`:null;
+};
+function _importSegHtml(){
+  return Object.keys(IMPORT_SOURCES).map(k=>`<button class="${k===_importSource?'on':''}" onclick="setImportSource('${k}')">${esc(IMPORT_SOURCES[k].label)}</button>`).join('');
+}
+function _importUploadCardHtml(){
+  return `<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
+    <div class="seg" id="impSourceSeg">${_importSegHtml()}</div>
+    <input type="file" id="fileIn" accept=".csv" class="fld">
+    <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
+    <p class="note-hint" id="impSourceHelp">${esc(IMPORT_SOURCES[_importSource].help)}</p>
+    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`;
+}
+function setImportSource(key){
+  if(!IMPORT_SOURCES[key])return;
+  _importSource=key;_clearImport();
+  const seg=document.getElementById('impSourceSeg');if(seg)seg.innerHTML=_importSegHtml();
+  const help=document.getElementById('impSourceHelp');if(help)help.textContent=IMPORT_SOURCES[_importSource].help;
+}
+
 /* ===== ADMIN DATA ===== */
 RENDER.adminData=async function(){
   let exported='Never';
@@ -2855,11 +2890,7 @@ RENDER.adminData=async function(){
   try{const s=await api('/settings');if(s){if(s.lastExportedAt)exported=dtFmt(s.lastExportedAt);pendingTemps=s.pendingTempPasswordCount||0;}}catch(e){}
   const isAdmin=ACTOR.role==='admin';
   const dataTableCard=`<div class="card tap" onclick="go('data')"><div class="rowsb"><div><div style="font-weight:600">Student data table</div><div class="sub">Filterable registration table &amp; Elvanto-format export</div></div><span class="pill info">View ›</span></div></div>`;
-  const uploadSection=`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
-    <input type="file" id="fileIn" accept=".csv" class="fld">
-    <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
-    <p class="note-hint">Matches existing students by name — adds new ones and updates changed fields.</p>
-    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`
+  const uploadSection=_importUploadCardHtml()
     +(CAMP_MODE==='at-camp'?`<div class="card"><div class="h3" style="margin-top:0">Notifications</div><button class="btn red" onclick="adminClear()">Clear all notifications</button></div>`:'');
   // R9: surface temp passwords still waiting from a new-year rollover so the admin knows to
   // download the workbook (which includes them once, then clears them) rather than lose them.
@@ -2893,11 +2924,7 @@ RENDER.adminData=async function(){
    tab) a way to import. Reuses adminUpload()'s #fileIn/#impResult elements. */
 RENDER.import=function(){
   if(!['director','admin'].includes(ACTOR.role)){paint('import','<p class="note-hint">Importing is restricted to directors and admins.</p>','Import','');return;}
-  paint('import',`<div class="card"><div class="h3" style="margin-top:0">Upload students (CSV)</div>
-    <input type="file" id="fileIn" accept=".csv" class="fld">
-    <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
-    <p class="note-hint">Matches existing students by name (and phone when names clash) — adds new ones and updates changed fields.</p>
-    <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`,'Import students','CSV upload');
+  paint('import',_importUploadCardHtml(),'Import students','CSV upload');
 };
 
 /* ===== DATA (director/admin): filterable registration table + Elvanto-format export ===== */
@@ -2924,13 +2951,15 @@ RENDER.data=async function(){
       <select class="fld" id="dfGen" style="flex:1;min-width:110px" onchange="dataApply()">
         <option value="">All genders</option><option value="male">Male</option><option value="female">Female</option></select>
       <select class="fld" id="dfGr" style="flex:1;min-width:120px" onchange="dataApply()">${gradeOpts}</select>
+      <select class="fld" id="dfReview" style="flex:1;min-width:140px" onchange="dataApply()">
+        <option value="">All records</option><option value="1">Needs review only</option></select>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" onclick="dataExport(true)">Export filtered</button>
       <button class="btn ghost" onclick="dataExport(false)">Export all</button>
     </div>
     <div id="dataCount" class="note-hint" style="margin-top:6px"></div>
-    <div style="overflow-x:auto;margin-top:8px"><table id="dataTbl" style="min-width:860px;border-collapse:collapse;font-size:.8rem"></table></div>
+    <div style="overflow-x:auto;margin-top:8px"><table id="dataTbl" style="min-width:1020px;border-collapse:collapse;font-size:.8rem"></table></div>
   </div>`,'Data','Registrations');
   dataApply();
 };
@@ -2939,9 +2968,10 @@ function dataFilters(){
     churchId:document.getElementById('dfCh')?.value||'',
     gender:document.getElementById('dfGen')?.value||'',
     grade:document.getElementById('dfGr')?.value||'',
+    needsReview:document.getElementById('dfReview')?.value||'',
   };
 }
-const DATA_COLS=[['Name','name'],['Church','church'],['Gender','gender'],['Grade','grade'],['Reg type','regType'],['Cost','cost'],['Discount code','discount'],['Mobile','mobile'],['Medical','medical'],['Dietary','dietary'],['Other','other'],['Blue card','blueCard']];
+const DATA_COLS=[['Name','name'],['Church','church'],['Gender','gender'],['Grade','grade'],['Reg type','regType'],['Cost','cost'],['Discount code','discount'],['Mobile','mobile'],['Medical','medical'],['Dietary','dietary'],['Other','other'],['Blue card','blueCard'],['Accommodation','accommodation'],['Review','review']];
 function _dataSortVal(r,key){
   switch(key){
     case 'name':return (r.lastName+', '+r.firstName).toLowerCase();
@@ -2956,6 +2986,8 @@ function _dataSortVal(r,key){
     case 'dietary':return (r.dietaryRequirements||[]).join(', ').toLowerCase();
     case 'other':return (r.otherMedications||'').toLowerCase();
     case 'blueCard':return (r.blueCardNumber||'').toLowerCase();
+    case 'accommodation':return (r.accommodationKind||'')+'|'+(r.accommodationKindConfidence||'');
+    case 'review':return r.needsReview?1:0;
     default:return '';
   }
 }
@@ -2972,6 +3004,7 @@ function dataApply(){
     if(f.gender&&r.gender!==f.gender)return false;
     if(f.grade==='leader'){if(r.kind!=='leader')return false;}
     else if(f.grade){if(r.kind==='leader'||String(r.grade??'')!==f.grade)return false;}
+    if(f.needsReview==='1'&&!r.needsReview)return false;
     return true;
   });
   if(_dataSortKey)rows=rows.slice().sort((a,b)=>{
@@ -2979,18 +3012,46 @@ function dataApply(){
     if(av<bv)return -1*_dataSortDir;if(av>bv)return 1*_dataSortDir;return 0;
   });
   const td=v=>`<td style="border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(v||'—')}</td>`;
+  // tdRaw skips esc() — only for cells built entirely from enum-like fields / trusted markup (Accommodation, Review).
+  const tdRaw=html=>`<td style="border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">${html}</td>`;
   const body=rows.map(r=>{
     const grade=r.kind==='leader'?'Leader':(r.grade??'—');
     const cost=r.registrationCost!=null?'$'+r.registrationCost.toLocaleString():'—';
-    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.registrationType)}${td(cost)}${td(r.discountCode)}${td(fmtPhone(r.mobile))}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}</tr>`;
+    return `<tr>${td(r.lastName+', '+r.firstName)}${td(r.churchName)}${td(r.gender)}${td(grade)}${td(r.registrationType)}${td(cost)}${td(r.discountCode)}${td(fmtPhone(r.mobile))}${td((r.medicalConditions||[]).join(', '))}${td((r.dietaryRequirements||[]).join(', '))}${td(r.otherMedications)}${td(r.blueCardNumber)}${tdRaw(accomCell(r))}${tdRaw(reviewCell(r))}</tr>`;
   }).join('');
   const t=document.getElementById('dataTbl');
   const thead=DATA_COLS.map(([label,key])=>{
     const arrow=_dataSortKey===key?(_dataSortDir===1?' ▲':' ▼'):'';
     return `<th style="text-align:left;border-bottom:2px solid var(--line);padding:6px 8px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap" onclick="dataSort('${key}')">${label}${arrow}</th>`;
   }).join('');
-  if(t)t.innerHTML=`<thead><tr>${thead}</tr></thead><tbody>${body||'<tr><td colspan="12" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
+  if(t)t.innerHTML=`<thead><tr>${thead}</tr></thead><tbody>${body||'<tr><td colspan="14" style="padding:10px;color:var(--muted)">No matching registrants</td></tr>'}</tbody>`;
   const c=document.getElementById('dataCount');if(c)c.textContent=`${rows.length} of ${(_dataCache||[]).length} registrants`;
+}
+function accomCell(r){
+  const kind=r.accommodationKind==='tent'?'Tent':r.accommodationKind==='classroom'?'Classroom':'—';
+  const badge=r.accommodationKindConfidence==='guessed'?' <span class="pill amb">Guessed</span>':'';
+  return kind+badge;
+}
+function reviewCell(r){
+  return r.needsReview?`<span class="pill warn" style="cursor:pointer" onclick="openReviewModal('${r.id}')">${icSm('alert')} Needs review</span>`:'—';
+}
+function openReviewModal(id){
+  const r=(_dataCache||[]).find(x=>x.id===id);
+  if(!r){toast('Record not found');return;}
+  modal(`<h3>Needs review · ${esc(r.firstName+' '+r.lastName)}</h3>
+    <p class="sub" style="margin:4px 0 8px">${esc(r.needsReviewReason||'No reason recorded.')}</p>
+    <button class="btn" onclick="_markReviewed('${id}')">Mark reviewed</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Cancel</button>`);
+}
+async function _markReviewed(id){
+  try{
+    await api('/registrants/'+id,{method:'PATCH',body:{needsReview:false,needsReviewReason:null}});
+    closeModal();
+    const r=(_dataCache||[]).find(x=>x.id===id);
+    if(r){r.needsReview=false;r.needsReviewReason=null;}
+    dataApply();
+    toast('Marked reviewed');
+  }catch(e){toast(e.message);}
 }
 async function dataExport(filtered){
   try{
@@ -3147,15 +3208,18 @@ function adminUpload(){
   reader.onload=async()=>{try{
     const csvData=reader.result;
     // Step 1: dry-run preview
-    const r=await api('/import/csv',{method:'POST',body:{csvData,updateExisting:true,dryRun:true}});
+    const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData,updateExisting:true,dryRun:true}});
     _pendingImportCsv=csvData;
-    _renderImportPreview(r);
+    _renderImportPreview(r,_importSource);
   }catch(e){toast(e.message);}};
   reader.readAsText(f);
 }
-function _renderImportPreview(r){
+function _renderImportPreview(r,source){
+  source=source||_importSource;
   const box=document.getElementById('impResult');if(!box)return;
   box.style.display='block';
+  // Only the Form source resolves a church-name column (resolveChurch) — Ticket List/Invoice
+  // responses never carry phantomChurches, so this guard is naturally a no-op for them.
   const phantoms=r.phantomChurches||[];
   const errHtml=(r.errors||[]).slice(0,5).map(e=>`<div style="color:#b91c1c;font-size:.8rem">Row ${e.row}: ${esc(e.message)}</div>`).join('');
   let phantomHtml='';
@@ -3177,8 +3241,13 @@ function _renderImportPreview(r){
   const confirmHtml=_pendingImportCsv&&!phantoms.length?`<button class="btn" style="margin-top:8px" onclick="_confirmImport()">Confirm &amp; import</button> <button class="btn ghost" style="margin-top:8px;margin-left:6px" onclick="_clearImport()">Cancel</button>`:'';
   const delCount=r.deleted||0;
   const delNote=delCount?` · <b style="color:#b91c1c">${delCount} to delete</b>`:'';
+  const extraFn=IMPORT_SOURCES[source]&&IMPORT_SOURCES[source].extraLine;
+  const extra=extraFn?extraFn(r):null;
+  const extraHtml=extra?`<div class="warnbox">${extra}</div>`:'';
+  const unmatched=(source==='invoices'&&r.unmatchedInvoices)||[];
+  const unmatchedHtml=unmatched.length?unmatched.slice(0,5).map(u=>`<div style="color:#92400e;font-size:.8rem">Row ${u.row}: ${esc(u.invoiceNumber||'—')} \xb7 ${esc(u.billingName||'—')} \xb7 $${((u.amountPaid??u.ticketTotal)??0).toLocaleString()}</div>`).join(''):'';
   box.innerHTML=`<div class="infobox"><b>Preview (dry-run):</b> ${r.created} to add \xb7 ${r.updated} to update \xb7 ${r.skipped} to skip${delNote} \xb7 ${(r.errors||[]).length} errors</div>
-    ${phantomHtml}${errHtml}${confirmHtml}`;
+    ${extraHtml}${phantomHtml}${errHtml}${unmatchedHtml}${confirmHtml}`;
 }
 async function _createPhantomChurches(names){
   const btn=event.currentTarget||event.target;
@@ -3196,15 +3265,18 @@ async function _createPhantomChurches(names){
     catch(e){toast('Failed to create "'+name+'": '+(e.message||'error'));if(btn){btn.disabled=false;btn.textContent='Retry';}return;}
   }
   toast(names.length+' church'+(names.length===1?'':'es')+' created');
-  try{const r=await api('/import/csv',{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:true}});_renderImportPreview(r);}catch(e){toast(e.message);}
+  try{const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:true}});_renderImportPreview(r,_importSource);}catch(e){toast(e.message);}
 }
 async function _confirmImport(){
   if(!_pendingImportCsv){toast('No import pending');return;}
   try{
-    const r=await api('/import/csv',{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:false}});
+    const r=await api(IMPORT_SOURCES[_importSource].endpoint,{method:'POST',body:{csvData:_pendingImportCsv,updateExisting:true,dryRun:false}});
     _pendingImportCsv=null;
     const box=document.getElementById('impResult');if(box){box.style.display='block';
-      box.innerHTML=`<div class="callbox"><b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors</div>`;}
+      const extraFn=IMPORT_SOURCES[_importSource]&&IMPORT_SOURCES[_importSource].extraLine;
+      const extra=extraFn?extraFn(r):null;
+      box.innerHTML=`<div class="callbox"><b style="color:#15803d">${r.created}</b> new · <b>${r.updated}</b> updated · ${r.skipped} skipped · <b style="color:#b91c1c">${(r.errors||[]).length}</b> errors</div>`
+        +(extra?`<div class="warnbox">${extra}</div>`:'');}
     toast('Import complete');
   }catch(e){toast(e.message);}
 }

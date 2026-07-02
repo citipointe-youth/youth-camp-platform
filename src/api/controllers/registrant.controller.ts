@@ -100,6 +100,20 @@ export function makeRegistrantController(services: RegistrantControllerServices)
           lifecycle: b['status'] === 'cancelled' ? 'cancelled' : 'registered',
         }),
         ...(blueCardNumber !== undefined && { blueCardNumber }),
+        // Ticket List / Invoice import fields — lets an admin manually clear
+        // needsReview/needsReviewReason after reconciling an orphan, or hand-correct
+        // ticketNumber/accommodationKindConfidence/the four money fields.
+        ...(b['ticketNumber'] !== undefined && { ticketNumber: b['ticketNumber'] as string | null }),
+        ...(b['invoiceNumber'] !== undefined && { invoiceNumber: b['invoiceNumber'] as string | null }),
+        ...(b['accommodationKindConfidence'] !== undefined && {
+          accommodationKindConfidence: b['accommodationKindConfidence'] as Person['accommodationKindConfidence'],
+        }),
+        ...(b['discountAmount'] !== undefined && { discountAmount: b['discountAmount'] as number | null }),
+        ...(b['amountPaid'] !== undefined && { amountPaid: b['amountPaid'] as number | null }),
+        ...(b['feesAmount'] !== undefined && { feesAmount: b['feesAmount'] as number | null }),
+        ...(b['taxAmount'] !== undefined && { taxAmount: b['taxAmount'] as number | null }),
+        ...(b['needsReview'] !== undefined && { needsReview: b['needsReview'] as boolean }),
+        ...(b['needsReviewReason'] !== undefined && { needsReviewReason: b['needsReviewReason'] as string | null }),
       };
 
       return toRegistrantDto(await person.update(req.ctx.actor, id, patch));

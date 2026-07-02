@@ -36,8 +36,13 @@ export interface ImportService {
   importCsv(actor: Actor, input: unknown): Promise<ImportResult>;
 }
 
-function parseGender(val: string): Person['gender'] {
+// Blank/whitespace-only input -> null (no data supplied — the caller decides how to treat
+// that: keep the existing value on update, default to 'other' on create). A NON-blank input
+// that doesn't match male/female legitimately parses to 'other' — that is a real answer, not
+// a blank-cell default.
+function parseGender(val: string): Person['gender'] | null {
   const v = val.toLowerCase().trim();
+  if (v === '') return null;
   if (v === 'male' || v === 'm') return 'male';
   if (v === 'female' || v === 'f') return 'female';
   return 'other';
@@ -171,7 +176,9 @@ export function makeImportService(
             ? explicitChurchId
             : await resolveChurch(churchName, rowNum, now);
 
-          const gender = parseGender(field(row, 'Gender', 'gender') || 'other');
+          // null when the CSV cell is blank/absent — the merge/create branches below decide
+          // the fallback (keep existing value on update, default to 'other' on create).
+          const gender = parseGender(field(row, 'Gender', 'gender'));
           const gradeRaw = field(row, 'School Grade', 'grade', 'Grade');
           const { kind, grade } = parseGradeOrLeader(gradeRaw);
           if (gradeRaw && grade === null && kind === 'youth') {
@@ -257,17 +264,27 @@ export function makeImportService(
               ...match,
               firstName,
               lastName,
-              gender,
-              grade,
-              dateOfBirth: dob,
-              mobile,
-              email,
-              suburb,
-              postcode,
-              state,
-              medicareNumber,
+              // Blank-cell guard: a blank/absent CSV value for these fields must never clobber
+              // a previously-known good value on a matched-existing update. `gradeRaw` blank
+              // covers both `kind` and `grade` since both are derived from the same School
+              // Grade cell (an unrecognized-but-present value still applies, matching the
+              // existing "grade left blank" warning behavior below — only a genuinely blank
+              // cell is guarded).
+              gender: gender ?? match.gender,
+              grade: gradeRaw ? grade : match.grade,
+              dateOfBirth: dob ?? match.dateOfBirth,
+              mobile: mobile ?? match.mobile,
+              email: email ?? match.email,
+              suburb: suburb ?? match.suburb,
+              postcode: postcode ?? match.postcode,
+              state: state ?? match.state,
+              medicareNumber: medicareNumber ?? match.medicareNumber,
+              // zone is NOT CSV-sourced — it's always resolved live from the person's church
+              // record (see comment above), so it is never "blank" and is intentionally kept
+              // unconditional: re-importing is how a person's zone stays in sync with their
+              // church's current zone.
               zone,
-              kind,
+              kind: gradeRaw ? kind : match.kind,
               medicalConditions: medical ? [medical] : match.medicalConditions,
               dietaryRequirements: dietary ? [dietary] : match.dietaryRequirements,
               otherMedications: otherMedications ?? match.otherMedications,
@@ -298,7 +315,9 @@ export function makeImportService(
               id: newId('person'),
               firstName,
               lastName,
-              gender,
+              // Creating a brand-new person is the one place a blank Gender cell legitimately
+              // needs a concrete default, since Person.gender is required/non-nullable.
+              gender: gender ?? 'other',
               dateOfBirth: dob,
               grade,
               school: field(row, 'school') || null,
@@ -332,6 +351,7 @@ export function makeImportService(
               discountCode,
               lifecycle: 'registered',
               atCamp: false,
+              needsReview: false,
               checkInHistory: [],
               signOutHistory: [],
               createdAt: now,

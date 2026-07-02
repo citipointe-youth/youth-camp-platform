@@ -217,6 +217,7 @@ export function makePersonService(repo: IPersonRepository): PersonService {
         paymentStatus: input.paymentStatus ?? 'unpaid',
         accommodationKind: input.accommodationKind ?? null,
         accommodationLabel: input.accommodationLabel ?? null,
+        needsReview: false,
         lifecycle: 'registered',
         atCamp: false,
         checkInHistory: [],

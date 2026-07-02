@@ -42,6 +42,15 @@ export interface RegistrantDto {
   registrationType: string | null;
   registrationCost: number | null;
   discountCode: string | null;
+  ticketNumber: string | null;
+  invoiceNumber: string | null;
+  accommodationKindConfidence: Person['accommodationKindConfidence'];
+  discountAmount: number | null;
+  amountPaid: number | null;
+  feesAmount: number | null;
+  taxAmount: number | null;
+  needsReview: boolean;
+  needsReviewReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -132,6 +141,15 @@ export function toRegistrantDto(p: Person): RegistrantDto {
     registrationType: p.registrationType ?? null,
     registrationCost: p.registrationCost ?? null,
     discountCode: p.discountCode ?? null,
+    ticketNumber: p.ticketNumber ?? null,
+    invoiceNumber: p.invoiceNumber ?? null,
+    accommodationKindConfidence: p.accommodationKindConfidence ?? null,
+    discountAmount: p.discountAmount ?? null,
+    amountPaid: p.amountPaid ?? null,
+    feesAmount: p.feesAmount ?? null,
+    taxAmount: p.taxAmount ?? null,
+    needsReview: p.needsReview ?? false,
+    needsReviewReason: p.needsReviewReason ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

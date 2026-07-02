@@ -33,6 +33,7 @@ function person(over: Partial<Person> = {}): Person {
       supervision: { granted: false, timestamp: null },
     },
     paymentStatus: 'unpaid',
+    needsReview: false,
     lifecycle: 'arrived', // a camper (at camp) by default so notes attach
     atCamp: true,
     checkInHistory: [],

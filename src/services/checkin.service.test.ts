@@ -25,7 +25,7 @@ function person(over: Partial<Person> = {}): Person {
       media: { granted: false, timestamp: null },
       supervision: { granted: false, timestamp: null },
     },
-    paymentStatus: 'unpaid', lifecycle: 'arrived', atCamp: true,
+    paymentStatus: 'unpaid', needsReview: false, lifecycle: 'arrived', atCamp: true,
     checkInHistory: [], signOutHistory: [],
     createdAt: now, updatedAt: now,
     ...over,

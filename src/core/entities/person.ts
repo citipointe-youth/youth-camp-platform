@@ -100,6 +100,32 @@ export interface Person {
   registrationCost?: number | null;
   discountCode?: string | null;
 
+  // ----- Ticket List / Invoice import (Elvanto 3-CSV split) -----
+  /** Owned by the Ticket List import. */
+  ticketNumber?: string | null;
+  /** Owned by the Ticket List import; also read by the Invoice import to cross-reference rows to the same person. */
+  invoiceNumber?: string | null;
+  /**
+   * How `accommodationKind` was determined. `null`/absent = no value yet, OR set the
+   * old way (CSV/manual) before this feature existed — deliberately NOT retroactively
+   * treated as a guess. Ticket List import always sets `'confirmed'`. Invoice-inference
+   * sets `'guessed'` only when nothing better already exists. `Church.accommodationOverride`
+   * also sets `'confirmed'` when it applies.
+   */
+  accommodationKindConfidence?: 'guessed' | 'confirmed' | null;
+  /** Owned by the Invoice import. */
+  discountAmount?: number | null;
+  /** Owned by the Invoice import. */
+  amountPaid?: number | null;
+  /** Owned by the Invoice import. */
+  feesAmount?: number | null;
+  /** Owned by the Invoice import. */
+  taxAmount?: number | null;
+  /** True when Ticket List/Invoice import created or updated this record without a confident match — needs admin reconciliation. Defaults false. */
+  needsReview: boolean;
+  /** Human-readable reason set alongside `needsReview: true` (e.g. "No matching Form registrant for invoice #123"). */
+  needsReviewReason?: string | null;
+
   // ----- lifecycle (the unification core) -----
   lifecycle: PersonLifecycle;
   atCamp: boolean; // derived convenience: lifecycle is an at-camp state

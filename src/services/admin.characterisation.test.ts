@@ -82,6 +82,7 @@ function person(over: Partial<Person>): Person {
     churchId: 'c1',
     churchName: 'Victory',
     zone: 'Yellow',
+    needsReview: false,
     lifecycle: 'registered',
     atCamp: false,
     medicalConditions: [],

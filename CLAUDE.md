@@ -230,6 +230,60 @@ clean, `npm run test` = 275 pass.
   (`_dataCache` sorted by `createdAt` ascending client-side, since `/registrants` itself returns
   alphabetical order) rather than whatever order the last sort left it in.
 
+## Multi-source CSV import (Form / Ticket List / Invoice) — deployed 2026-07-02
+
+Elvanto now exports three separate CSVs instead of one manually-merged file. Full design at
+`docs/superpowers/specs/2026-07-02-multi-source-import-design.md`. **Real column headers for
+Ticket List / Invoice are unconfirmed** — every header alias below is a best guess pending a real
+test import; the multi-alias `field(row, ...)` pattern makes correcting them a low-risk follow-up.
+
+- **Three backend services, one shared core.** `src/services/import.service.ts` (existing, Form —
+  `POST /import/csv`, unchanged behaviour except the blank-clobber fix below) stays the
+  authoritative full-roster import (church-scoped matching, **still deletes anyone absent from the
+  file**). Two new sibling services, mirroring the existing `church-import.service.ts` pattern:
+  `src/services/ticket-import.service.ts` (`POST /import/tickets`) and
+  `src/services/invoice-import.service.ts` (`POST /import/invoices`) — **neither ever deletes**.
+  All three share `src/services/person-matching.ts` (NEW): `findPersonMatch` (cross-church name
+  index, exact-then-bounded-Levenshtein-≤2 fuzzy fallback, only auto-matches a single unambiguous
+  candidate) and `mergeOwnedFields` (a field only overwrites if the incoming value is non-blank —
+  the same primitive that fixed the Form-import bug below).
+- **Field ownership, enforced structurally (not by convention):** Form owns grade/gender/medical/
+  dietary. Ticket List owns `accommodationKind` (+ NEW `accommodationKindConfidence:
+  'guessed'|'confirmed'|null` — Ticket List always sets `'confirmed'`, unconditional overwrite,
+  unless `Church.accommodationOverride` applies, which still wins and is also `'confirmed'`), NEW
+  `ticketNumber`, NEW `invoiceNumber`, `paymentStatus`. Invoice owns `registrationCost` (reused as
+  "ticket total"), `discountCode` (reused), NEW `discountAmount`/`amountPaid`/`feesAmount`/
+  `taxAmount`, and may **guess** `accommodationKind` (`confidence:'guessed'`, never overwrites a
+  `'confirmed'` value) by exact-cents-matching the invoice total against a price→type table built
+  **dynamically every run** from already-confirmed Ticket-List people this season (requires ≥3
+  confirmed samples at that exact price AND a ≥90% kind-majority before trusting it).
+- **No confident match → orphan + flag, never silently discarded (Ticket List/Invoice only).**
+  Ticket List creates a new `Person` with NEW `needsReview:true` + `needsReviewReason` (no
+  `churchId` — verified this makes it invisible to church/zoneLeader RBAC scoping automatically,
+  visible only to admin/director). **Invoice never creates a person** — `Person.churchId` is
+  non-nullable and the Invoice export has no church field, so an unmatched invoice goes into the
+  response's `unmatchedInvoices[]` for manual reconciliation instead of a fabricated record. An
+  invoice matching >1 person (shared invoice number) withholds all `$`/accommodation fields for
+  everyone in the group (can't attribute a shared total) but still applies a flat `discountCode`.
+- **Form-import blank-clobber bug fixed:** `parseGender`/the update-merge branch previously reset
+  a matched person's `gender` to `'other'` (and several other fields to blank) whenever the
+  current CSV row's cell was empty — a real, live bug on ordinary Form re-imports, unrelated to
+  the new sources. Blank cells now preserve the existing value on update; `'other'` remains the
+  create-time default only. `zone` is deliberately still unconditional (it's church-derived, not
+  CSV-derived — re-importing is how it stays in sync with the church record).
+- **SPA:** one upload screen, a Form/Ticket List/Invoice `.seg` source selector
+  (`IMPORT_SOURCES`/`setImportSource`/`_importUploadCardHtml`, same segmented-control pattern as
+  the check-in day selector) reusing the existing dry-run→preview→confirm flow, parameterized by
+  endpoint. Data tab (`RENDER.data`) gained a `needsReview` filter + column (`reviewCell`/
+  `openReviewModal`/`_markReviewed` — PATCHes `needsReview:false`, no merge tool, manual
+  reconciliation only) and an `Accommodation` column with an amber "Guessed" pill only on
+  `confidence==='guessed'` (no badge for `'confirmed'`/`null`, matching the app's only-badge-the-
+  exceptional-state convention).
+- **Migration `017_ticket_invoice_import_fields.sql`** — 8 new nullable `people` columns (+
+  `needs_review not null default false`); also fixed a **pre-existing, unrelated** bug where
+  `PERSON_UPDATE_COLS` (Supabase `on conflict do update set` list) was missing `elvanto_meta`/
+  `medicare_number`/`church_unlisted_note`, so those three fields silently never updated on save.
+
 ## Commands (run from this folder)
 
 ```bash

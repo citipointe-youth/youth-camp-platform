@@ -56,6 +56,7 @@ function person(over: Partial<Person> = {}): Person {
       supervision: { granted: false, timestamp: null },
     },
     paymentStatus: 'unpaid',
+    needsReview: false,
     lifecycle: 'registered',
     atCamp: false,
     checkInHistory: [],

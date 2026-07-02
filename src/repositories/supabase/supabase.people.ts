@@ -89,6 +89,16 @@ function toPerson(
     registrationType: (row['registration_type'] as string | null) ?? null,
     registrationCost: (row['registration_cost'] as number | null) ?? null,
     discountCode: (row['discount_code'] as string | null) ?? null,
+    ticketNumber: (row['ticket_number'] as string | null) ?? null,
+    invoiceNumber: (row['invoice_number'] as string | null) ?? null,
+    accommodationKindConfidence:
+      (row['accommodation_kind_confidence'] as Person['accommodationKindConfidence']) ?? null,
+    discountAmount: (row['discount_amount'] as number | null) ?? null,
+    amountPaid: (row['amount_paid'] as number | null) ?? null,
+    feesAmount: (row['fees_amount'] as number | null) ?? null,
+    taxAmount: (row['tax_amount'] as number | null) ?? null,
+    needsReview: (row['needs_review'] as boolean | null) ?? false,
+    needsReviewReason: (row['needs_review_reason'] as string | null) ?? null,
     lifecycle: row['lifecycle'] as Person['lifecycle'],
     atCamp: row['at_camp'] as boolean,
     checkInHistory: checkIns,
@@ -281,6 +291,15 @@ function personColumns(p: Person): Record<string, unknown> {
     registration_type: p.registrationType ?? null,
     registration_cost: p.registrationCost ?? null,
     discount_code: p.discountCode ?? null,
+    ticket_number: p.ticketNumber ?? null,
+    invoice_number: p.invoiceNumber ?? null,
+    accommodation_kind_confidence: p.accommodationKindConfidence ?? null,
+    discount_amount: p.discountAmount ?? null,
+    amount_paid: p.amountPaid ?? null,
+    fees_amount: p.feesAmount ?? null,
+    tax_amount: p.taxAmount ?? null,
+    needs_review: p.needsReview ?? false,
+    needs_review_reason: p.needsReviewReason ?? null,
     lifecycle: p.lifecycle,
     at_camp: p.atCamp,
     created_at: p.createdAt,
@@ -297,6 +316,13 @@ const PERSON_UPDATE_COLS = [
   'blue_card_expiry', 'consents', 'payment_status', 'accommodation_kind',
   'accommodation_label', 'registration_type', 'registration_cost', 'discount_code',
   'lifecycle', 'at_camp', 'updated_at',
+  // Pre-existing bug fix (unrelated to this change): these three columns were being
+  // written on insert but never updated on conflict, so edits to them silently never
+  // persisted on save/saveMany.
+  'elvanto_meta', 'medicare_number', 'church_unlisted_note',
+  // Ticket List / Invoice import fields (017).
+  'ticket_number', 'invoice_number', 'accommodation_kind_confidence', 'discount_amount',
+  'amount_paid', 'fees_amount', 'tax_amount', 'needs_review', 'needs_review_reason',
 ] as const;
 
 /** Delete + reinsert a person's history child rows (authoritative replace). */

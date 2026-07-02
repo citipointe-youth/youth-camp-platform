@@ -303,3 +303,80 @@ describe('ImportService.importCsv — Elvanto export shape', () => {
     expect(p.mobile).toBe('0499 259 222');
   });
 });
+
+describe('ImportService.importCsv — blank-cell guard on update (no clobbering)', () => {
+  let h: Awaited<ReturnType<typeof build>>;
+  beforeEach(async () => { h = await build(); });
+
+  it('a blank Gender cell on re-import preserves the existing gender (does not reset to "other")', async () => {
+    await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Gender,Grade\nAda,Lovelace,Victory,Female,9',
+    });
+    const res = await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,10', // no Gender column
+      updateExisting: true,
+    });
+    expect(res).toMatchObject({ created: 0, updated: 1 });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.gender).toBe('female'); // preserved, not reset to 'other'
+    expect(p.grade).toBe(10); // the field that WAS present still updates
+  });
+
+  it('a brand-new person with a blank Gender cell still defaults to "other"', async () => {
+    const res = await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Grade\nGrace,Hopper,Victory,8', // no Gender column
+    });
+    expect(res.created).toBe(1);
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.gender).toBe('other');
+  });
+
+  it('a non-blank Gender cell on re-import still overwrites as before', async () => {
+    await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Gender,Grade\nAda,Lovelace,Victory,Female,9',
+    });
+    const res = await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Gender,Grade\nAda,Lovelace,Victory,Male,10',
+      updateExisting: true,
+    });
+    expect(res).toMatchObject({ created: 0, updated: 1 });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.gender).toBe('male');
+  });
+
+  it('blank Mobile/Email/Suburb/State cells on re-import preserve existing values', async () => {
+    await h.svc.importCsv(actor('admin'), {
+      csvData:
+        'First Name,Last Name,Church,Mobile,Email Address,Suburb,State,Grade\n' +
+        'Ada,Lovelace,Victory,0400 111 111,ada@example.com,Newtown,QLD,9',
+    });
+    const res = await h.svc.importCsv(actor('admin'), {
+      // Same phone (so the same-name pool still resolves to this one person), but
+      // Email/Suburb/State columns are missing entirely from this re-upload.
+      csvData: 'First Name,Last Name,Church,Mobile,Grade\nAda,Lovelace,Victory,0400 111 111,11',
+      updateExisting: true,
+    });
+    expect(res).toMatchObject({ created: 0, updated: 1 });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.mobile).toBe('0400 111 111');
+    expect(p.email).toBe('ada@example.com');
+    expect(p.suburb).toBe('Newtown');
+    expect(p.state).toBe('QLD');
+    expect(p.grade).toBe(11);
+  });
+
+  it('a blank School Grade cell on re-import preserves the existing grade and kind', async () => {
+    await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Grade\nAda,Lovelace,Victory,9',
+    });
+    const res = await h.svc.importCsv(actor('admin'), {
+      csvData: 'First Name,Last Name,Church,Mobile\nAda,Lovelace,Victory,0400 555 555', // no Grade column
+      updateExisting: true,
+    });
+    expect(res).toMatchObject({ created: 0, updated: 1 });
+    const p = (await h.personRepo.findAll())[0]!;
+    expect(p.grade).toBe(9);
+    expect(p.kind).toBe('youth');
+    expect(p.mobile).toBe('0400 555 555'); // the field that WAS present still updates
+  });
+});

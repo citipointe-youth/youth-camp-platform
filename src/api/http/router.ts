@@ -16,6 +16,8 @@ import { makeAttendanceController } from '../controllers/attendance.controller';
 import { makeContentController } from '../controllers/content.controller';
 import { makeImportController } from '../controllers/import.controller';
 import { makeChurchImportController } from '../controllers/church-import.controller';
+import { makeTicketImportController } from '../controllers/ticket-import.controller';
+import { makeInvoiceImportController } from '../controllers/invoice-import.controller';
 import { makeAuditController } from '../controllers/audit.controller';
 import { makeExportController } from '../controllers/export.controller';
 import { makeAccountController } from '../controllers/account.controller';
@@ -37,6 +39,8 @@ export function buildRoutes(services: Services): (Route | BufferRoute)[] {
   const content = makeContentController({ content: services.content });
   const importCtrl = makeImportController({ importService: services.importService });
   const churchImportCtrl = makeChurchImportController({ churchImport: services.churchImport });
+  const ticketImportCtrl = makeTicketImportController({ ticketImport: services.ticketImport });
+  const invoiceImportCtrl = makeInvoiceImportController({ invoiceImport: services.invoiceImport });
   const auditCtrl = makeAuditController({ auditExport: services.auditExport, settingsRepo: services.settingsRepo });
   const exportCtrl = makeExportController({ exportService: services.exportService });
   const account = makeAccountController({ account: services.account });
@@ -154,6 +158,8 @@ export function buildRoutes(services: Services): (Route | BufferRoute)[] {
     // ----- Import -----
     { method: 'POST', path: '/import/csv', auth: true, handler: (r) => importCtrl.run(r) },
     { method: 'POST', path: '/import/churches', auth: true, handler: (r) => churchImportCtrl.run(r) },
+    { method: 'POST', path: '/import/tickets', auth: true, handler: (r) => ticketImportCtrl.run(r) },
+    { method: 'POST', path: '/import/invoices', auth: true, handler: (r) => invoiceImportCtrl.run(r) },
     { method: 'GET', path: '/export/registrants', auth: true, handler: (r) => exportCtrl.registrants(r) },
 
     // ----- Audit export (BufferRoute — xlsx and CSV downloads) -----
