@@ -2947,14 +2947,16 @@ function _detectImportType(headers){
   }
   return bestScore>=2?best:null;
 }
-// Read one file to CSV text. CSV is read directly; .xlsx is converted to CSV via the vendored
-// SheetJS parser (Phase B, _xlsxToCsv) so the rest of the pipeline is source-agnostic.
-function _readImportFile(file){
+// Read one file to CSV text. CSV is read directly; .xlsx/.xls is converted to CSV via the
+// vendored SheetJS parser (lazy-loaded on first use) so the rest of the pipeline is
+// source-agnostic — detection, dry-run, phantom churches and confirm all work unchanged.
+async function _readImportFile(file){
+  const isXlsx=/\.(xlsx|xls)$/i.test(file.name);
+  if(isXlsx)await _ensureXlsx();
   return new Promise((resolve,reject)=>{
-    const isXlsx=/\.x(lsx|ls)$/i.test(file.name);
     const r=new FileReader();
     r.onerror=()=>reject(new Error('Could not read '+file.name));
-    if(isXlsx&&typeof _xlsxToCsv==='function'){
+    if(isXlsx){
       r.onload=()=>{try{resolve({name:file.name,text:_xlsxToCsv(r.result)});}catch(e){reject(new Error(file.name+': '+(e.message||'could not read spreadsheet')));}};
       r.readAsArrayBuffer(file);
     }else{
@@ -2962,6 +2964,36 @@ function _readImportFile(file){
       r.readAsText(file);
     }
   });
+}
+// Lazy-load the vendored SheetJS build (~0.9MB) only when an Excel file is actually chosen, so it
+// never weighs on normal navigation. Same-origin, so CSP script-src 'self' allows it.
+let _xlsxLoading=null;
+function _ensureXlsx(){
+  if(window.XLSX)return Promise.resolve();
+  if(_xlsxLoading)return _xlsxLoading;
+  _xlsxLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='vendor/xlsx.full.min.js';
+    s.onload=()=>window.XLSX?resolve():reject(new Error('Excel reader failed to initialise'));
+    s.onerror=()=>{_xlsxLoading=null;reject(new Error('Could not load the Excel reader — try exporting as CSV instead.'));};
+    document.head.appendChild(s);
+  });
+  return _xlsxLoading;
+}
+// Convert an .xlsx ArrayBuffer to CSV text. When the workbook has multiple sheets, pick the one
+// whose header row matches a known import type (Form/Ticket/Invoice); otherwise use the first.
+function _xlsxToCsv(arrayBuffer){
+  const wb=XLSX.read(arrayBuffer,{type:'array'});
+  const names=wb.SheetNames||[];
+  if(!names.length)throw new Error('the workbook has no sheets');
+  let chosen=names[0];
+  for(const nm of names){
+    const ws=wb.Sheets[nm];if(!ws)continue;
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});
+    const head=((rows&&rows[0])||[]).map(h=>String(h==null?'':h).trim().toLowerCase());
+    if(_detectImportType(head)){chosen=nm;break;}
+  }
+  return XLSX.utils.sheet_to_csv(wb.Sheets[chosen]);
 }
 // Per-type "extra" warning line for the preview/result (orphans, guessed accommodation, unmatched).
 function _importExtraLine(type,r){
@@ -2975,13 +3007,13 @@ function _importExtraLine(type,r){
   }
   return null;
 }
-let _importAccept='.csv'; // Phase B (Excel) flips this to '.csv,.xlsx' once _xlsxToCsv is vendored
+const _importAccept='.csv,.xlsx,.xls'; // CSV read directly; Excel via lazy-loaded vendored SheetJS
 function _importUploadCardHtml(){
   return `<div class="card"><div class="h3" style="margin-top:0">Import registrations</div>
     <div id="impLastUploads" class="imp-stamps"></div>
     <input type="file" id="fileIn" accept="${_importAccept}" multiple class="fld">
     <button class="btn" onclick="adminUpload()">Upload &amp; import</button>
-    <p class="note-hint">Add your <b>Form</b>, <b>Ticket List</b> and/or <b>Invoice</b> export — one or all at once. Each file is detected automatically and imported in the right order. You can import just the Form now and add the others later.</p>
+    <p class="note-hint">Add your <b>Form</b>, <b>Ticket List</b> and/or <b>Invoice</b> export — one or all at once, <b>CSV or Excel</b>. Each file is detected automatically and imported in the right order. You can import just the Form now and add the others later.</p>
     <div id="impResult" class="card" style="margin-top:10px;display:none"></div></div>`;
 }
 // Per-source "last imported" lines, loaded after the upload card paints (from /settings stamps).
