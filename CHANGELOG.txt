@@ -1,6 +1,74 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-02 (late) — BUG-LIST FIXES + MULTI-FILE AUTO-DETECT IMPORT + EXCEL + SECURITY HEADERS
+---------------------------------------------------------------------------------------------
+A large admin-requested batch. Verified: SPA main-script `node --check` OK, npm run typecheck
+clean, npm run test = 392 pass (3 new audit-export regression tests). Migration 018 applied to
+prod. Deployed in three pushes (Phase A bugs+redesign, Phase B Excel, Phase E hardening).
+sw.js stepped camp-v9 -> v12.
+
+BUG LIST (admin, at-camp):
+  * Moved the church auto-create/override tooltip from the "Add a church" tile to the "Churches"
+    list tile (RENDER.adminAccounts).
+  * "Add a note" button on student profiles — camper detail (openCamper) and the admin
+    Individual Student Data Edit modal (stuEdit). Gated to actual campers (note.service rejects
+    non-arrived) + note-writing roles (canReadCamperNotes).
+  * First-aid Search / All-Students tap now opens the profile. Root cause: openStudentInfo/
+    openFirstAidLog hard-painted the 'search' screen, which paint()'s stale-guard drops when the
+    active screen is 'allstudents'. Now render into the active first-aid screen (_faScreen()) and
+    the Back button is origin-aware (_faBackExpr).
+  * Director at-camp home hides the Notices TILE (nav tab unchanged) — renderHomeAtCamp.
+  * Phone side-drag / vertical overscroll fixed: `.screen` pinned overflow-x:hidden +
+    overscroll-behavior:contain (a bare overflow-y:auto computes overflow-x to `auto`, letting
+    each screen pan sideways on any slight overflow); body overscroll-behavior:none. Inner
+    overflow-x:auto table wrappers and the desktop layout are untouched.
+  * Audit workbook 500 FIXED (was failing on EVERY export, never worked): the worksheet name
+    'Sign-in/Sign-out Log' contained an illegal '/', so ExcelJS threw on addWorksheet. Renamed
+    to 'Sign-in & Sign-out Log'. Regression test audit-export.service.test.ts added.
+  * Compliance filenames now carry camp year + export date: youth-camp-<year>-<base>-<date>
+    (_exportName in the SPA; audit workbook + sign-in/out log).
+  * Dedicated "First-Aid Records" workbook sheet (parsed Problem/Treatment/First-aider/Brought
+    by), EXCLUDED from "Notes & Testimonies" to avoid duplication.
+  * "Save Defaults" now records + shows when it last ran (settings.defaultsSavedAt, migration
+    018), on the Data screen's Save Defaults card AND as a status item on the close-out checklist.
+  * Laptop tooltip clamp: _clampTip now flips the bubble above the "?" when it would run off the
+    bottom of a short viewport (added .htip-pop.flip-up).
+  * Ticket-type "accommodation blank": parsing was proven correct against the real sample (no BOM;
+    "Classroom Accommodation"/"EARLY BIRD | Tent Accomodation" map correctly). It only blanked
+    when a Ticket List was imported before/without a matching Form (rows became needsReview
+    orphans). Fixed by the import redesign's auto-ordering + an explicit "import the Form first"
+    warning.
+
+MULTI-FILE AUTO-DETECT IMPORT (replaces the segmented Form/Ticket/Invoice selector):
+  * One upload field takes 1-3 exports at once. Each file's type is DETECTED from its column
+    headers (_detectImportType / _IMPORT_SIGNATURES), so a file can no longer be sent to the wrong
+    importer (the old footgun: a stale #fileIn kept across a manual source switch). Imported in
+    dependency order Form -> Ticket -> Invoice via ONE combined preview -> single confirm
+    (_renderImportPreview / _confirmImport). Unrecognised files are rejected with their columns
+    shown and a manual type/skip choice (_renderImportUnknown). No file is mandatory.
+  * Per-source "last imported" timestamps (settings.form/tickets/invoices_imported_at, migration
+    018) stamped in the import controllers (src/api/controllers/_import-stamp.ts, only on real
+    non-dry-run imports) and shown on the upload screen (_loadImportStamps).
+  * Post-import "Review N flagged records" deep-link into the Data tab's needs-review filter
+    (_goReviewData). Error lists now show up to 8 rows with a "+N more" count.
+
+EXCEL (.xlsx/.xls) IMPORT (Phase B):
+  * Vendored SheetJS (public/vendor/xlsx.full.min.js, ~0.9MB), LAZY-loaded only when an Excel
+    file is actually chosen (_ensureXlsx) so it never weighs on normal navigation. Same-origin,
+    so the existing CSP (script-src 'self') already permits it; the build uses no eval/Function.
+  * _readImportFile converts .xlsx/.xls to CSV text (_xlsxToCsv) before the unchanged detection/
+    dry-run/confirm pipeline. Multi-sheet workbooks: the sheet whose header row matches a known
+    type wins, else the first sheet. Verified end-to-end against the real sample data.
+  * NOTE: Connection Made Simple + its Connection Audit ALREADY support Excel via their own
+    dependency-free readXlsx (native DecompressionStream) at every upload point — verified
+    working on real CMS data; no CMS change was needed.
+
+SECURITY HARDENING (Phase E — header-only, zero user friction):
+  * express-adapter: disabled X-Powered-By; added HSTS (prod), Cross-Origin-Opener-Policy +
+    Cross-Origin-Resource-Policy 'same-origin', and Cache-Control: no-store on all API + export
+    responses (static assets stay cacheable). CSP meta gained frame-ancestors 'none'.
+
 2026-07-02 — HARDENING/PERF PORT FROM CMS: CSP meta tag + server-side dashboard cache
 --------------------------------------------------------------------------------------
 Two defence-in-depth/perf improvements ported from Connection Made Simple (SPA + backend,

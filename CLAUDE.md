@@ -296,6 +296,48 @@ additive changes — no matching/merge logic needed to change.
   `PERSON_UPDATE_COLS` (Supabase `on conflict do update set` list) was missing `elvanto_meta`/
   `medicare_number`/`church_unlisted_note`, so those three fields silently never updated on save.
 
+## Bug-list + import redesign + Excel + security headers — deployed 2026-07-02 (late)
+
+Large admin batch (SPA + backend + **migration 018**). `npm run typecheck` clean, `npm run test`
+= 275→**392 pass**, SPA `node --check` OK. sw.js `camp-v9`→`camp-v12`.
+
+- **Import UI REDESIGNED — SUPERSEDES the segmented-selector description in the multi-source
+  section above.** The manual Form/Ticket/Invoice `.seg` picker is **gone**. One upload field
+  (`_importUploadCardHtml`) takes **1–3 files at once**; each file's type is **auto-detected from
+  its column headers** (`_detectImportType`/`_IMPORT_SIGNATURES`), so a file can't be sent to the
+  wrong importer. Files run in dependency order **Form→Ticket→Invoice** in a single combined
+  preview→confirm (`adminUpload`→`_renderImportPreview`→`_confirmImport`). Unknown files are
+  rejected with their columns shown + a manual type/skip choice (`_renderImportUnknown`). No file
+  is mandatory. Per-source **last-imported** timestamps show on the screen (`_loadImportStamps`).
+  The three backend import endpoints/services are **unchanged**; the redesign is SPA-only plus a
+  controller-layer timestamp stamp (`src/api/controllers/_import-stamp.ts`).
+- **Excel (.xlsx/.xls) import:** vendored **SheetJS** at `public/vendor/xlsx.full.min.js`,
+  **lazy-loaded** on first Excel use (`_ensureXlsx`; same-origin so CSP `script-src 'self'`
+  allows it; no eval/Function). `_readImportFile` converts Excel→CSV (`_xlsxToCsv`, header-matched
+  sheet selection) then the CSV pipeline is unchanged. (CMS + its Connection Audit already have
+  Excel via their own dependency-free `readXlsx` — no CMS change was needed.)
+- **Migration 018** (`018_defaults_and_import_timestamps.sql`, applied to prod) — 4 nullable
+  `timestamptz` on `settings`: `defaults_saved_at` (bugs 6/10 — shown on the Data screen's Save
+  Defaults card + the close-out checklist; stamped in `admin.service.saveDefaults`) and
+  `form/tickets/invoices_imported_at` (the import last-upload lines). **`supabase.settings` writes
+  ALL settings columns on every save**, so this HAD to be applied before/with deploy.
+- **Audit workbook 500 FIXED** (`audit-export.service.ts`): worksheet name `'Sign-in/Sign-out Log'`
+  had an illegal `/` → ExcelJS threw on `addWorksheet`, so the download had **never** worked.
+  Renamed to `'Sign-in & Sign-out Log'`. Added a dedicated **First-Aid Records** sheet (parsed
+  4-line body; excluded from Notes & Testimonies). Regression test: `audit-export.service.test.ts`.
+- **Compliance filenames** now include camp year + export date (`_exportName`).
+- **First-aid Search/All-Students → profile fix:** `openStudentInfo`/`openFirstAidLog` now paint
+  the **active** first-aid screen (`_faScreen()`) instead of hard-coding `'search'` (which
+  `paint()`'s stale-guard dropped when on the `allstudents` screen); Back is origin-aware.
+- **Add-note button** on student profiles (`openCamper`, `stuEdit`), camper-only + note-writer-only.
+- **Director at-camp home** hides the Notices tile (nav unchanged). **Phone overscroll/side-drag**
+  fixed via `.screen{overflow-x:hidden;overscroll-behavior:contain}` + body `overscroll-behavior`.
+  **Church tooltip** moved to the Churches list tile. **Laptop tooltip** flips up near the bottom
+  edge (`_clampTip` + `.htip-pop.flip-up`).
+- **Security headers (zero user friction):** `express-adapter` disables `X-Powered-By`; adds HSTS
+  (prod), COOP+CORP `same-origin`, and `Cache-Control: no-store` on API/export responses (static
+  stays cacheable); CSP meta gained `frame-ancestors 'none'`.
+
 ## App icon + home-hero brand mark — updated 2026-07-02
 
 The Home Screen (PWA "Add to Home Screen") icon was a thin outlined triangle in an off-brand
