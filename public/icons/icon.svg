@@ -1,7 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#12233b"/>
-  <!-- tent silhouette in camp blue -->
-  <path d="M256 120 L408 392 H104 Z" fill="none" stroke="#2563eb" stroke-width="28" stroke-linejoin="round"/>
-  <path d="M256 120 L256 392" stroke="#3b82f6" stroke-width="24"/>
-  <circle cx="256" cy="300" r="20" fill="#f59e0b"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- tent: roof, door flap (mid-purple for depth), ground line, guy-lines -->
+  <path d="M256 146 L388 388 H124 Z" fill="#ffffff"/>
+  <path d="M256 192 L300 388 H212 Z" fill="#9333ea"/>
+  <rect x="112" y="380" width="288" height="12" rx="6" fill="#ffffff"/>
+  <path d="M186 280 L140 364" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M326 280 L372 364" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+  <!-- cross flag above the peak -->
+  <rect x="244" y="90" width="24" height="70" rx="8" fill="#ffffff"/>
+  <rect x="222" y="112" width="68" height="24" rx="8" fill="#ffffff"/>
 </svg>

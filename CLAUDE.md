@@ -296,6 +296,36 @@ additive changes — no matching/merge logic needed to change.
   `PERSON_UPDATE_COLS` (Supabase `on conflict do update set` list) was missing `elvanto_meta`/
   `medicare_number`/`church_unlisted_note`, so those three fields silently never updated on save.
 
+## App icon + home-hero brand mark — updated 2026-07-02
+
+The Home Screen (PWA "Add to Home Screen") icon was a thin outlined triangle in an off-brand
+navy/blue that didn't match the app's actual purple/violet palette and didn't read as a tent.
+Replaced via a brainstormed multi-option review (4 SVG concepts sent to the user for comparison
+at both full size and realistic 60/76px home-screen size before picking one).
+- **`public/icons/icon.svg`** — new design: the app's real header gradient (`#7c3aed`→`#1e1b4b`,
+  135deg, matching `.hero`/header exactly) on a rounded-square (`rx="96"`), with a proper white
+  A-frame tent (sloped roof, mid-purple `#9333ea` triangular door flap for depth, a ground line,
+  two guy-lines) and a simple white cross standing above the peak like a chapel-tent flag. Content
+  is kept within the maskable-icon safe zone (roughly a centered 80%-diameter circle) so it
+  survives OS circle/squircle cropping. `manifest.json` is unchanged (already `"sizes":"any"`,
+  `"purpose":"any maskable"`, SVG-only — no PNG generated yet).
+- **`public/sw.js` `CACHE` bumped `camp-v7`→`camp-v8`** — the service worker cache-firsts icons,
+  so without a version bump, anyone who already added the app to their home screen would keep
+  seeing the old icon indefinitely.
+- **Known gap, not yet fixed**: `apple-touch-icon` in `index.html` points straight at the SVG.
+  iOS Safari's "Add to Home Screen" generally needs a PNG there (SVG support for that specific
+  link tag is inconsistent) — likely part of why the icon looked wrong on a phone in the first
+  place. Rasterizing to PNG (180×180 apple-touch-icon, 192/512 for the manifest) is flagged for a
+  follow-up, not done as part of this change.
+- **`heroMark()` (NEW, `public/index.html`)** — a reduced-detail, 16%-opacity white version of the
+  same tent+cross mark (no background square, just the line art), absolutely positioned on the
+  right side of a `.hero` card. Added as the **first child** of both Home hero cards (pre-camp
+  `RENDER.home` and at-camp `renderHomeAtCamp`) so it paints behind the greeting text, matching
+  how `.hero`'s existing `:before`/`:after` decorative circles already behave (`.hero` already has
+  `position:relative;overflow:hidden`, so the mark clips cleanly like those do). Not used anywhere
+  else — if a fifth hero-style card gets added later (budget, devotional) and should also carry
+  the mark, call `heroMark()` there too rather than duplicating the SVG markup.
+
 ## Commands (run from this folder)
 
 ```bash

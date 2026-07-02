@@ -719,6 +719,22 @@ function icLg(n,cls){return ic(n,'ic-lg'+(cls?' '+cls:''));}
 function icXl(n,cls){return ic(n,'ic-xl'+(cls?' '+cls:''));}
 /* Consistent empty-state component (C4): 48px icon + message. */
 function emptyState(n,msg){return `<div class="emptyst">${icXl(n)}<div class="emptyst-msg">${esc(msg)}</div></div>`;}
+/* App-mark watermark (tent + cross, matches public/icons/icon.svg) for the right side of a
+   .hero card. Low-opacity white so it sits behind the card's text without competing for
+   contrast; .hero already has position:relative + overflow:hidden, so a right-bleeding mark
+   clips cleanly the same way the existing :before/:after decorative circles do. Emit this as
+   the FIRST child of .hero so normal-flow text paints on top of it. */
+function heroMark(){
+  return `<svg viewBox="0 0 512 512" style="position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:132px;height:132px;opacity:.16;pointer-events:none" aria-hidden="true">
+    <path d="M256 146 L388 388 H124 Z" fill="#fff"/>
+    <path d="M256 192 L300 388 H212 Z" fill="#fff" opacity=".6"/>
+    <rect x="112" y="380" width="288" height="12" rx="6" fill="#fff"/>
+    <path d="M186 280 L140 364" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <path d="M326 280 L372 364" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+    <rect x="244" y="90" width="24" height="70" rx="8" fill="#fff"/>
+    <rect x="222" y="112" width="68" height="24" rx="8" fill="#fff"/>
+  </svg>`;
+}
 const canReadNotes=()=>ACTOR&&['zoneLeader','director','admin'].includes(ACTOR.role);
 /* Notes ON AN INDIVIDUAL PROFILE: church may see notes for its OWN campers (no
    consolidated list — the Notes tab stays zone/director/admin via canReadNotes()).
@@ -1069,7 +1085,7 @@ RENDER.home=async function renderHome(){
     api('/notifications').catch(()=>[]),
   ]);
   const s=SETTINGS,isWide=['director','admin'].includes(ACTOR.role);
-  let body=`<div class="hero"><div class="k">${esc((s&&s.campName)||h.campName)}</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
+  let body=`<div class="hero">${heroMark()}<div class="k">${esc((s&&s.campName)||h.campName)}</div><h2>Hi ${esc(ACTOR.displayName)}</h2>
     <div class="cd"><div class="big">${h.daysToGo??'—'}</div><div class="meta">days to go<br>${esc(h.startDate||'')}${s&&s.endDate?' – '+esc(s.endDate):''}</div></div></div>`;
   // Bug-2: registrations split by who (Student/Leader) × where they sleep (Tent/Classroom).
   // Replaces the old Campers/Leaders/Ldr-blue-card band. Counts come from the already-loaded
@@ -1158,7 +1174,7 @@ async function renderHomeAtCamp(){
   const myDayHtml=ACTOR.role==='church'?renderMyDay(d):'';
   // Paint the home screen immediately with tiles + notices — don't block on the pulse.
   // The pulse placeholder is replaced in the background once the check-in status loads.
-  const html=`<div class="hero"><div class="k">${esc(SETTINGS?.campName||'Youth Camp')} · Live</div>
+  const html=`<div class="hero">${heroMark()}<div class="k">${esc(SETTINGS?.campName||'Youth Camp')} · Live</div>
     <h2>Hi ${esc(d.greetingName||ACTOR.displayName)}</h2>
     <div style="color:#cfe0ff;font-size:.82rem">${ACTOR.role==='admin'?'Back office':ACTOR.role==='director'?'Director':ACTOR.role==='zoneLeader'?(esc(ACTOR.zone)+' Zone Leader'):'Church · '+esc(ACTOR.zone)+' Zone'}</div></div>
   ${myDayHtml}
