@@ -1,6 +1,20 @@
 YOUTH CAMP PLATFORM — CHANGELOG
 ================================
 
+2026-07-03 — SECURITY: LOGIN USER-ENUMERATION HARDENING
+-------------------------------------------------------
+Independent review (round 2, beyond the Phase E headers) found the auth stack strong — HMAC-signed
+stateless sessions with timing-safe verification + assertSessionSecret fail-fast, scrypt+salt+
+timing-safe passwords, Zod validation, parameterized SQL, no error/stack leakage. One real,
+exploitable gap remained:
+  * LOGIN ENUMERATION ORACLE — an unknown username returned immediately (no scrypt) while a known
+    one ran the ~expensive scrypt, and a passwordless account returned a distinct "no password
+    set" message. Since the login limiter is keyed per ip+USERNAME, an attacker could time-/message-
+    probe which usernames exist. Fixed in auth.service.login: a missing / inactive / passwordless
+    account now runs an equal-cost dummy scrypt (DUMMY_PASSWORD_HASH) and returns the same
+    "Invalid credentials" as a wrong password — no timing or message difference. 3 tests added
+    (395 pass). Backend-only; no user-visible change.
+
 2026-07-03 — FIRST-AID RECORDS EXPORT
 -------------------------------------
   * The first-aid Records page (RENDER.records) gained an "Export" button that downloads the

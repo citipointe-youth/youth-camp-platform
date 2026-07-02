@@ -53,6 +53,27 @@ describe('AuthService.login', () => {
     await repo.init();
   });
 
+  // User-enumeration hardening: a wrong username, an inactive account and a passwordless account
+  // must all fail identically to a wrong password ("Invalid credentials"), so neither the message
+  // nor (via the equal-cost dummy scrypt) the timing reveals whether a username exists.
+  it('unknown username fails with the same "Invalid credentials" as a wrong password', async () => {
+    await seedUser(repo);
+    const svc = makeAuthService(repo);
+    await expect(svc.login({ username: 'nope', password: 'demo1234' })).rejects.toThrow(/Invalid credentials/);
+  });
+
+  it('inactive account fails with "Invalid credentials" (no distinct message)', async () => {
+    await seedUser(repo, { username: 'off', status: 'inactive' });
+    const svc = makeAuthService(repo);
+    await expect(svc.login({ username: 'off', password: 'demo1234' })).rejects.toThrow(/Invalid credentials/);
+  });
+
+  it('passwordless account fails with "Invalid credentials" (not a distinct "no password set")', async () => {
+    await seedUser(repo, { username: 'nopw', passwordHash: null as unknown as string });
+    const svc = makeAuthService(repo);
+    await expect(svc.login({ username: 'nopw', password: 'anything' })).rejects.toThrow(/Invalid credentials/);
+  });
+
   it('issues a signed stateless token for valid credentials and never returns the password hash', async () => {
     await seedUser(repo);
     const svc = makeAuthService(repo);

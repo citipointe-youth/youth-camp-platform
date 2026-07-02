@@ -9,6 +9,12 @@ import type { LoginInput } from '../core/validation/auth.schema';
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
+// A well-formed but unmatchable scrypt hash (salt:key). Used to run an equal-cost password
+// verification when the account doesn't exist / has no password, so login response time and
+// error message don't reveal whether a username is real (user-enumeration backstop — the login
+// limiter is keyed per ip+username, so an attacker CAN probe many usernames otherwise).
+const DUMMY_PASSWORD_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`;
+
 // Stateless HMAC-signed sessions (replaces the old in-memory token Map, which was
 // fatal on serverless / multi-instance hosting: each cold start began with an empty
 // Map, logging every user out, and a token minted on instance A was unknown to
@@ -97,8 +103,12 @@ export function makeAuthService(users: IUserRepository, settings?: ISettingsRepo
 
       const { username, password } = parsed.data as LoginInput;
       const user = await users.findByUsername(username);
-      if (!user || user.status !== 'active') throw new UnauthorizedError('Invalid credentials');
-      if (!user.passwordHash) throw new UnauthorizedError('Account has no password set');
+      if (!user || user.status !== 'active' || !user.passwordHash) {
+        // Equal-cost dummy verify so a missing / inactive / passwordless account can't be told
+        // apart — by timing OR message — from a wrong password (user-enumeration backstop).
+        await verifyPassword(password, DUMMY_PASSWORD_HASH);
+        throw new UnauthorizedError('Invalid credentials');
+      }
 
       const valid = await verifyPassword(password, user.passwordHash);
       if (!valid) throw new UnauthorizedError('Invalid credentials');
