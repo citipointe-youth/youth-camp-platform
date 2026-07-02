@@ -112,7 +112,7 @@ export function makeTicketImportService(
             continue;
           }
 
-          const eventOccurrenceRaw = field(row, 'Event Occurrence', 'Occurrence', 'Event');
+          const eventOccurrenceRaw = field(row, 'Event Occurrence information', 'Event Occurrence', 'Occurrence', 'Event');
           if (eventOccurrenceRaw) occurrencesSeen.add(eventOccurrenceRaw);
           if (
             opts.eventOccurrence &&
@@ -123,6 +123,20 @@ export function makeTicketImportService(
               message:
                 `Row occurrence "${eventOccurrenceRaw || '(blank)'}" does not match filter ` +
                 `"${opts.eventOccurrence}" — skipped`,
+            });
+            skipped++;
+            continue;
+          }
+
+          // A cancelled/refunded ticket must never be treated as confirmed accommodation truth —
+          // "Active" is the only value observed in a real export; anything else explicitly not
+          // active is skipped so it can't silently overwrite a good value. Blank/unrecognized
+          // (e.g. a differently-worded export) passes through unfiltered rather than blocking.
+          const ticketStatusRaw = field(row, 'Ticket Status');
+          if (ticketStatusRaw && ticketStatusRaw.trim().toLowerCase() !== 'active') {
+            warnings.push({
+              row: rowNum,
+              message: `Ticket Status "${ticketStatusRaw}" is not Active — row skipped`,
             });
             skipped++;
             continue;
@@ -141,7 +155,7 @@ export function makeTicketImportService(
             });
           }
           const phoneRaw = field(row, 'Phone', 'Phone Number', 'Mobile', 'Mobile Number');
-          const paymentStatusRaw = field(row, 'Payment Status', 'paymentStatus', 'Status');
+          const paymentStatusRaw = field(row, 'Invoice Payment Status', 'Payment Status', 'paymentStatus', 'Status');
           const parsedPaymentStatus = paymentStatusRaw ? mapPaymentStatus(paymentStatusRaw) : null;
           if (paymentStatusRaw && parsedPaymentStatus === null) {
             warnings.push({

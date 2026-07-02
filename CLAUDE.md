@@ -233,9 +233,21 @@ clean, `npm run test` = 275 pass.
 ## Multi-source CSV import (Form / Ticket List / Invoice) — deployed 2026-07-02
 
 Elvanto now exports three separate CSVs instead of one manually-merged file. Full design at
-`docs/superpowers/specs/2026-07-02-multi-source-import-design.md`. **Real column headers for
-Ticket List / Invoice are unconfirmed** — every header alias below is a best guess pending a real
-test import; the multi-alias `field(row, ...)` pattern makes correcting them a low-risk follow-up.
+`docs/superpowers/specs/2026-07-02-multi-source-import-design.md`. **Column headers were
+corrected against a real sample** (`Sample Data New/` sibling folder, 2026-07-02) after initial
+implementation — real Ticket List headers are `Event Occurrence information` (not `Event
+Occurrence`) and `Invoice Payment Status` (not `Payment Status`); real Invoice/Billing Contacts
+headers are plain `First Name`/`Last Name` (not `Billing First Name`), `Fees Paid` (not `Fees`),
+`Total Tax` (not `Tax`). Ticket List also has a `Ticket Status` column not anticipated at design
+time — a ticket whose status isn't `Active` (case-insensitive) is now skipped with a warning
+rather than treated as confirmed accommodation truth (e.g. a cancelled/refunded ticket). All of
+this is covered by `src/services/multi-source-import.integration.test.ts`, which runs the actual
+three real sample files end-to-end through all three importers in sequence and asserts the final
+state — including that the Invoice file's billing contact is often a **parent**, not the
+registrant (e.g. an invoice billed to "Jacqueline Hales" covering attendee "Gizelle Hales"),
+which is exactly why invoice-number matching is tier 1 and billing-name matching is only a
+fallback. The multi-alias `field(row, ...)` pattern made all of these corrections low-risk,
+additive changes — no matching/merge logic needed to change.
 
 - **Three backend services, one shared core.** `src/services/import.service.ts` (existing, Form —
   `POST /import/csv`, unchanged behaviour except the blank-clobber fix below) stays the

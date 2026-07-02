@@ -142,13 +142,25 @@ exceptional state).
 
 ## Known open risks (flagged for the user's real-sample follow-up)
 
-1. **Invoice export may have no name field at all** — the tiered fallback (invoice-number
-   cross-reference, then billing-name) degrades gracefully if the name tier doesn't exist, but an
-   Invoice-only import before any Ticket List data exists for that invoice number would have
-   nothing to match against and everything lands in `unmatchedInvoices`.
-2. Ticket-type strings (`Tent`/`Classroom`), payment-status strings (`Paid`/`Partial`/`Pending`),
-   and all column header names are **assumed**, not sampled — corrected once real exports arrive.
+1. ~~**Invoice export may have no name field at all**~~ — **RESOLVED 2026-07-02.** The real
+   export does have a name field (plain `First Name`/`Last Name`), but it's the **billing
+   contact**, frequently a parent rather than the registrant (e.g. an invoice for "Jacqueline
+   Hales" covers attendee "Gizelle Hales") — confirming the tiered design was the right call:
+   `invoiceNumber` cross-reference is tier 1 and is what actually resolves real invoices;
+   billing-name matching (tier 2) is a fallback and always emits a "verify" warning. See
+   `src/services/multi-source-import.integration.test.ts`.
+2. ~~Ticket-type strings, payment-status strings, and all column header names are assumed~~ —
+   **RESOLVED 2026-07-02** against a real sample (see `CLAUDE.md`'s dated batch note for the
+   exact corrected headers). One thing the original design didn't anticipate: Ticket List has a
+   `Ticket Status` column — a non-`Active` ticket (cancelled/refunded) is now skipped rather than
+   treated as confirmed accommodation truth.
 3. Orphans created by Ticket List have no church; the SPA needs to render that gracefully
    ("Unassigned" rather than a blank cell).
 4. No bulk "mark all reviewed" action — one-at-a-time only, acceptable for now given manual merge
    is already out of scope.
+5. **Still unverified**: `Invoice Status` (e.g. `Paid`) is deliberately NOT filtered on for the
+   Invoice import, unlike Ticket List's `Ticket Status` — there's no equally clear "only this one
+   value is valid" signal (unlike tickets, invoices legitimately have several valid non-final
+   states like `Unpaid`/`Overdue`/`Partial` that should still be imported), so filtering was
+   judged more likely to wrongly drop real financial data than to help. Revisit if a real
+   `Cancelled`/`Void`/`Draft` invoice is ever seen importing incorrectly.

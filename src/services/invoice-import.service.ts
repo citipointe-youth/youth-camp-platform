@@ -170,15 +170,20 @@ export function makeInvoiceImportService(personRepo: IPersonRepository): Invoice
 
         try {
           const invoiceNumber = field(row, 'Invoice Number', 'Invoice #', 'Invoice ID', 'invoiceNumber') || null;
-          const billingFirst = field(row, 'Billing First Name', 'Payer First Name') || '';
-          const billingLast = field(row, 'Billing Last Name', 'Payer Last Name') || '';
-          const billingPhone = field(row, 'Billing Phone', 'Payer Phone', 'Phone', 'Mobile Number') || null;
+          // Real Billing Contacts export (2026-07-02 sample) uses plain "First Name"/"Last Name"
+          // for the billing contact — NOT a "Billing "/"Payer " prefix as first guessed. Note this
+          // is very often a PARENT, not the registrant (e.g. invoice billed to "Jacqueline Hales"
+          // for attendee "Gizelle Hales") — that's exactly why invoice-number matching is tier 1
+          // and this name is only a fallback (see the "billing-contact name only" warning below).
+          const billingFirst = field(row, 'First Name', 'Billing First Name', 'Payer First Name') || '';
+          const billingLast = field(row, 'Last Name', 'Billing Last Name', 'Payer Last Name') || '';
+          const billingPhone = field(row, 'Phone', 'Billing Phone', 'Payer Phone', 'Mobile Number') || null;
 
           const ticketTotalRaw = field(row, 'Ticket Total', 'Tickets Total', 'registrationCost') || '';
           const discountTotalRaw = field(row, 'Discount Total', 'Discount Amount') || '';
           const amountPaidRaw = field(row, 'Amount Paid', 'Paid Amount', 'Total Paid') || '';
-          const feesRaw = field(row, 'Fees', 'Processing Fee', 'Fees Total') || '';
-          const taxRaw = field(row, 'Tax', 'GST', 'Tax Total') || '';
+          const feesRaw = field(row, 'Fees Paid', 'Fees', 'Processing Fee', 'Fees Total') || '';
+          const taxRaw = field(row, 'Total Tax', 'Tax', 'GST', 'Tax Total') || '';
           const discountCode = field(row, 'Discount Code', 'Code', 'Coupon Code') || null;
 
           const ticketTotal = parseMoney(ticketTotalRaw);
