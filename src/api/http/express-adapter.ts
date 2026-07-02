@@ -26,6 +26,7 @@ function loginKeyOf(req: Request): string {
 export function createApp(routes: (Route | BufferRoute)[], authService: AuthService): Express {
   const app = express();
   app.set('trust proxy', true); // honour X-Forwarded-For behind a reverse proxy
+  app.disable('x-powered-by');  // don't advertise the framework (minor info-leak reduction)
 
   const allowWildcard = env.CORS_ORIGINS.includes('*');
   if (allowWildcard && env.NODE_ENV === 'production') {
@@ -46,6 +47,16 @@ export function createApp(routes: (Route | BufferRoute)[], authService: AuthServ
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    // Cross-origin isolation: this is a standalone same-origin PWA (no cross-origin popups or
+    // embedders), so these are zero-friction hardening — they stop other sites opener-linking or
+    // hot-linking our resources. Google Fonts are unaffected (CORP governs OUR responses).
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    // HSTS: enforce HTTPS for a long window. Prod-only (localhost dev is plain HTTP); browsers
+    // ignore it over HTTP anyway, but gating on NODE_ENV keeps the header honest.
+    if (env.NODE_ENV === 'production') {
+      res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    }
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
@@ -71,6 +82,9 @@ export function createApp(routes: (Route | BufferRoute)[], authService: AuthServ
 
     app[method](expressPath, async (req: Request, res: Response) => {
       const isLogin = route.method === 'POST' && route.path === '/auth/login';
+      // API + export responses can carry personal/medical data — never let a browser or proxy
+      // cache them. Static assets are served by express.static above and stay cacheable.
+      res.setHeader('Cache-Control', 'no-store');
       try {
         // Throttle FAILED login attempts per IP+username (brute-force backstop).
         if (isLogin) {
